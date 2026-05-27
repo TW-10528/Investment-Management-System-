@@ -1,0 +1,183 @@
+.capital-calls {
+  animation: fadeIn 0.3s ease-in;
+}
+
+.calls-header {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.calls-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: #333;
+}
+
+.subtitle {
+  margin: 0.5rem 0 0 0;
+  color: #999;
+  font-size: 0.95rem;
+}
+
+.filter-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.filter-section label {
+  display: block;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 0.5rem 1rem;
+  border: 2px solid #ddd;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  color: #666;
+}
+
+.filter-btn:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.filter-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: #667eea;
+}
+
+.error-message {
+  background: #fff5f5;
+  color: #ff6b6b;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.empty-state {
+  background: white;
+  padding: 3rem;
+  border-radius: 12px;
+  text-align: center;
+  color: #999;
+}
+
+.calls-table-container {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.calls-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.calls-table thead {
+  background: #f8f9fa;
+  border-bottom: 2px solid #ddd;
+}
+
+.calls-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.calls-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.calls-table tbody tr:hover {
+  background: #fafbfc;
+}
+
+.calls-table .font-bold {
+  font-weight: 600;
+}
+
+.calls-table .mono {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  color: #999;
+}
+
+.calls-table .text-right {
+  text-align: right;
+  font-weight: 500;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-badge.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.approved {
+  background: #cfe2ff;
+  color: #084298;
+}
+
+.status-badge.paid {
+  background: #d1e7dd;
+  color: #0f5132;
+}
+
+.status-badge.cancelled {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.loading {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  text-align: center;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+@media (max-width: 768px) {
+  .calls-table {
+    font-size: 0.85rem;
+  }
+
+  .calls-table th,
+  .calls-table td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .calls-table-container {
+    overflow-x: auto;
+  }
+}

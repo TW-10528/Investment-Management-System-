@@ -1,0 +1,245 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button { font-family: inherit; }
+
+/* ── Light/Dark CSS custom properties ─────────────────────────────────────── */
+:root {
+  color-scheme: light;
+  --color-bg:           #f1f5f9;   /* slate-100  */
+  --color-card:         #ffffff;
+  --color-card-border:  #e2e8f0;   /* slate-200 */
+  --color-header-bg:    #f8fafc;   /* slate-50 */
+  --color-row-hover:    #f8fafc;
+  --color-divider:      #e2e8f0;   /* slate-200 */
+  --color-text:         #0f172a;   /* slate-900 */
+  --color-text-muted:   #64748b;   /* slate-500 */
+  --color-text-sub:     #94a3b8;   /* slate-400 */
+  --color-input-bg:     #ffffff;
+  --color-input-border: #cbd5e1;   /* slate-300 */
+  --color-input-text:   #0f172a;
+  --color-select-bg:    #ffffff;
+  --shadow-card:        0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+  --shadow-card-hover:  0 4px 16px rgba(0,0,0,0.1), 0 1px 4px rgba(0,0,0,0.06);
+}
+
+html.dark {
+  color-scheme: dark;
+  --color-bg:           #0d1117;   /* near black */
+  --color-card:         #161b22;   /* GitHub dark */
+  --color-card-border:  #21262d;
+  --color-header-bg:    #161b22;
+  --color-row-hover:    #1c2128;
+  --color-divider:      #21262d;
+  --color-text:         #e6edf3;   /* near white */
+  --color-text-muted:   #7d8590;
+  --color-text-sub:     #484f58;
+  --color-input-bg:     #0d1117;
+  --color-input-border: #30363d;
+  --color-input-text:   #e6edf3;
+  --color-select-bg:    #161b22;
+  --shadow-card:        0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
+  --shadow-card-hover:  0 4px 20px rgba(0,0,0,0.4);
+}
+
+/* ── Global element defaults ───────────────────────────────────────────────── */
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  transition: background-color 0.25s, color 0.25s;
+}
+
+/* ── Reusable semantic utility classes ─────────────────────────────────────── */
+@layer components {
+
+  /* Page & card backgrounds */
+  .theme-page  { background-color: var(--color-bg); }
+  .theme-card  {
+    background-color: var(--color-card);
+    border-color: var(--color-card-border);
+  }
+
+  /* Text */
+  .theme-text       { color: var(--color-text); }
+  .theme-text-muted { color: var(--color-text-muted); }
+  .theme-text-sub   { color: var(--color-text-sub); }
+
+  /* Table */
+  .theme-table-head { background-color: var(--color-header-bg); }
+  .theme-row-hover:hover { background-color: var(--color-row-hover); }
+  .theme-divider    { border-color: var(--color-divider); }
+
+  /* Inputs */
+  .theme-input {
+    background-color: var(--color-input-bg);
+    border-color: var(--color-input-border);
+    color: var(--color-input-text);
+  }
+  .theme-input:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+  }
+
+  /* Premium card with shadow + hover */
+  .pro-card {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-card-border);
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .pro-card:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  /* Gradient stat cards */
+  .stat-indigo  { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
+  .stat-blue    { background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%); }
+  .stat-emerald { background: linear-gradient(135deg, #059669 0%, #0891b2 100%); }
+  .stat-amber   { background: linear-gradient(135deg, #d97706 0%, #ea580c 100%); }
+  .stat-violet  { background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%); }
+  .stat-slate   { background: linear-gradient(135deg, #475569 0%, #334155 100%); }
+
+  /* Gradient text */
+  .gradient-text-indigo {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .gradient-text-emerald {
+    background: linear-gradient(135deg, #10b981, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glass effect */
+  .glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  /* Role badges */
+  .role-admin   { @apply bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300; }
+  .role-finance { @apply bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300; }
+  .role-board   { @apply bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300; }
+  .role-user    { @apply bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300; }
+
+  /* Status dots */
+  .status-active   { @apply text-emerald-500; }
+  .status-pending  { @apply text-amber-500; }
+  .status-inactive { @apply text-slate-400; }
+
+  /* Pill button */
+  .pill-btn {
+    @apply px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 border;
+  }
+
+  /* Nav item active glow */
+  .nav-active-glow {
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.3), inset 0 0 0 1px rgba(99, 102, 241, 0.4);
+  }
+}
+
+/* ── Animations ─────────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0); }
+}
+
+.animate-fade-in  { animation: fadeIn  0.22s ease-out both; }
+.animate-slide-in { animation: slideIn 0.18s ease-out both; }
+.animate-slide-up { animation: slideUp 0.25s ease-out both; }
+.animate-pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-card-border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-muted);
+}
+
+/* ── Focus ring ─────────────────────────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Table improvements ─────────────────────────────────────────────────────── */
+.data-table th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  color: var(--color-text-muted);
+  background: var(--color-header-bg);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.data-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-text);
+}
+
+.data-table tr:last-child td { border-bottom: none; }
+
+/* ── Progress bar with gradient ─────────────────────────────────────────────── */
+.progress-track {
+  height: 6px;
+  background: var(--color-card-border);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progress-fill-indigo {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-fill-amber {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #f59e0b, #f97316);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}

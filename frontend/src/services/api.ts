@@ -1,0 +1,144 @@
+import axios from 'axios';
+import type { AxiosInstance } from 'axios';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+
+const api: AxiosInstance = axios.create({
+  baseURL: API_BASE,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    // Only auto-redirect on 401 when NOT already on an auth page.
+    // Redirecting while on /login would silently reload the page and swallow error messages.
+    const onAuthPage = ['/login', '/signup', '/forgot-password'].some(p =>
+      window.location.pathname.startsWith(p)
+    );
+    if (err.response?.status === 401 && !onAuthPage) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+export const authAPI = {
+  login:  (email: string, password: string) =>
+    api.post('/auth/login', new URLSearchParams({ username: email, password }), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }),
+  signup: (data: { full_name: string; email: string; password: string; role?: string }) =>
+    api.post('/auth/signup', data),
+  me:     () => api.get('/auth/me'),
+};
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+export const dashboardAPI = {
+  summary: () => api.get('/dashboard/summary'),
+};
+
+// ── Funds ────────────────────────────────────────────────────────────────────
+export const fundsAPI = {
+  list:    ()            => api.get('/funds/'),
+  get:     (id: string)  => api.get(`/funds/${id}`),
+  ledger:  (id: string)  => api.get(`/funds/${id}/ledger`),
+  create:  (data: any)   => api.post('/funds/', data),
+  update:  (id: string, data: any) => api.put(`/funds/${id}`, data),
+  deactivate: (id: string) => api.delete(`/funds/${id}`),
+};
+
+// ── Capital Calls ─────────────────────────────────────────────────────────────
+export const capitalCallsAPI = {
+  list:     (fundId?: string, status?: string) => {
+    const p = new URLSearchParams();
+    if (fundId) p.append('fund_id', fundId);
+    if (status) p.append('status', status);
+    return api.get(`/capital-calls/?${p}`);
+  },
+  get:      (id: string)  => api.get(`/capital-calls/${id}`),
+  create:   (data: any)   => api.post('/capital-calls/', data),
+  approve:  (id: string)  => api.patch(`/capital-calls/${id}/approve`),
+  markPaid: (id: string, data?: any) => api.patch(`/capital-calls/${id}/mark-paid`, data),
+};
+
+// ── Distributions ─────────────────────────────────────────────────────────────
+export const distributionsAPI = {
+  list:   (fundId?: string) => {
+    const p = fundId ? `?fund_id=${fundId}` : '';
+    return api.get(`/distributions/${p}`);
+  },
+  create: (data: any)   => api.post('/distributions/', data),
+  delete: (id: string)  => api.delete(`/distributions/${id}`),
+};
+
+// ── FX Rates ─────────────────────────────────────────────────────────────────
+export const fxRatesAPI = {
+  list:    ()              => api.get('/fx-rates/'),
+  latest:  ()              => api.get('/fx-rates/latest'),
+  live:    ()              => api.get('/fx-rates/live'),
+  history: (days?: number) => api.get(`/fx-rates/history${days ? `?days=${days}` : ''}`),
+  create:  (data: any)     => api.post('/fx-rates/', data),
+};
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+export const usersAPI = {
+  list:         ()                      => api.get('/users/'),
+  pendingCount: ()                      => api.get('/users/pending-count'),
+  create:       (data: any)             => api.post('/users/', data),
+  approve:      (id: string, role?: string) => api.post(`/users/${id}/approve`, null, {
+    params: role ? { role } : {},
+  }),
+  reject:       (id: string)            => api.post(`/users/${id}/reject`),
+  update:       (id: string, data: any) => api.put(`/users/${id}`, data),
+  deactivate:   (id: string)            => api.delete(`/users/${id}`),
+};
+
+// ── Auth extras ───────────────────────────────────────────────────────────────
+export const authExtAPI = {
+  forgotPassword:  (email: string)                       => api.post('/auth/forgot-password', { email }),
+  verifyOtp:       (email: string, otp: string)          => api.post('/auth/verify-otp',      { email, otp }),
+  resetPassword:   (email: string, otp: string, new_password: string) =>
+                     api.post('/auth/reset-password', { email, otp, new_password }),
+};
+
+// ── Notices (PDF upload & processing) ────────────────────────────────────────
+export const noticesAPI = {
+  list:            (params?: { notice_type?: string; status?: string; fund_id?: string }) => {
+    const p = new URLSearchParams();
+    if (params?.notice_type) p.append('notice_type', params.notice_type);
+    if (params?.status)      p.append('status',      params.status);
+    if (params?.fund_id)     p.append('fund_id',     params.fund_id);
+    return api.get(`/notices/?${p}`);
+  },
+  pendingCount:    ()                        => api.get('/notices/pending-count'),
+  get:             (id: string)              => api.get(`/notices/${id}`),
+  upload:          (formData: FormData)      =>
+    api.post('/notices/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  approve:         (id: string, fund_id?: string, notes?: string) =>
+    api.post(`/notices/${id}/approve`, null, {
+      params: { ...(fund_id ? { fund_id } : {}), ...(notes ? { admin_notes: notes } : {}) },
+    }),
+  reject:          (id: string, notes?: string) =>
+    api.post(`/notices/${id}/reject`, null, {
+      params: notes ? { admin_notes: notes } : {},
+    }),
+  updateExtracted: (id: string, data: Record<string, unknown>) =>
+    api.put(`/notices/${id}/extracted`, data),
+  recentInvestments: (limit?: number) =>
+    api.get('/notices/investments/recent', { params: limit ? { limit } : {} }),
+  allInvestments: (params?: { fund_id?: string; sector?: string; geography?: string }) =>
+    api.get('/notices/investments/all', { params }),
+  latestNav:       () => api.get('/notices/nav/latest'),
+};
+
+export default api;
