@@ -6,12 +6,10 @@ import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import FundManagement from './pages/FundManagement';
 import FundDetail from './pages/FundDetail';
-import CapitalCalls from './pages/CapitalCalls';
-import Distributions from './pages/Distributions';
 import FxRates from './pages/FxRates';
 import Users from './pages/Users';
 import Notices from './pages/Notices';
-import Investments from './pages/Investments';
+import Calculator from './pages/Calculator';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('authToken');
@@ -43,13 +41,11 @@ export default function App() {
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="funds" element={<FundManagement />} />
-          <Route path="funds/:id" element={<FundDetail />} />
-          <Route path="capital-calls" element={<CapitalCalls />} />
-          <Route path="distributions" element={<Distributions />} />
-          <Route path="fx-rates" element={<FxRates />} />
-          <Route path="notices"      element={<Notices />} />
-          <Route path="investments"  element={<Investments />} />
+          <Route path="funds"      element={<FundManagement />} />
+          <Route path="funds/:id"  element={<FundDetail />} />
+          <Route path="fx-rates"   element={<FxRates />} />
+          <Route path="notices"    element={<Notices />} />
+          <Route path="calculator" element={<Calculator />} />
 
           {/* Admin-only */}
           <Route

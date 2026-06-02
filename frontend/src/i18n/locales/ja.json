@@ -7,9 +7,20 @@
     "distributions": "分配",
     "fxRates": "為替レート",
     "investments": "投資先",
+    "calculator": "計算ツール",
     "users": "ユーザー管理",
     "signOut": "サインアウト",
     "viewOnly": "閲覧のみ"
+  },
+  "calculator": {
+    "title": "高度な財務計算ツール",
+    "subtitle": "IRR · DPI/TVPI · ライブ為替換算 · ネット出資額 · フィー＆キャリー試算",
+    "irrTab": "IRR / NPV",
+    "fxTab": "為替換算",
+    "multiplesTab": "DPI / TVPI",
+    "netCallTab": "ネット出資額",
+    "feeTab": "フィー＆キャリー",
+    "availableAll": "全ユーザー利用可"
   },
   "dashboard": {
     "title": "ポートフォリオ ダッシュボード",

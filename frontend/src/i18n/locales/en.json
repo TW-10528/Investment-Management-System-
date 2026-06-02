@@ -7,9 +7,21 @@
     "distributions": "Distributions",
     "fxRates": "FX Rates",
     "investments": "Investments",
+    "calculator": "Calculators",
+    "rulesEngine": "Rules Engine",
     "users": "Users",
     "signOut": "Sign out",
     "viewOnly": "View only"
+  },
+  "calculator": {
+    "title": "Advanced Financial Calculators",
+    "subtitle": "IRR · DPI/TVPI · Live FX Converter · Net Call · Fee & Carry modelling",
+    "irrTab": "IRR / NPV",
+    "fxTab": "FX Converter",
+    "multiplesTab": "DPI / TVPI",
+    "netCallTab": "Net Call",
+    "feeTab": "Fee & Carry",
+    "availableAll": "Available to all users"
   },
   "dashboard": {
     "title": "Portfolio Dashboard",

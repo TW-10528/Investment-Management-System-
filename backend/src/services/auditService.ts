@@ -11,7 +11,7 @@ export async function logAction(
 ): Promise<void> {
   try {
     await prisma.auditLog.create({
-      data: { action, tableName, userEmail, userId, recordId, oldValues, newValues },
+      data: { action, tableName, userEmail, userId, recordId, oldValues: oldValues as any, newValues: newValues as any },
     })
   } catch {
     // Never crash on audit failure

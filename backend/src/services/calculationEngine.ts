@@ -173,6 +173,7 @@ export class CalculationEngine {
         unfunded_usd:       c,
         investment_capacity: c,
         net_cash_position:  0,
+        is_active:          fund.isActive,
         dpi:                0,
       }
     }
@@ -196,6 +197,7 @@ export class CalculationEngine {
       investment_capacity: f(snapshot.investmentCapacity),
       net_cash_position:   f(snapshot.netCashPosition),
       dpi:                 f(snapshot.dpi),
+      is_active:           fund.isActive,
     }
   }
 }

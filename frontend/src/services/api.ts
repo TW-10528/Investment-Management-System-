@@ -1,7 +1,8 @@
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+// Use Vite proxy (/api → localhost:8001) in dev; absolute URL in production
+const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE,
@@ -49,12 +50,28 @@ export const dashboardAPI = {
 
 // ── Funds ────────────────────────────────────────────────────────────────────
 export const fundsAPI = {
-  list:    ()            => api.get('/funds/'),
-  get:     (id: string)  => api.get(`/funds/${id}`),
-  ledger:  (id: string)  => api.get(`/funds/${id}/ledger`),
-  create:  (data: any)   => api.post('/funds/', data),
-  update:  (id: string, data: any) => api.put(`/funds/${id}`, data),
-  deactivate: (id: string) => api.delete(`/funds/${id}`),
+  list:       ()                         => api.get('/funds/'),
+  get:        (id: string)               => api.get(`/funds/${id}`),
+  ledger:     (id: string)               => api.get(`/funds/${id}/ledger`),
+  create:     (data: any)                => api.post('/funds/', data),
+  update:     (id: string, data: any)    => api.put(`/funds/${id}`, data),
+  deactivate:  (id: string)              => api.delete(`/funds/${id}`),
+  reactivate:  (id: string)              => api.patch(`/funds/${id}/reactivate`),
+  // Capital calls
+  getCalls:       (id: string)           => api.get(`/funds/${id}/capital-calls`),
+  createCall:     (id: string, d: any)   => api.post(`/funds/${id}/capital-calls`, d),
+  updateCall:     (id: string, cId: string, d: any) => api.patch(`/funds/${id}/capital-calls/${cId}`, d),
+  deleteCall:     (id: string, cId: string)         => api.delete(`/funds/${id}/capital-calls/${cId}`),
+  // Distributions
+  getDists:       (id: string)           => api.get(`/funds/${id}/distributions`),
+  createDist:     (id: string, d: any)   => api.post(`/funds/${id}/distributions`, d),
+  updateDist:     (id: string, dId: string, d: any) => api.patch(`/funds/${id}/distributions/${dId}`, d),
+  deleteDist:     (id: string, dId: string)         => api.delete(`/funds/${id}/distributions/${dId}`),
+  // NAV records
+  getNavRecords:  (id: string)           => api.get(`/funds/${id}/nav-records`),
+  createNavRecord:(id: string, d: any)   => api.post(`/funds/${id}/nav-records`, d),
+  updateNavRecord:(id: string, nId: string, d: any) => api.patch(`/funds/${id}/nav-records/${nId}`, d),
+  deleteNavRecord:(id: string, nId: string)         => api.delete(`/funds/${id}/nav-records/${nId}`),
 };
 
 // ── Capital Calls ─────────────────────────────────────────────────────────────
@@ -124,6 +141,12 @@ export const noticesAPI = {
   get:             (id: string)              => api.get(`/notices/${id}`),
   upload:          (formData: FormData)      =>
     api.post('/notices/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  uploadExcel:     (formData: FormData)      =>
+    api.post('/notices/upload-excel', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  approveExcel:    (id: string, fund_id: string, notes?: string) =>
+    api.post(`/notices/excel/${id}/approve`, null, {
+      params: { fund_id, ...(notes ? { admin_notes: notes } : {}) },
+    }),
   approve:         (id: string, fund_id?: string, notes?: string) =>
     api.post(`/notices/${id}/approve`, null, {
       params: { ...(fund_id ? { fund_id } : {}), ...(notes ? { admin_notes: notes } : {}) },
@@ -139,6 +162,51 @@ export const noticesAPI = {
   allInvestments: (params?: { fund_id?: string; sector?: string; geography?: string }) =>
     api.get('/notices/investments/all', { params }),
   latestNav:       () => api.get('/notices/nav/latest'),
+};
+
+// ── Calculation Rules ─────────────────────────────────────────────────────────
+export const rulesAPI = {
+  list:        ()                              => api.get('/rules/'),
+  attributes:  ()                              => api.get('/rules/attributes'),
+  dashboard:   ()                              => api.get('/rules/dashboard'),
+  results:     (noticeId: string)              => api.get(`/rules/results/${noticeId}`),
+  create:      (data: any)                     => api.post('/rules/', data),
+  update:      (id: string, data: any)         => api.put(`/rules/${id}`, data),
+  delete:      (id: string)                    => api.delete(`/rules/${id}`),
+  run:         (noticeId: string)              => api.post(`/rules/run/${noticeId}`),
+  preview:     (data: any)                     => api.post('/rules/preview', data),
+  exportExcel: (noticeId: string)              =>
+    api.get(`/notices/${noticeId}/export-excel`, { responseType: 'blob' }),
+  // AttributeExtractors
+  listExtractors:   ()                              => api.get('/rules/extractors'),
+  createExtractor:  (data: any)                     => api.post('/rules/extractors', data),
+  updateExtractor:  (id: string, data: any)         => api.put(`/rules/extractors/${id}`, data),
+  deleteExtractor:  (id: string)                    => api.delete(`/rules/extractors/${id}`),
+  testExtractor:    (data: any)                     => api.post('/rules/extractors/test', data),
+  loadPreset:       (preset: string)                => api.post(`/rules/presets/${preset}`),
+};
+
+// ── Siguler Guff — PDF-parsed sigf.ts calculations ───────────────────────────
+export const sigulerGuffAPI = {
+  analysis: () => api.get('/siguler-guff/analysis'),
+};
+
+// ── Fund PDF — generic upload + per-fund analysis ────────────────────────────
+export const fundPdfAPI = {
+  registered:   ()                => api.get('/fund-pdf/registered'),
+  analysis:     (fundCode: string)=> api.get(`/fund-pdf/${fundCode}/analysis`),
+  upload:       (file: File)      => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post('/fund-pdf/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+};
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+export const notificationsAPI = {
+  list:    (unreadOnly?: boolean) => api.get(`/notifications/${unreadOnly ? '?unread=true' : ''}`),
+  markRead:(id: string)           => api.patch(`/notifications/${id}/read`),
+  markAll: ()                     => api.patch('/notifications/read-all'),
 };
 
 export default api;

@@ -5,17 +5,16 @@ import { usersAPI, noticesAPI } from '../services/api';
 import { usePreferences } from '../contexts/PreferencesContext';
 import { LANGUAGES } from '../i18n';
 import SettingsModal from './SettingsModal';
+import NotificationBell from './NotificationBell';
 
 /* ── Nav items ─────────────────────────────────────────────────────────────── */
 const NAV_ITEMS = [
-  { to: '/',              key: 'nav.dashboard',     icon: '⊞',  end: true,  adminOnly: false, badge: 'none' as const },
-  { to: '/funds',         key: 'nav.funds',          icon: '🏦', end: false, adminOnly: false, badge: 'none' as const },
-  { to: '/notices',       key: 'nav.notices',        icon: '📄', end: false, adminOnly: false, badge: 'notices' as const },
-  { to: '/capital-calls', key: 'nav.capitalCalls',   icon: '📋', end: false, adminOnly: false, badge: 'none' as const },
-  { to: '/distributions', key: 'nav.distributions',  icon: '💸', end: false, adminOnly: false, badge: 'none' as const },
-  { to: '/investments',   key: 'nav.investments',    icon: '🎯', end: false, adminOnly: false, badge: 'none' as const },
-  { to: '/fx-rates',      key: 'nav.fxRates',        icon: '💱', end: false, adminOnly: false, badge: 'none' as const },
-  { to: '/users',         key: 'nav.users',          icon: '👥', end: false, adminOnly: true,  badge: 'users' as const },
+  { to: '/',           key: 'nav.dashboard', icon: '⊞',  end: true,  adminOnly: false, badge: 'none' as const },
+  { to: '/funds',      key: 'nav.funds',     icon: '🏦', end: false, adminOnly: false, badge: 'none' as const },
+  { to: '/notices',    key: 'nav.notices',   icon: '📄', end: false, adminOnly: false, badge: 'notices' as const },
+  { to: '/fx-rates',   key: 'nav.fxRates',   icon: '💱', end: false, adminOnly: false, badge: 'none' as const },
+  { to: '/calculator', key: 'nav.calculator',icon: '🧮', end: false, adminOnly: false, badge: 'none' as const },
+  { to: '/users',      key: 'nav.users',     icon: '👥', end: false, adminOnly: true,  badge: 'users' as const },
 ];
 
 /* ── Role helpers ──────────────────────────────────────────────────────────── */
@@ -250,6 +249,9 @@ export default function Layout() {
             >
               ⚙️
             </button>
+
+            {/* Notifications */}
+            <NotificationBell />
 
             {/* Sign out */}
             <button

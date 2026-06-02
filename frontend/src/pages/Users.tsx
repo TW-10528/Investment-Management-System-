@@ -242,16 +242,21 @@ export default function Users() {
     if (me.role !== 'admin') navigate('/', { replace: true });
   }, [me.role, navigate]);
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
+  const fetchUsers = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await usersAPI.list();
       setUsers(res.data);
-    } catch { toast.error('Failed to load users'); }
-    finally { setLoading(false); }
+    } catch { if (!silent) toast.error('Failed to load users'); }
+    finally { if (!silent) setLoading(false); }
   }, []);
 
+  // Initial load + poll every 20 s so new registrations appear automatically
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => {
+    const id = setInterval(() => fetchUsers(true), 20_000);
+    return () => clearInterval(id);
+  }, [fetchUsers]);
 
   async function doApprove(u: User) {
     const assignedRole = approvalRoles[u.id] || 'user';
@@ -405,12 +410,18 @@ export default function Users() {
             {active.length} active · {inactive.length} deactivated · max 10 seats
           </p>
         </div>
-        <button
-          onClick={() => { setEditTarget(null); setModal('add'); }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
-        >
-          + Add User
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => fetchUsers()}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border theme-divider theme-text-muted hover:border-indigo-400 hover:text-indigo-500 transition-colors text-sm font-medium">
+            ↻ Refresh
+          </button>
+          <button
+            onClick={() => { setEditTarget(null); setModal('add'); }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
+          >
+            + Add User
+          </button>
+        </div>
       </div>
 
       {/* ── Role stats bar ───────────────────────────────────────────────────── */}

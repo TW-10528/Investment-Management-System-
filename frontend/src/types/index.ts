@@ -162,11 +162,67 @@ export interface NoticeUpload {
   fund_name?: string;
   notice_type: 'capital_call' | 'distribution' | 'financial_statement';
   status: 'pending' | 'approved' | 'rejected';
+  /** Display name — set by API as originalName ?? filename */
   file_name: string;
-  extracted_data: Record<string, unknown>;
+  original_name?: string;
+  filename?: string;
+  extracted_data: ExtractedNoticeData;
+  confidence?: number;
+  confidence_grade?: 'high' | 'medium' | 'low';
   admin_notes?: string;
+  uploaded_by?: string;
   reviewed_at?: string;
   created_at?: string;
+  approved_at?: string;
+}
+
+export interface ExtractedNoticeData {
+  noticeType?:      string;
+  confidenceGrade?: 'high' | 'medium' | 'low';
+  confidence?:      number;
+  fundName?:        string;
+  amounts?:         number[];
+  dates?:           string[];
+  keywords?:        string[];
+  // Capital Call
+  grossCallUsd?:        number;
+  netCallUsd?:          number;
+  reinvestableUsd?:     number;
+  managementFeeUsd?:    number;
+  expenseUsd?:          number;
+  investmentAmountUsd?: number;
+  callNumber?:          number;
+  callPct?:             number;
+  dueDate?:             string;
+  fxRate?:              number;
+  wireReference?:       string;
+  // Distribution
+  distributionUsd?:   number;
+  distributionDate?:  string;
+  distributionBreakdown?: {
+    capitalReturnUsd?: number;
+    incomeUsd?:        number;
+    recallableUsd?:    number;
+    totalUsd?:         number;
+  };
+  // NAV / Financial Statement
+  navUsd?:  number;
+  navDate?: string;
+  period?:  string;
+  irr?:     number;
+  tvpi?:    number;
+  dpi?:     number;
+  // Investment targets
+  investmentTargets?: Array<{
+    projectName:     string;
+    actualName?:     string;
+    amountUsd?:      number;
+    investmentType?: string;
+    sector?:         string;
+    geography?:      string;
+    dealType?:       string;
+  }>;
+  [key: string]: unknown;
 }
 
 export interface NavRecord {
