@@ -18,6 +18,7 @@ import dashboardRoutes    from './modules/dashboard/dashboard.routes'
 import noticesRoutes      from './modules/notices/notices.routes'
 import notificationsRoutes from './modules/notifications/notifications.routes'
 import rulesRoutes        from './modules/rules/rules.routes'
+import fundReportsRoutes  from './modules/fund-reports/fund-reports.routes'
 
 export function createApp() {
   const app = new Hono()
@@ -69,6 +70,7 @@ export function createApp() {
   app.route('/api/v1/notices',        noticesRoutes)
   app.route('/api/v1/notifications',  notificationsRoutes)
   app.route('/api/v1/rules',          rulesRoutes)
+  app.route('/api/v1/fund-reports',   fundReportsRoutes)
 
   // ── 404 ────────────────────────────────────────────────────────────────────
   app.notFound((c) => c.json({ detail: `Route ${c.req.method} ${c.req.path} not found` }, 404))

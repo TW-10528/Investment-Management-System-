@@ -6,11 +6,12 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { fundsAPI, fundPdfAPI } from '../services/api';
+import { fundsAPI } from '../services/api';
 import type { FundDetail, FundSummary, LedgerRow, LedgerSnapshot } from '../types/index';
 import { fmt, strategyBg, strategyColor } from '../lib/format';
 import AddFundWizard from '../components/AddFundWizard';
-import FundPdfUpload from '../components/FundPdfUpload';
+import FundDocuments from '../components/FundDocuments';
+import FundUploadBar from '../components/FundUploadBar';
 import toast from 'react-hot-toast';
 
 // ── Role helpers ──────────────────────────────────────────────────────────────
@@ -103,6 +104,14 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
 
   const sf = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 
+  // Cash flow: manual value if entered, else the formula G = -B + C.
+  const hasManualCf  = form?.manual_cash_flow_usd !== undefined
+                    && form?.manual_cash_flow_usd !== ''
+                    && form?.manual_cash_flow_usd !== null;
+  const cashFlowPreview = hasManualCf
+    ? Number(form.manual_cash_flow_usd)
+    : (Number(form?.distribution_usd) || 0) - (Number(form?.gross_call_usd) || 0);
+
   async function submit() {
     setSaving(true);
     try {
@@ -139,34 +148,59 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
 
       {/* inline form */}
       {form && (
-        <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 border-b theme-border"
-             style={{ background: 'rgba(79,70,229,0.03)' }}>
-          <Field label="Due Date">
-            <input type="date" className={inp} value={form.due_date??''} onChange={e=>sf('due_date',e.target.value)} />
-          </Field>
-          <Field label="Net Call (USD)">
-            <input type="number" className={inp} placeholder="49000" value={form.net_call_usd??''} onChange={e=>sf('net_call_usd',e.target.value)} />
-          </Field>
-          <Field label="Call % of Commitment">
-            <input type="number" className={inp} placeholder="4.90" step="0.01" value={form.call_pct??''} onChange={e=>sf('call_pct',e.target.value)} />
-          </Field>
-          <Field label="Status">
-            <select className={inp} value={form.status??'pending'} onChange={e=>sf('status',e.target.value)}>
-              {CALL_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
-            </select>
-          </Field>
-          <Field label="Notice Date">
-            <input type="date" className={inp} value={form.notice_date??''} onChange={e=>sf('notice_date',e.target.value)} />
-          </Field>
-          <Field label="FX Rate (USD/JPY)">
-            <input type="number" className={inp} placeholder="154.20" step="0.01" value={form.fx_rate??''} onChange={e=>sf('fx_rate',e.target.value)} />
-          </Field>
-          <Field label="Notes">
-            <input className={inp} value={form.notes??''} onChange={e=>sf('notes',e.target.value)} />
-          </Field>
-          <div className="flex items-end gap-2">
-            <SaveBtn loading={saving} onClick={submit} />
-            <CancelBtn onClick={() => setForm(null)} />
+        <div className="p-5 border-b theme-border" style={{ background: 'rgba(79,70,229,0.03)' }}>
+          <p className="text-[11px] theme-text-muted mb-3">
+            Enter the ledger inputs manually. Cash flow is computed as <b>G = −B + C</b> (capital contribution out, distribution in).
+            Tax and amount-due are not part of the cash flow.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <Field label="Due / Transaction Date">
+              <input type="date" className={inp} value={form.due_date??''} onChange={e=>sf('due_date',e.target.value)} />
+            </Field>
+            <Field label="B · Capital Contribution (USD)">
+              <input type="number" className={inp} placeholder="49000" value={form.gross_call_usd??''} onChange={e=>sf('gross_call_usd',e.target.value)} />
+            </Field>
+            <Field label="C · Distribution Received (USD)">
+              <input type="number" className={inp} placeholder="0" value={form.distribution_usd??''} onChange={e=>sf('distribution_usd',e.target.value)} />
+            </Field>
+            <Field label="D · Reinvestable (USD)">
+              <input type="number" className={inp} placeholder="0" value={form.reinvestable_usd??''} onChange={e=>sf('reinvestable_usd',e.target.value)} />
+            </Field>
+            <Field label="Call % of Commitment">
+              <input type="number" className={inp} placeholder="4.90" step="0.01" value={form.call_pct??''} onChange={e=>sf('call_pct',e.target.value)} />
+            </Field>
+            <Field label="Status">
+              <select className={inp} value={form.status??'pending'} onChange={e=>sf('status',e.target.value)}>
+                {CALL_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label="Notice Date">
+              <input type="date" className={inp} value={form.notice_date??''} onChange={e=>sf('notice_date',e.target.value)} />
+            </Field>
+            <Field label="FX Rate (USD/JPY)">
+              <input type="number" className={inp} placeholder="154.20" step="0.01" value={form.fx_rate??''} onChange={e=>sf('fx_rate',e.target.value)} />
+            </Field>
+            <Field label="Cash Flow G (manual — leave blank to auto −B + C)">
+              <input type="number" className={inp} placeholder="auto"
+                value={form.manual_cash_flow_usd??''} onChange={e=>sf('manual_cash_flow_usd',e.target.value)} />
+            </Field>
+            <Field label="Notes">
+              <input className={inp} value={form.notes??''} onChange={e=>sf('notes',e.target.value)} />
+            </Field>
+            <div className="flex items-end">
+              <div className="rounded-lg px-3 py-2 border theme-border w-full" style={{ background: 'rgba(16,185,129,0.06)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest theme-text-muted">
+                  Cash Flow G {hasManualCf ? '(manual)' : '= −B + C'}
+                </p>
+                <p className="text-sm font-bold tabular-nums mt-0.5" style={{ color: cashFlowPreview < 0 ? C.red : C.emerald }}>
+                  {cashFlowPreview < 0 ? '−$' : '$'}{Math.abs(cashFlowPreview).toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-end gap-2">
+              <SaveBtn loading={saving} onClick={submit} />
+              <CancelBtn onClick={() => setForm(null)} />
+            </div>
           </div>
         </div>
       )}
@@ -177,32 +211,38 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
           <table className="w-full text-sm">
             <thead style={{ background:'var(--color-header-bg)' }}>
               <tr className="border-b theme-border text-xs">
-                {['#','Notice Date','Due Date','Call %','Amount (USD)','Amount (JPY)','FX Rate','Status',''].map(h=>(
+                {['#','Notice Date','Due Date','Call %','B · Capital','C · Dist','G · Cash Flow','FX Rate','Status',''].map(h=>(
                   <th key={h} className={`px-4 py-2.5 font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h===''||h==='#'?'text-left':'text-right'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y theme-border">
-              {calls.map((cc:any)=>(
+              {calls.map((cc:any)=>{
+                const cf = cc.cash_flow_usd ?? (Number(cc.distribution_usd??0) - Number(cc.gross_call_usd??0));
+                return (
                 <tr key={cc.id} className="theme-row-hover transition-colors">
                   <td className="px-4 py-3 font-bold theme-text">#{cc.call_number}</td>
                   <td className="px-4 py-3 text-right theme-text-muted">{cc.notice_date}</td>
                   <td className="px-4 py-3 text-right theme-text-muted">{cc.due_date}</td>
                   <td className="px-4 py-3 text-right theme-text">{cc.call_pct!=null ? `${Number(cc.call_pct).toFixed(2)}%` : '—'}</td>
-                  <td className="px-4 py-3 text-right font-semibold" style={{color:C.indigo}}>${Number(cc.net_call_usd).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right theme-text-muted">¥{Number(cc.net_call_jpy).toLocaleString('ja-JP')}</td>
+                  <td className="px-4 py-3 text-right font-semibold" style={{color:C.indigo}}>${Number(cc.gross_call_usd??cc.net_call_usd).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right" style={{color:C.emerald}}>{Number(cc.distribution_usd??0)>0 ? `$${Number(cc.distribution_usd).toLocaleString()}` : '—'}</td>
+                  <td className="px-4 py-3 text-right font-semibold" style={{color: cf<0?C.red:C.emerald}}>
+                    {cf<0?'−$':'$'}{Math.abs(cf).toLocaleString()}
+                    {cc.manual_cash_flow_usd!=null && <span className="ml-1 text-[9px] font-bold px-1 rounded" style={{color:C.amber,background:'rgba(217,119,6,0.12)'}} title="Manual cash-flow entry">M</span>}
+                  </td>
                   <td className="px-4 py-3 text-right theme-text-muted">{cc.fx_rate ? Number(cc.fx_rate).toFixed(2) : '—'}</td>
                   <td className="px-4 py-3 text-right"><StatusPill s={cc.status} /></td>
                   <td className="px-4 py-3">
                     {canEdit && (
                       <div className="flex gap-1.5 items-center">
-                        <EditBtn onClick={()=>setForm({id:cc.id,due_date:cc.due_date,notice_date:cc.notice_date,net_call_usd:cc.net_call_usd,call_pct:cc.call_pct,status:cc.status,fx_rate:cc.fx_rate,notes:cc.notes})} />
+                        <EditBtn onClick={()=>setForm({id:cc.id,due_date:cc.due_date,notice_date:cc.notice_date,gross_call_usd:cc.gross_call_usd,distribution_usd:cc.distribution_usd,reinvestable_usd:cc.reinvestable_usd,manual_cash_flow_usd:cc.manual_cash_flow_usd,call_pct:cc.call_pct,status:cc.status,fx_rate:cc.fx_rate,notes:cc.notes})} />
                         <DelBtn onClick={()=>del(cc.id)} />
                       </div>
                     )}
                   </td>
                 </tr>
-              ))}
+              );})}
             </tbody>
           </table>
         </div>
@@ -746,55 +786,17 @@ function WireTab({ detail, canEdit, fundId, onSaved }: { detail:FundDetail; canE
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// sigf.ts ANALYSIS PANEL
-// ─────────────────────────────────────────────────────────────────────────────
-function SigfPanel({ sigfData }: { sigfData: any }) {
-  if (!sigfData?.totals) return null;
-  const t = sigfData.totals;
-  return (
-    <div className="border-t theme-border">
-      <div className="px-5 py-3 flex items-center gap-3 flex-wrap"
-           style={{ background:'rgba(99,102,241,0.04)' }}>
-        <span className="text-[9px] font-black px-2 py-0.5 rounded font-mono"
-              style={{ background:'rgba(99,102,241,0.2)', color:'#818cf8' }}>sigf.ts</span>
-        <p className="text-sm font-bold theme-text">PDF-sourced Computed Columns</p>
-        <span className="text-xs theme-text-muted">{sigfData.pdf_count} PDFs · commitment ${sigfData.commitment?.toLocaleString()}</span>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x theme-border border-t theme-border">
-        {[
-          { col:'E', label:'Cumulative Drawn',    val:'$'+t.cumulative_drawn?.toLocaleString(),    color:C.indigo  },
-          { col:'F', label:'Investment Capacity', val:'$'+t.investment_capacity?.toLocaleString(), color:C.emerald },
-          { col:'G', label:'Net Cash Flow',       val:'−$'+Math.abs(t.net_cash_flow??0).toLocaleString(), color:C.red },
-          { col:'L', label:'Non-Recallable Dist', val:'$'+(t.non_recallable_dist??0).toLocaleString(), color:C.slate },
-        ].map(m=>(
-          <div key={m.col} className="px-5 py-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[9px] font-black px-1.5 py-0.5 rounded font-mono border"
-                    style={{ color:m.color, borderColor:m.color+'40', background:m.color+'12' }}>
-                col {m.col}
-              </span>
-              <p className="text-[10px] font-semibold theme-text-muted uppercase tracking-wide">{m.label}</p>
-            </div>
-            <p className="text-xl font-bold tabular-nums" style={{ color:m.color }}>{m.val}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // FULL FUND SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-type TabKey = 'calls' | 'distributions' | 'nav' | 'ledger' | 'details' | 'wire';
+type TabKey = 'documents' | 'calls' | 'distributions' | 'nav' | 'ledger' | 'details' | 'wire';
 
 function FundSection({
-  fund, detail, sigfData, canEdit, onChanged,
+  fund, detail, canEdit, onChanged,
 }: {
-  fund: FundSummary; detail: FundDetail; sigfData: any;
+  fund: FundSummary; detail: FundDetail;
   canEdit: boolean; onChanged: () => void;
 }) {
-  const [tab, setTab] = useState<TabKey>('calls');
+  const [tab, setTab] = useState<TabKey>('documents');
   const fundId   = fund.fund_id;
   const isActive = fund.is_active !== false;
   const dotColor = strategyColor[fund.strategy??''] ?? '#6b7280';
@@ -815,6 +817,7 @@ function FundSection({
   }
 
   const TABS: { key: TabKey; label: string }[] = [
+    { key:'documents',     label:'Documents'      },
     { key:'calls',         label:'Capital Calls'  },
     { key:'distributions', label:'Distributions'  },
     { key:'nav',           label:'NAV Records'    },
@@ -892,9 +895,6 @@ function FundSection({
         </div>
       </div>
 
-      {/* ── sigf.ts columns ── */}
-      {sigfData && <SigfPanel sigfData={sigfData} />}
-
       {/* ── tabs ── */}
       <div className="border-t theme-border">
         <div className="flex overflow-x-auto border-b theme-border"
@@ -910,6 +910,7 @@ function FundSection({
           ))}
         </div>
 
+        {tab==='documents'     && <FundDocuments fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='calls'         && <CallsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='distributions' && <DistsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='nav'           && <NavTab      fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
@@ -922,6 +923,56 @@ function FundSection({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// FUND CARD (list view — name + a few headline stats, click to open)
+// ─────────────────────────────────────────────────────────────────────────────
+function FundCard({ fund, detail, onClick }: { fund: FundSummary; detail?: FundDetail; onClick: () => void }) {
+  const isActive = fund.is_active !== false;
+  const dotColor = strategyColor[fund.strategy ?? ''] ?? '#6b7280';
+  const badge    = strategyBg[fund.strategy ?? '']   ?? 'bg-gray-100 text-gray-700';
+  const summary  = (detail as any)?.summary ?? {};
+  const commitment = Number(detail?.commitment_usd ?? 0);
+  const drawn      = Number(summary.drawn_pct ?? 0);
+
+  return (
+    <button onClick={onClick}
+      className="theme-card border theme-border rounded-2xl p-5 text-left w-full transition-colors hover:border-indigo-500/50"
+      style={{ opacity: isActive ? 1 : 0.6 }}>
+      <div className="flex items-start gap-3">
+        <span className="w-3 h-3 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: dotColor }} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base font-bold theme-text leading-snug">{fund.fund_name}</h2>
+            {!isActive && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border text-slate-400 bg-slate-500/10 border-slate-500/20">Inactive</span>
+            )}
+          </div>
+          {detail?.fund_name_jp && <p className="text-xs theme-text-muted mt-0.5">{detail.fund_name_jp}</p>}
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            {fund.strategy && <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${badge}`}>{fund.strategy}</span>}
+            {detail?.vintage_year && <span className="text-[11px] theme-text-muted">Vintage {detail.vintage_year}</span>}
+            {fund.manager && <span className="text-[11px] theme-text-muted truncate">· {fund.manager}</span>}
+          </div>
+        </div>
+        <span className="theme-text-muted text-lg flex-shrink-0">→</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t theme-border">
+        {[
+          ['Commitment', fmt.usd(commitment, true)],
+          ['Drawn',      `${drawn.toFixed(1)}%`],
+          ['DPI',        `${Number(summary.dpi ?? 0).toFixed(2)}×`],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{label}</p>
+            <p className="text-sm font-bold tabular-nums theme-text mt-0.5">{value}</p>
+          </div>
+        ))}
+      </div>
+    </button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 export default function FundManagement() {
@@ -930,11 +981,11 @@ export default function FundManagement() {
 
   const [funds,       setFunds]       = useState<FundSummary[]>([]);
   const [details,     setDetails]     = useState<Record<string, FundDetail>>({});
-  const [sigfMap,     setSigfMap]     = useState<Record<string, any>>({});
   const [loading,     setLoading]     = useState(true);
   const [showWizard,  setShowWizard]  = useState(false);
   const [showInactive,setShowInactive]= useState(true);
   const [search,      setSearch]      = useState('');
+  const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
 
   const loadFunds = useCallback(async () => {
     setLoading(true);
@@ -953,30 +1004,7 @@ export default function FundManagement() {
     finally { setLoading(false); }
   }, []);
 
-  const loadSigf = useCallback(async () => {
-    try {
-      const reg  = await fundPdfAPI.registered();
-      const codes: string[] = reg.data.map((f: any) => f.fund_code);
-      const results = await Promise.allSettled(codes.map(c => fundPdfAPI.analysis(c)));
-      const map: Record<string, any> = {};
-      results.forEach((r, i) => {
-        if (r.status === 'fulfilled') map[codes[i]] = r.value.data;
-      });
-      setSigfMap(map);
-    } catch { /* non-fatal */ }
-  }, []);
-
-  useEffect(() => { loadFunds(); loadSigf(); }, [loadFunds, loadSigf]);
-
-  function getSigf(fund: FundSummary): any {
-    for (const data of Object.values(sigfMap)) {
-      if (!data?.fund_name) continue;
-      // match by first two words of fund name
-      const probe = data.fund_name.split(' ').slice(0,2).join(' ').toLowerCase();
-      if (fund.fund_name.toLowerCase().includes(probe)) return data;
-    }
-    return null;
-  }
+  useEffect(() => { loadFunds(); }, [loadFunds]);
 
   const activeCount   = funds.filter(f => f.is_active !== false).length;
   const inactiveCount = funds.length - activeCount;
@@ -989,33 +1017,48 @@ export default function FundManagement() {
       (f.strategy ?? '').toLowerCase().includes(search.toLowerCase())
     );
 
+  const selectedFund   = selectedFundId ? funds.find(f => f.fund_id === selectedFundId) ?? null : null;
+  const selectedDetail = selectedFundId ? details[selectedFundId] : undefined;
+
   return (
     <div className="p-6 space-y-6 animate-fade-in">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold theme-text">{t('funds.title')}</h1>
-          <p className="text-sm theme-text-muted mt-0.5">
-            {activeCount} active fund{activeCount!==1?'s':''}
-            {inactiveCount>0 && ` · ${inactiveCount} inactive`}
-            {canEdit && ' · all sections editable'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {inactiveCount > 0 && (
-            <button onClick={() => setShowInactive(v=>!v)}
-              className="text-sm px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text transition-colors">
-              {showInactive ? 'Hide inactive' : `Show inactive (${inactiveCount})`}
+          {selectedFund && (
+            <button onClick={() => setSelectedFundId(null)}
+              className="text-sm theme-text-muted hover:theme-text transition-colors mb-1">
+              ← All funds
             </button>
           )}
-          {canEdit && (
-            <button onClick={() => setShowWizard(true)}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
-              + Add Fund
-            </button>
+          <h1 className="text-xl font-bold theme-text">
+            {selectedFund ? selectedFund.fund_name : t('funds.title')}
+          </h1>
+          {!selectedFund && (
+            <p className="text-sm theme-text-muted mt-0.5">
+              {activeCount} active fund{activeCount!==1?'s':''}
+              {inactiveCount>0 && ` · ${inactiveCount} inactive`}
+              {' · select a fund to view its details'}
+            </p>
           )}
         </div>
+        {!selectedFund && (
+          <div className="flex items-center gap-2">
+            {inactiveCount > 0 && (
+              <button onClick={() => setShowInactive(v=>!v)}
+                className="text-sm px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text transition-colors">
+                {showInactive ? 'Hide inactive' : `Show inactive (${inactiveCount})`}
+              </button>
+            )}
+            {canEdit && (
+              <button onClick={() => setShowWizard(true)}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                + Add Fund
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* View-only banner */}
@@ -1026,62 +1069,62 @@ export default function FundManagement() {
         </div>
       )}
 
-      {/* PDF Upload */}
-      <div className="theme-card border theme-border rounded-2xl overflow-hidden">
-        <div className="px-5 py-3 border-b theme-border"
-             style={{ background:'rgba(99,102,241,0.04)' }}>
-          <p className="text-sm font-bold theme-text">Upload Capital Call PDF</p>
-          <p className="text-xs theme-text-muted mt-0.5">
-            Drop any fund PDF — auto-detects fund · runs sigf.ts formulas · updates dashboard instantly
-          </p>
-        </div>
-        <div className="p-5">
-          <FundPdfUpload onUploaded={() => { loadFunds(); loadSigf(); }} />
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 theme-text-sub">🔍</span>
-        <input type="text" placeholder="Search funds…" value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 theme-input rounded-xl text-sm" />
-      </div>
-
-      {/* Fund sections */}
-      {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="w-9 h-9 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-20 theme-text-muted">
-          <p className="text-5xl mb-4">🏦</p>
-          <p className="text-base font-medium">No funds found</p>
-          {canEdit && <p className="text-sm mt-2">Click "+ Add Fund" to create your first fund.</p>}
-        </div>
+      {selectedFund ? (
+        /* ── DETAIL VIEW — one fund's full sections ── */
+        selectedDetail ? (
+          <FundSection
+            fund={selectedFund}
+            detail={selectedDetail}
+            canEdit={canEdit}
+            onChanged={() => { loadFunds(); }}
+          />
+        ) : (
+          <div className="theme-card border theme-border rounded-2xl p-8 flex items-center gap-4">
+            <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+            <p className="text-sm theme-text-muted">Loading {selectedFund.fund_name}…</p>
+          </div>
+        )
       ) : (
-        <div className="space-y-8">
-          {filtered.map(fund => {
-            const detail = details[fund.fund_id];
-            if (!detail) return (
-              <div key={fund.fund_id}
-                   className="theme-card border theme-border rounded-2xl p-8 flex items-center gap-4">
-                <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                <p className="text-sm theme-text-muted">Loading {fund.fund_name}…</p>
-              </div>
-            );
-            return (
-              <FundSection
-                key={fund.fund_id}
-                fund={fund}
-                detail={detail}
-                sigfData={getSigf(fund)}
-                canEdit={canEdit}
-                onChanged={() => { loadFunds(); loadSigf(); }}
-              />
-            );
-          })}
-        </div>
+        /* ── LIST VIEW — upload bar + fund name cards ── */
+        <>
+          {canEdit && funds.length > 0 && (
+            <FundUploadBar
+              funds={funds.map(f => ({ fund_id: f.fund_id, fund_name: f.fund_name }))}
+              onUploaded={() => loadFunds()}
+            />
+          )}
+
+          {/* Search */}
+          <div className="relative max-w-sm">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 theme-text-sub">🔍</span>
+            <input type="text" placeholder="Search funds…" value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 theme-input rounded-xl text-sm" />
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-20">
+              <div className="w-9 h-9 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-20 theme-text-muted">
+              <p className="text-5xl mb-4">🏦</p>
+              <p className="text-base font-medium">No funds found</p>
+              {canEdit && <p className="text-sm mt-2">Click "+ Add Fund" to create your first fund.</p>}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {filtered.map(fund => (
+                <FundCard
+                  key={fund.fund_id}
+                  fund={fund}
+                  detail={details[fund.fund_id]}
+                  onClick={() => setSelectedFundId(fund.fund_id)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {showWizard && (

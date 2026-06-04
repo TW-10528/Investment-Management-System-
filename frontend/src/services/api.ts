@@ -164,6 +164,18 @@ export const noticesAPI = {
   latestNav:       () => api.get('/notices/nav/latest'),
 };
 
+// ── Fund Reports (per-fund PDF upload → auto-parse → auto-calculate) ─────────
+export const fundReportsAPI = {
+  list:   (fundId: string)                  => api.get('/fund-reports', { params: { fund_id: fundId } }),
+  get:    (id: string)                      => api.get(`/fund-reports/${id}`),
+  upload: (fundId: string, formData: FormData, noticeType?: string) =>
+    api.post('/fund-reports/upload', formData, {
+      params:  { fund_id: fundId, ...(noticeType ? { notice_type: noticeType } : {}) },
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  delete: (id: string)                      => api.delete(`/fund-reports/${id}`),
+};
+
 // ── Calculation Rules ─────────────────────────────────────────────────────────
 export const rulesAPI = {
   list:        ()                              => api.get('/rules/'),

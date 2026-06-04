@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { usersAPI, noticesAPI } from '../services/api';
+import { usersAPI } from '../services/api';
 import { usePreferences } from '../contexts/PreferencesContext';
 import { LANGUAGES } from '../i18n';
 import SettingsModal from './SettingsModal';
@@ -11,7 +11,6 @@ import NotificationBell from './NotificationBell';
 const NAV_ITEMS = [
   { to: '/',           key: 'nav.dashboard', icon: '⊞',  end: true,  adminOnly: false, badge: 'none' as const },
   { to: '/funds',      key: 'nav.funds',     icon: '🏦', end: false, adminOnly: false, badge: 'none' as const },
-  { to: '/notices',    key: 'nav.notices',   icon: '📄', end: false, adminOnly: false, badge: 'notices' as const },
   { to: '/fx-rates',   key: 'nav.fxRates',   icon: '💱', end: false, adminOnly: false, badge: 'none' as const },
   { to: '/calculator', key: 'nav.calculator',icon: '🧮', end: false, adminOnly: false, badge: 'none' as const },
   { to: '/users',      key: 'nav.users',     icon: '👥', end: false, adminOnly: true,  badge: 'users' as const },
@@ -42,7 +41,6 @@ export default function Layout() {
   const isReadOnly = ['board_member', 'user'].includes(user.role);
 
   const [pendingUsers,   setPendingUsers]   = useState(0);
-  const [pendingNotices, setPendingNotices] = useState(0);
   const [showSettings,   setShowSettings]   = useState(false);
   const [showLangMenu,   setShowLangMenu]   = useState(false);
 
@@ -52,11 +50,8 @@ export default function Layout() {
     let cancelled = false;
     async function load() {
       try {
-        const [ur, nr] = await Promise.all([usersAPI.pendingCount(), noticesAPI.pendingCount()]);
-        if (!cancelled) {
-          setPendingUsers(ur.data.count ?? 0);
-          setPendingNotices(nr.data.count ?? 0);
-        }
+        const ur = await usersAPI.pendingCount();
+        if (!cancelled) setPendingUsers(ur.data.count ?? 0);
       } catch { /* ignore */ }
     }
     load();
@@ -116,7 +111,7 @@ export default function Layout() {
             Navigation
           </p>
           {NAV.map(({ to, key, icon, end, badge }) => {
-            const badgeCount = badge === 'users' ? pendingUsers : badge === 'notices' ? pendingNotices : 0;
+            const badgeCount = badge === 'users' ? pendingUsers : 0;
             return (
               <NavLink
                 key={to}
@@ -155,33 +150,20 @@ export default function Layout() {
         </nav>
 
         {/* Pending alerts */}
-        {isAdmin && (pendingUsers > 0 || pendingNotices > 0) && (
+        {isAdmin && pendingUsers > 0 && (
           <div className="mx-2.5 mb-2 px-3 py-2.5 rounded-xl space-y-1.5" style={{
             background: 'rgba(245,158,11,0.08)',
             border: '1px solid rgba(245,158,11,0.2)',
           }}>
-            {pendingUsers > 0 && (
-              <div>
-                <p className="text-amber-400 text-xs font-semibold">
-                  ⏳ {pendingUsers} {t('users.awaitingApproval')}
-                </p>
-                <button onClick={() => navigate('/users')}
-                  className="text-amber-300 hover:text-amber-200 text-xs underline underline-offset-2">
-                  {t('users.reviewNow')}
-                </button>
-              </div>
-            )}
-            {pendingNotices > 0 && (
-              <div>
-                <p className="text-yellow-400 text-xs font-semibold">
-                  📄 {pendingNotices} {t('notices.pending')}
-                </p>
-                <button onClick={() => navigate('/notices')}
-                  className="text-yellow-300 hover:text-yellow-200 text-xs underline underline-offset-2">
-                  {t('notices.review')}
-                </button>
-              </div>
-            )}
+            <div>
+              <p className="text-amber-400 text-xs font-semibold">
+                ⏳ {pendingUsers} {t('users.awaitingApproval')}
+              </p>
+              <button onClick={() => navigate('/users')}
+                className="text-amber-300 hover:text-amber-200 text-xs underline underline-offset-2">
+                {t('users.reviewNow')}
+              </button>
+            </div>
           </div>
         )}
 

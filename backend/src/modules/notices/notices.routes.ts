@@ -8,6 +8,8 @@ import { auth } from '../../middleware/auth'
 import { canEdit } from '../../middleware/guard'
 import { prisma } from '../../lib/prisma'
 import { parsePdf } from '../../services/pdfParser'
+import { parseFundPdf } from '../../services/fundParsers/index'
+import { resolveFund } from '../../services/fundParsers/fund-resolver'
 import { notifyAllAdmins, notifyUser } from '../../services/notificationService'
 import { runRulesForNotice } from '../../services/rulesEngine'
 import { config } from '../../config/index'
@@ -164,20 +166,47 @@ router.post('/upload', async (c) => {
   const buffer   = Buffer.from(await file.arrayBuffer())
   fs.writeFileSync(filepath, buffer)
 
-  const extracted = await parsePdf(buffer)
-  if (noticeType && noticeType !== extracted.noticeType) {
-    extracted.noticeType = noticeType as typeof extracted.noticeType
+  // Try fund-specific parser first; fall back to generic parser
+  let extractedData: any
+  let resolvedFundId = fundId ?? null
+
+  const fundParsed = await parseFundPdf(buffer)
+  if (fundParsed.fundKey !== 'unknown') {
+    // Known fund — use fund-specific extraction
+    const { rawText: _, ...stored } = fundParsed
+    extractedData = stored
+
+    // Auto-resolve fundId if not manually supplied
+    if (!resolvedFundId) {
+      const resolved = await resolveFund(fundParsed.fundKey)
+      if (resolved) resolvedFundId = resolved.id
+    }
+  } else {
+    // Unknown fund — fall back to generic parser
+    const generic = await parsePdf(buffer)
+    if (noticeType && noticeType !== 'auto' && noticeType !== generic.noticeType) {
+      generic.noticeType = noticeType as typeof generic.noticeType
+    }
+    extractedData = generic
+  }
+
+  const finalNoticeType: string = extractedData.noticeType ?? noticeType ?? 'capital_call'
+
+  // Verify resolvedFundId still exists before linking (prevents FK constraint error)
+  if (resolvedFundId) {
+    const fundExists = await prisma.fund.findUnique({ where: { id: resolvedFundId }, select: { id: true } })
+    if (!fundExists) resolvedFundId = null
   }
 
   const notice = await prisma.notice.create({
     data: {
       filename,
       originalName:  file.name,
-      noticeType:    extracted.noticeType,
+      noticeType:    finalNoticeType,
       status:        'pending',
-      fundId:        fundId ?? null,
-      extractedData: extracted as any,
-      confidence:    extracted.confidence,
+      fundId:        resolvedFundId,
+      extractedData: { ...extractedData, _source: 'notice_page' } as any,
+      confidence:    extractedData.confidence ?? null,
       uploadedBy:    user.email,
     },
   })
@@ -185,9 +214,9 @@ router.post('/upload', async (c) => {
   await notifyAllAdmins({
     type:    'notice_uploaded',
     title:   'New Notice Pending Review',
-    message: `${user.email} uploaded a ${extracted.noticeType.replace('_', ' ')} notice (${extracted.confidenceGrade} confidence).`,
+    message: `${user.email} uploaded a ${finalNoticeType.replace('_', ' ')} notice for ${extractedData.fundName ?? 'unknown fund'} (${extractedData.confidenceGrade ?? 'low'} confidence).`,
     link:    '/notices',
-    metadata: { notice_id: notice.id, notice_type: extracted.noticeType },
+    metadata: { notice_id: notice.id, fund_key: extractedData.fundKey ?? null },
   })
 
   return c.json(noticeDict(notice))
@@ -211,25 +240,38 @@ router.post('/:id/approve', async (c) => {
   if (notice.noticeType === 'capital_call') {
     const latestFx = await prisma.fxRate.findFirst({ orderBy: { rateDate: 'desc' } })
     const fx       = data.fxRate ?? (latestFx ? parseFloat(latestFx.usdJpy.toString()) : 150)
-    const grossUsd = data.grossCallUsd  ?? data.amounts?.[0] ?? 0
-    const netUsd   = data.netCallUsd    ?? grossUsd
-    const reinvest = data.reinvestableUsd ?? 0
-    const netJpy   = Math.round(parseFloat(String(netUsd)) * parseFloat(String(fx)))
+    const grossUsd = parseFloat(String(data.grossCallUsd ?? data.amounts?.[0] ?? 0))
+    const netUsd   = parseFloat(String(data.netCallUsd   ?? grossUsd))
+    const reinvest = parseFloat(String(data.reinvestableUsd ?? 0))
+    const callPct  = parseFloat(String(data.callPct ?? 0))
+    const netJpy   = Math.round(netUsd * parseFloat(String(fx)))
     const dueDate  = data.dueDate ? new Date(data.dueDate) : (data.dates?.[0] ? new Date(data.dates[0]) : new Date())
+    const noticeDate = data.noticeDate ? new Date(data.noticeDate) : new Date()
 
-    const cc = await prisma.capitalCall.create({
-      data: {
-        fundId, noticeDate: new Date(), dueDate,
-        callNumber: data.callNumber ?? null, callPct: data.callPct ?? null,
-        grossCallUsd: grossUsd, netCallUsd: netUsd, reinvestableUsd: reinvest,
-        investmentAmountUsd: data.investmentAmountUsd ?? null,
-        managementFeeUsd: data.managementFeeUsd ?? null,
-        expenseUsd: data.expenseUsd ?? null,
-        netCallJpy: netJpy, fxRate: fx,
-        wireReference: data.wireReference ?? null, status: 'pending',
-      },
-    })
-    created.capital_call = { id: cc.id }
+    // Deduplicate — skip if a call for this fund+dueDate already exists
+    const existing = await prisma.capitalCall.findFirst({ where: { fundId, dueDate } })
+    if (existing) {
+      created.capital_call = { id: existing.id, deduplicated: true }
+    } else {
+      const last    = await prisma.capitalCall.findFirst({ where: { fundId }, orderBy: { callNumber: 'desc' } })
+      const callNum = (last?.callNumber ?? 0) + 1
+
+      const cc = await prisma.capitalCall.create({
+        data: {
+          fundId, noticeDate, dueDate, callNumber: callNum, callPct,
+          grossCallUsd: grossUsd, netCallUsd: netUsd, reinvestableUsd: reinvest,
+          investmentAmountUsd: grossUsd,
+          managementFeeUsd: parseFloat(String(data.managementFeeUsd ?? 0)),
+          expenseUsd: parseFloat(String(data.expenseUsd ?? 0)),
+          netCallJpy: netJpy, fxRate: fx,
+          wireReference: data.wireReference ?? null,
+          // 'approved' = admin confirmed; shows in dashboard immediately.
+          // Change to 'paid' once the wire is sent.
+          status: 'approved',
+        },
+      })
+      created.capital_call = { id: cc.id }
+    }
 
     if (data.investmentTargets?.length) {
       for (const it of data.investmentTargets) {

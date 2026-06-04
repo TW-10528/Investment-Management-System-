@@ -56,7 +56,7 @@ router.get('/:id/ledger', async (c) => {
   if (!fund) return c.json({ detail: 'Fund not found' }, 404)
 
   const [paidCalls, distributions] = await Promise.all([
-    prisma.capitalCall.findMany({ where: { fundId: fund.id, status: 'paid' }, orderBy: { executionDate: 'asc' } }),
+    prisma.capitalCall.findMany({ where: { fundId: fund.id, status: { in: ['approved', 'paid'] } }, orderBy: { executionDate: 'asc' } }),
     prisma.distribution.findMany({ where: { fundId: fund.id }, orderBy: { distributionDate: 'asc' } }),
   ])
 
@@ -71,6 +71,7 @@ router.get('/:id/ledger', async (c) => {
       capitalPaidIn:   new Decimal(cc.grossCallUsd.toString()),
       capitalReceived: new Decimal(cc.distributionUsd.toString()),
       reinvestable:    new Decimal(cc.reinvestableUsd.toString()),
+      manualCashFlow:  cc.manualCashFlowUsd != null ? new Decimal(cc.manualCashFlowUsd.toString()) : null,
       callId:          cc.id,
       wireReference:   cc.wireReference,
     })),
@@ -228,14 +229,20 @@ router.get('/:id/capital-calls', async (c) => {
     call_number:    cc.callNumber,
     notice_date:    cc.noticeDate?.toISOString().slice(0, 10),
     due_date:       cc.dueDate?.toISOString().slice(0, 10),
-    call_pct:       cc.callPct ? parseFloat(cc.callPct.toString()) : null,
-    gross_call_usd: parseFloat(cc.grossCallUsd.toString()),
-    net_call_usd:   parseFloat(cc.netCallUsd.toString()),
-    net_call_jpy:   parseFloat(cc.netCallJpy.toString()),
-    fx_rate:        cc.fxRate ? parseFloat(cc.fxRate.toString()) : null,
-    status:         cc.status,
-    paid_at:        cc.paidAt?.toISOString() ?? null,
-    notes:          cc.notes,
+    call_pct:         cc.callPct ? parseFloat(cc.callPct.toString()) : null,
+    gross_call_usd:   parseFloat(cc.grossCallUsd.toString()),    // B — capital contribution
+    distribution_usd: parseFloat(cc.distributionUsd.toString()), // C — distribution received
+    reinvestable_usd: parseFloat(cc.reinvestableUsd.toString()), // D — reinvestable subset of C
+    manual_cash_flow_usd: cc.manualCashFlowUsd != null ? parseFloat(cc.manualCashFlowUsd.toString()) : null,
+    cash_flow_usd:    cc.manualCashFlowUsd != null                // G = manual override, else -B + C
+                        ? parseFloat(cc.manualCashFlowUsd.toString())
+                        : parseFloat(cc.distributionUsd.toString()) - parseFloat(cc.grossCallUsd.toString()),
+    net_call_usd:     parseFloat(cc.netCallUsd.toString()),
+    net_call_jpy:     parseFloat(cc.netCallJpy.toString()),
+    fx_rate:          cc.fxRate ? parseFloat(cc.fxRate.toString()) : null,
+    status:           cc.status,
+    paid_at:          cc.paidAt?.toISOString() ?? null,
+    notes:            cc.notes,
   })))
 })
 
@@ -245,6 +252,10 @@ router.post('/:id/capital-calls', async (c) => {
   const b       = await c.req.json().catch(() => ({}))
   const latestFx = await prisma.fxRate.findFirst({ orderBy: { rateDate: 'desc' } })
   const fxRate   = b.fx_rate ? parseFloat(b.fx_rate) : (latestFx ? parseFloat(latestFx.usdJpy.toString()) : 150)
+  // Manual ledger inputs (drive the cash-flow formula G = -B + C in CalculationEngine):
+  const grossUsd = parseFloat(b.gross_call_usd ?? b.net_call_usd ?? 0)  // B — capital contribution
+  const distUsd  = parseFloat(b.distribution_usd ?? 0)                  // C — distribution received
+  const reinvest = parseFloat(b.reinvestable_usd ?? 0)                  // D — reinvestable subset of C
   const netUsd   = parseFloat(b.net_call_usd ?? b.gross_call_usd ?? 0)
   const last     = await prisma.capitalCall.findFirst({ where: { fundId: fund.id }, orderBy: { callNumber: 'desc' } })
   const cc = await prisma.capitalCall.create({ data: {
@@ -252,14 +263,17 @@ router.post('/:id/capital-calls', async (c) => {
     callNumber:      (last?.callNumber ?? 0) + 1,
     noticeDate:      b.notice_date ? new Date(b.notice_date) : new Date(),
     dueDate:         new Date(b.due_date),
-    grossCallUsd:    parseFloat(b.gross_call_usd ?? netUsd),
+    grossCallUsd:    grossUsd,
+    distributionUsd: distUsd,
+    reinvestableUsd: reinvest,
+    manualCashFlowUsd: (b.manual_cash_flow_usd !== undefined && b.manual_cash_flow_usd !== '' && b.manual_cash_flow_usd !== null)
+                         ? parseFloat(b.manual_cash_flow_usd) : null,
     netCallUsd:      netUsd,
-    reinvestableUsd: 0,
     netCallJpy:      Math.round(netUsd * fxRate),
     fxRate,
     callPct:         b.call_pct ? parseFloat(b.call_pct) : 0,
     notes:           b.notes ?? null,
-    status:          b.status ?? 'pending',
+    status:          b.status ?? 'approved',
   }})
   return c.json({ id: cc.id }, 201)
 })
@@ -267,10 +281,19 @@ router.post('/:id/capital-calls', async (c) => {
 router.patch('/:id/capital-calls/:ccId', async (c) => {
   const b    = await c.req.json().catch(() => ({}))
   const data: any = {}
-  if (b.status      !== undefined) data.status  = b.status
-  if (b.paid_at     !== undefined) data.paidAt  = b.paid_at ? new Date(b.paid_at) : null
-  if (b.notes       !== undefined) data.notes   = b.notes
-  if (b.net_call_usd!== undefined) {
+  if (b.status          !== undefined) data.status          = b.status
+  if (b.paid_at         !== undefined) data.paidAt          = b.paid_at ? new Date(b.paid_at) : null
+  if (b.notes           !== undefined) data.notes           = b.notes
+  if (b.due_date        !== undefined) data.dueDate         = new Date(b.due_date)
+  if (b.notice_date     !== undefined) data.noticeDate      = new Date(b.notice_date)
+  if (b.call_pct        !== undefined) data.callPct         = b.call_pct ? parseFloat(b.call_pct) : 0
+  if (b.gross_call_usd  !== undefined) data.grossCallUsd    = parseFloat(b.gross_call_usd)  // B
+  if (b.distribution_usd!== undefined) data.distributionUsd = parseFloat(b.distribution_usd) // C
+  if (b.reinvestable_usd!== undefined) data.reinvestableUsd = parseFloat(b.reinvestable_usd) // D
+  if (b.manual_cash_flow_usd !== undefined)                                                  // G override (or clear)
+    data.manualCashFlowUsd = (b.manual_cash_flow_usd === '' || b.manual_cash_flow_usd === null)
+      ? null : parseFloat(b.manual_cash_flow_usd)
+  if (b.net_call_usd    !== undefined) {
     const fx = b.fx_rate ?? 150
     data.netCallUsd = parseFloat(b.net_call_usd)
     data.netCallJpy = Math.round(parseFloat(b.net_call_usd) * fx)

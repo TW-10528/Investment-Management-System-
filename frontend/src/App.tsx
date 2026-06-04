@@ -8,7 +8,6 @@ import FundManagement from './pages/FundManagement';
 import FundDetail from './pages/FundDetail';
 import FxRates from './pages/FxRates';
 import Users from './pages/Users';
-import Notices from './pages/Notices';
 import Calculator from './pages/Calculator';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -44,7 +43,6 @@ export default function App() {
           <Route path="funds"      element={<FundManagement />} />
           <Route path="funds/:id"  element={<FundDetail />} />
           <Route path="fx-rates"   element={<FxRates />} />
-          <Route path="notices"    element={<Notices />} />
           <Route path="calculator" element={<Calculator />} />
 
           {/* Admin-only */}

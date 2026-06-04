@@ -29,6 +29,7 @@ export interface Transaction {
   capitalPaidIn:   Decimal   // B
   capitalReceived: Decimal   // C
   reinvestable:    Decimal   // D
+  manualCashFlow?: Decimal | null   // when set, overrides G (= -B + C)
   callId?:         string
   distId?:         string
   wireReference?:  string | null
@@ -80,7 +81,8 @@ export class CalculationEngine {
 
       E = E.plus(B)                // E = prev_E + B
       F = F.minus(B).plus(D)       // F = prev_F - B + D
-      const G = new Decimal(0).minus(B).plus(C)  // G = -B + C
+      // G = -B + C, unless a manual cash-flow value was entered for this row.
+      const G = tx.manualCashFlow != null ? tx.manualCashFlow : new Decimal(0).minus(B).plus(C)
       H = H.plus(G)                // H = prev_H + G
 
       rows.push({
@@ -121,7 +123,7 @@ export class CalculationEngine {
   static async fundSummary(fund: any): Promise<Record<string, unknown>> {
     const [paidCalls, distributions] = await Promise.all([
       prisma.capitalCall.findMany({
-        where:   { fundId: fund.id, status: 'paid' },
+        where:   { fundId: fund.id, status: { in: ['approved', 'paid'] } },
         orderBy: { executionDate: 'asc' },
       }),
       prisma.distribution.findMany({

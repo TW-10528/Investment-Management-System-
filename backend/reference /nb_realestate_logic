@@ -1,0 +1,851 @@
+"""
+NB Real Estate Secondary Opportunities Fund II extraction module.
+ 
+Purpose:
+- Extract values from NB Real Estate Secondary Opportunities Fund II / Offshore Fund II
+  capital call / drawdown notice PDFs.
+- Map extracted values to the company's standard Excel fields.
+- Calculate formula-based Excel fields using either previous_state or report cumulative values.
+ 
+IMPORTANT CASH FLOW RULE FOR COMPANY EXCEL:
+- current_transaction_cash_flow = -capital_contribution_amount + distribution_amount_received
+- tax_expense is extracted and shown separately, but it is NOT included in cash flow.
+- amount_due_from_limited_partner is extracted and shown separately, but it is NOT used for Excel cash flow.
+- If previous_state.cumulative_cash_flow is provided:
+      cash_flow in final_excel_fields = previous cumulative cash flow + current transaction cash flow
+- If previous_state.cumulative_cash_flow is not provided:
+      cash_flow in final_excel_fields = current transaction cash flow
+ 
+Run in WSL directly:
+    pip install pdfplumber
+    python nb_realestate_module_updated.py "uploads/Capital Call (1).pdf"
+ 
+Run with previous state:
+    python nb_realestate_module_updated.py "uploads/Capital Call (2).pdf" \
+      '{"cumulative_cash_flow":-1492921.17}'
+ 
+Import usage from FastAPI main:
+    from nb_realestate_module_updated import extract_nb_realestate_report, extract_pdf_text
+"""
+import json
+import os
+import re
+import sys
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+ 
+try:
+    import pdfplumber
+except ImportError:
+    pdfplumber = None
+ 
+ 
+# ------------------------------------------------------------
+# PDF / text utilities
+# ------------------------------------------------------------
+ 
+def extract_pdf_text(file_path: str) -> str:
+    if pdfplumber is None:
+        raise ImportError("pdfplumber is required. Install with: pip install pdfplumber")
+ 
+    text_parts: List[str] = []
+    with pdfplumber.open(file_path) as pdf:
+        for page in pdf.pages:
+            text_parts.append(page.extract_text() or "")
+    return "\n".join(text_parts)
+ 
+ 
+def normalize_text(text: str) -> str:
+    text = text.replace("\xa0", " ").replace("\u200b", "")
+    text = re.sub(r"[ \t]+", " ", text)
+    return text
+ 
+ 
+def normalize_date(date_text: Optional[str]) -> Optional[str]:
+    if not date_text:
+        return None
+ 
+    date_text = date_text.strip()
+    for fmt in ("%B %d, %Y", "%b %d, %Y", "%m/%d/%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(date_text, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return date_text
+ 
+ 
+def clean_amount(value: Optional[str], absolute: bool = False) -> Optional[float]:
+    """
+    Converts:
+        $250,000.00      -> 250000.0
+        ($38,405.43)     -> -38405.43
+        - or $-          -> 0.0
+    If absolute=True, negative/parentheses values are returned positive.
+    """
+    if value is None:
+        return None
+ 
+    value = value.strip()
+    if value in {"-", "$-", "$ -", "—"}:
+        return 0.0
+ 
+    is_negative = False
+    if value.startswith("(") and value.endswith(")"):
+        is_negative = True
+        value = value[1:-1]
+ 
+    value = value.replace("$", "").replace(",", "").replace("%", "").replace(" ", "")
+ 
+    if value in {"", "-"}:
+        return 0.0
+ 
+    try:
+        amount = float(value)
+        if is_negative:
+            amount = -amount
+        if absolute:
+            amount = abs(amount)
+        return amount
+    except ValueError:
+        return None
+ 
+ 
+def find_first_date(text: str) -> Optional[str]:
+    match = re.search(r"\b([A-Za-z]+\s+\d{1,2},\s+\d{4})\b", text)
+    return normalize_date(match.group(1)) if match else None
+ 
+ 
+def find_date_by_label(text: str, labels: List[str]) -> Optional[str]:
+    for label in labels:
+        pattern = rf"{re.escape(label)}\s*:?\s*([A-Za-z]+\s+\d{{1,2}},\s+\d{{4}})"
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return normalize_date(match.group(1))
+    return None
+ 
+ 
+_AMOUNT_PATTERN = r"(\(?\$?\s*-?[\d,]+(?:\.\d+)?%?\)?|\$?\s*-)"
+ 
+ 
+def find_amount_by_label(
+    text: str,
+    labels: List[str],
+    absolute: bool = True,
+    occurrence: int = 1,
+) -> Optional[float]:
+    for label in labels:
+        pattern = rf"{re.escape(label)}\s*:?\s*{_AMOUNT_PATTERN}"
+        matches = list(re.finditer(pattern, text, flags=re.IGNORECASE))
+        if len(matches) >= occurrence:
+            return clean_amount(matches[occurrence - 1].group(1), absolute=absolute)
+    return None
+ 
+ 
+ 
+def find_signed_amount_by_label(
+    text: str,
+    labels: List[str],
+    occurrence: int = 1,
+) -> Optional[float]:
+    """
+    Finds an amount after a label and preserves sign.
+    Example:
+        Additional Payment ... $63,016.92     -> 63016.92
+        Additional Payment ... ($28,582.70)   -> -28582.70
+    """
+    return find_amount_by_label(
+        text=text,
+        labels=labels,
+        absolute=False,
+        occurrence=occurrence,
+    )
+ 
+def find_company_name(text: str) -> Optional[str]:
+    # Usually appears before Amount Due.
+    match = re.search(
+        r"\n\s*([A-Za-z0-9 .,&'-]+?)\s*\n\s*Amount Due\s*:",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return " ".join(match.group(1).strip().split())
+ 
+    by_order_match = re.search(r"By order of:\s*([^\n]+)", text, flags=re.IGNORECASE)
+    if by_order_match:
+        return " ".join(by_order_match.group(1).strip().split())
+ 
+    return None
+ 
+ 
+def detect_currency(text: str) -> str:
+    if "$" in text:
+        return "USD"
+    if "¥" in text or "JPY" in text:
+        return "JPY"
+    return "unknown"
+ 
+ 
+def detect_fund_name(text: str) -> str:
+    if "NB Real Estate Secondary Opportunities Offshore Fund II LP" in text:
+        return "NB Real Estate Secondary Opportunities Offshore Fund II LP"
+    return "NB Real Estate Secondary Opportunities Fund II LP"
+ 
+ 
+# ------------------------------------------------------------
+# Extraction
+# ------------------------------------------------------------
+ 
+def extract_all_fields(text: str) -> Dict[str, Any]:
+    notice_date = find_first_date(text)
+    payment_date = find_date_by_label(text, ["Payment Date"])
+ 
+    amount_due = find_amount_by_label(text, ["AMOUNT DUE FROM LIMITED PARTNER", "Amount Due"], absolute=True)
+    limited_partner_commitment = find_amount_by_label(text, ["Limited Partner's Commitment"], absolute=True)
+    percent_called = find_amount_by_label(text, ["% of Capital Commitment Called"], absolute=True)
+ 
+    lp_share_capital_contribution = find_amount_by_label(
+        text,
+        ["Limited Partner's Share of Capital Contribution"],
+        absolute=True,
+    )
+ 
+    contribution_for_investments = find_amount_by_label(
+        text,
+        ["Limited Partner's Share of Capital Contribution for Investments"],
+        absolute=True,
+    )
+ 
+    contribution_for_partnership_expenses = find_amount_by_label(
+        text,
+        ["Limited Partner's Share of Capital Contribution for Partnership Expenses"],
+        absolute=True,
+    )
+ 
+    # Management fee line. This appears with different periods in NB notices.
+    management_fee_amount = find_amount_by_label(
+        text,
+        [
+            "For the period January 1, 2025 to June 30, 2025",
+            "For the period July 1, 2025 to December 31, 2025",
+            "For the period July 1, 2022 to December 31, 2024",
+            "For the period January 1, 2026 to June 30, 2026",
+        ],
+        absolute=True,
+    )
+ 
+    management_fee_rebate = find_amount_by_label(
+        text,
+        ["Management Fee Rebate"],
+        absolute=True,
+    ) or 0.0
+ 
+    # Additional Payment can be payable (+) or receivable / reducing amount due (-).
+    # If it appears in parentheses, it is treated as received and added to distribution_amount_received.
+    #
+    # Important:
+    # Some NB reports have footnote marks between the label and amount:
+    #   Additional Payment (Pursuant to Section 6.7(c) of the Limited Partnership Agreement)** ($28,582.70)
+    # So we use a flexible regex instead of exact label matching.
+    additional_payment_due_to_subsequent_closing = None
+    additional_payment_match = re.search(
+        r"Additional\s+Payment\s*\(Pursuant\s+to\s+Section\s+6\.7\(c\)\s+of\s+the\s+Limited\s+Partnership\s+Agreement\)\*{0,5}\s*"
+        + _AMOUNT_PATTERN,
+        text,
+        flags=re.IGNORECASE,
+    )
+    if additional_payment_match:
+        additional_payment_due_to_subsequent_closing = clean_amount(
+            additional_payment_match.group(1),
+            absolute=False,
+        )
+ 
+    annual_fee_rate = find_amount_by_label(text, ["Annual Fee Rate @"], absolute=True)
+ 
+    fund_distributable_proceeds = find_amount_by_label(
+        text,
+        ["Fund's Distributable Proceeds from Investments"],
+        absolute=True,
+    )
+ 
+    lp_share_distributable_proceeds = find_amount_by_label(
+        text,
+        ["Limited Partner's Share of Distributable Proceeds*"],
+        absolute=True,
+    )
+ 
+    tax_expense = find_amount_by_label(text, ["Tax Expense"], absolute=True) or 0.0
+ 
+    original_commitment = find_amount_by_label(text, ["Original Commitment"], absolute=True)
+ 
+    inception_to_date_contributions = find_amount_by_label(
+        text,
+        ["Less: Inception-to-Date Contributions (including Current Capital Contribution)"],
+        absolute=True,
+    )
+ 
+    itd_reinvestable = find_amount_by_label(
+        text,
+        [
+            "Plus: Inception-to-Date Distributable Proceeds Subject to Reinvestment (including Current Distribution)",
+            "Plus: Inception-to-Date Distributable Proceeds Subject to Reinvestment",
+        ],
+        absolute=True,
+    )
+ 
+    remaining_commitment = find_amount_by_label(text, ["Remaining Commitment"], absolute=True)
+    inception_to_date_distributions = find_amount_by_label(text, ["Inception-to-Date Distributions"], absolute=True)
+ 
+    reference = None
+    ref_match = re.search(r"Reference:\s*([A-Za-z0-9-]+)", text, flags=re.IGNORECASE)
+    if ref_match:
+        reference = ref_match.group(1).strip()
+ 
+    account_name = None
+    account_name_match = re.search(r"Account Name:\s*([^\n]+)", text, flags=re.IGNORECASE)
+    if account_name_match:
+        account_name = account_name_match.group(1).strip()
+ 
+    bank_name = None
+    bank_match = re.search(r"\n\s*(Bank of America,\s*N\.A\.)", text, flags=re.IGNORECASE)
+    if bank_match:
+        bank_name = bank_match.group(1).strip()
+ 
+    # Excel B / capital_contribution_amount:
+    # Use LP Share of Capital Contribution + net Management Fee.
+    # Management Fee Rebate reduces the fee.
+    #
+    # Important for NB_110325:
+    #   375,000 + 31,250 - 24,146.28 = 382,103.72
+    #
+    # Do NOT add Organizational Expenses separately because they are already
+    # included inside Limited Partner's Share of Capital Contribution.
+    net_management_fee = 0.0
+    if management_fee_amount is not None:
+        net_management_fee = float(management_fee_amount) - float(management_fee_rebate or 0.0)
+ 
+    current_gross_capital_contribution = 0.0
+    if lp_share_capital_contribution is not None:
+        current_gross_capital_contribution += float(lp_share_capital_contribution)
+    current_gross_capital_contribution += float(net_management_fee or 0.0)
+ 
+    if current_gross_capital_contribution == 0.0:
+        current_gross_capital_contribution = None
+ 
+    # Excel C / distribution_amount_received:
+    # Include deemed distribution plus Additional Payment only when Additional Payment is negative
+    # in the report, because it reduces the amount due and is treated as received.
+    #
+    # Important for NB_110325:
+    #   135,599.85 + 28,582.70 = 164,182.55
+    additional_payment_received = 0.0
+    if additional_payment_due_to_subsequent_closing is not None and additional_payment_due_to_subsequent_closing < 0:
+        additional_payment_received = abs(float(additional_payment_due_to_subsequent_closing))
+ 
+    current_distribution_amount = float(lp_share_distributable_proceeds or 0.0) + additional_payment_received
+ 
+    # Excel H / reinvestable_amount:
+    # Only deemed distribution is reinvestable. Additional payment is not reinvestable.
+    current_reinvestable_amount = float(lp_share_distributable_proceeds or 0.0)
+ 
+    return {
+        "notice_date": notice_date,
+        "payment_date": payment_date,
+        "amount_due": amount_due,
+        "limited_partner_commitment": limited_partner_commitment,
+        "percent_of_capital_commitment_called": percent_called,
+        "limited_partner_share_of_capital_contribution": lp_share_capital_contribution,
+        "capital_contribution_for_investments": contribution_for_investments,
+        "capital_contribution_for_partnership_expenses": contribution_for_partnership_expenses,
+        "management_fee_amount": management_fee_amount,
+        "management_fee_rebate": management_fee_rebate,
+        "net_management_fee": net_management_fee,
+        "additional_payment_due_to_subsequent_closing": additional_payment_due_to_subsequent_closing,
+        "additional_payment_received": additional_payment_received,
+        "annual_fee_rate_percent": annual_fee_rate,
+        "fund_distributable_proceeds_from_investments": fund_distributable_proceeds,
+        "limited_partner_share_of_distributable_proceeds": lp_share_distributable_proceeds,
+        "tax_expense": tax_expense,
+        "amount_due_from_limited_partner": amount_due,
+        "original_commitment": original_commitment,
+        "inception_to_date_contributions": inception_to_date_contributions,
+        "inception_to_date_distributable_proceeds_subject_to_reinvestment": itd_reinvestable,
+        "remaining_commitment": remaining_commitment,
+        "inception_to_date_distributions": inception_to_date_distributions,
+        "current_gross_capital_contribution": current_gross_capital_contribution,
+        "current_distribution_amount": current_distribution_amount,
+        "current_reinvestable_amount": current_reinvestable_amount,
+        "bank_name": bank_name,
+        "account_name": account_name,
+        "reference": reference,
+    }
+ 
+ 
+# ------------------------------------------------------------
+# Breakdown
+# ------------------------------------------------------------
+ 
+def build_breakdown(all_fields: Dict[str, Any]) -> Dict[str, Any]:
+    capital_call_breakdown: List[Dict[str, Any]] = []
+    distribution_breakdown: List[Dict[str, Any]] = []
+ 
+    if all_fields.get("capital_contribution_for_investments") is not None:
+        capital_call_breakdown.append({
+            "purpose": "portfolio_investments",
+            "label": "Limited Partner's Share of Capital Contribution for Investments",
+            "amount": all_fields["capital_contribution_for_investments"],
+            "excel_usage": "capital_contribution_amount_component",
+        })
+ 
+    if all_fields.get("capital_contribution_for_partnership_expenses") is not None:
+        capital_call_breakdown.append({
+            "purpose": "partnership_expenses",
+            "label": "Limited Partner's Share of Capital Contribution for Partnership Expenses",
+            "amount": all_fields["capital_contribution_for_partnership_expenses"],
+            "excel_usage": "capital_contribution_amount_component",
+        })
+ 
+    if not capital_call_breakdown and all_fields.get("limited_partner_share_of_capital_contribution") is not None:
+        capital_call_breakdown.append({
+            "purpose": "capital_contribution",
+            "label": "Limited Partner's Share of Capital Contribution",
+            "amount": all_fields["limited_partner_share_of_capital_contribution"],
+            "excel_usage": "capital_contribution_amount_component",
+        })
+ 
+    if all_fields.get("management_fee_amount") is not None:
+        capital_call_breakdown.append({
+            "purpose": "management_fee",
+            "label": "Capital Contributions Required for Partnership Management Fees",
+            "amount": all_fields["management_fee_amount"],
+            "excel_usage": "capital_contribution_amount_component_before_rebate",
+        })
+ 
+    if all_fields.get("management_fee_rebate"):
+        capital_call_breakdown.append({
+            "purpose": "management_fee_rebate",
+            "label": "Management Fee Rebate",
+            "amount": -abs(all_fields["management_fee_rebate"]),
+            "excel_usage": "reduces_capital_contribution_amount",
+        })
+ 
+    if all_fields.get("additional_payment_due_to_subsequent_closing") is not None:
+        addl = all_fields["additional_payment_due_to_subsequent_closing"]
+        if addl < 0:
+            distribution_breakdown.append({
+                "purpose": "additional_payment_received",
+                "label": "Additional Payment Due to Subsequent Closing",
+                "amount": abs(addl),
+                "excel_usage": "distribution_amount_received_component_not_reinvestable",
+            })
+        else:
+            capital_call_breakdown.append({
+                "purpose": "additional_payment_payable",
+                "label": "Additional Payment Due to Subsequent Closing",
+                "amount": addl,
+                "excel_usage": "actual_amount_due_only_not_excel_cashflow",
+            })
+ 
+    if all_fields.get("limited_partner_share_of_distributable_proceeds") is not None:
+        distribution_breakdown.append({
+            "purpose": "distributable_proceeds_subject_to_reinvestment",
+            "label": "Limited Partner's Share of Distributable Proceeds",
+            "amount": all_fields["limited_partner_share_of_distributable_proceeds"],
+            "excel_usage": "distribution_amount_received_and_reinvestable_amount",
+        })
+ 
+    if all_fields.get("tax_expense"):
+        distribution_breakdown.append({
+            "purpose": "tax_expense",
+            "label": "Tax Expense",
+            "amount": all_fields["tax_expense"],
+            "excel_usage": "extracted_only_not_used_in_cash_flow",
+        })
+ 
+    return {
+        "capital_call_breakdown": capital_call_breakdown,
+        "distribution_breakdown": distribution_breakdown,
+    }
+ 
+ 
+# ------------------------------------------------------------
+# Excel mapping and calculation
+# ------------------------------------------------------------
+ 
+def calculate_current_transaction_cash_flow(
+    capital_contribution_amount: float,
+    distribution_amount_received: float,
+) -> float:
+    """
+    Company Excel current transaction cash flow.
+ 
+    IMPORTANT:
+    This function intentionally does NOT use tax_expense.
+    This function intentionally does NOT use amount_due_from_limited_partner.
+ 
+    Formula:
+        current_transaction_cash_flow = -capital_contribution_amount + distribution_amount_received
+    """
+    return round(
+        -float(capital_contribution_amount or 0.0)
+        + float(distribution_amount_received or 0.0),
+        2,
+    )
+ 
+ 
+def map_to_excel_fields(all_fields: Dict[str, Any], breakdown: Dict[str, Any]) -> Dict[str, Any]:
+    commitment_amount = all_fields.get("original_commitment") or all_fields.get("limited_partner_commitment")
+    capital_contribution_amount = all_fields.get("current_gross_capital_contribution") or 0.0
+    distribution_amount_received = all_fields.get("current_distribution_amount") or 0.0
+    reinvestable_amount = all_fields.get("current_reinvestable_amount") or 0.0
+    amount_due = all_fields.get("amount_due_from_limited_partner") or 0.0
+    tax_expense = all_fields.get("tax_expense") or 0.0
+ 
+    current_transaction_cash_flow = calculate_current_transaction_cash_flow(
+        capital_contribution_amount=capital_contribution_amount,
+        distribution_amount_received=distribution_amount_received,
+    )
+ 
+    remarks_parts = ["NB Real Estate capital call/drawdown notice."]
+    if distribution_amount_received:
+        remarks_parts.append("Includes deemed distribution subject to reinvestment.")
+    if all_fields.get("management_fee_amount"):
+        remarks_parts.append("Includes net management fee capital contribution.")
+    if all_fields.get("management_fee_rebate"):
+        remarks_parts.append("Management fee rebate deducted from capital contribution amount.")
+    if all_fields.get("additional_payment_received"):
+        remarks_parts.append("Additional payment received included in distribution amount received, but not reinvestable amount.")
+    if tax_expense:
+        remarks_parts.append("Tax expense extracted separately and not used in cash flow.")
+ 
+    return {
+        "subscription_agreement_effective_date": None,
+        "commitment_amount": commitment_amount,
+        "transaction_date": all_fields.get("payment_date"),
+        "capital_contribution_amount": capital_contribution_amount,
+        "distribution_amount_received": distribution_amount_received,
+        "reinvestable_amount": reinvestable_amount,
+        "cumulative_capital_contributions": all_fields.get("inception_to_date_contributions"),
+        "remaining_commitment_formula_value": all_fields.get("remaining_commitment"),
+        "remaining_commitment": all_fields.get("remaining_commitment"),
+        # This is current transaction cash flow at extraction stage.
+        # final_excel_fields.cash_flow may become cumulative if previous_state is provided.
+        "cash_flow": current_transaction_cash_flow,
+        "remarks": " ".join(remarks_parts),
+        "distribution_details": breakdown.get("distribution_breakdown", []),
+        "distribution_not_allocated_to_reinvestment": round(max(distribution_amount_received - reinvestable_amount, 0.0), 2),
+        "tax_expense": tax_expense,
+        "amount_due_from_limited_partner": amount_due,
+        "management_fee_rebate": all_fields.get("management_fee_rebate", 0.0),
+        "net_management_fee": all_fields.get("net_management_fee", 0.0),
+        "additional_payment_due_to_subsequent_closing": all_fields.get("additional_payment_due_to_subsequent_closing"),
+        "additional_payment_received": all_fields.get("additional_payment_received", 0.0),
+    }
+ 
+ 
+def calculate_excel_fields(
+    extracted_excel_fields: Dict[str, Any],
+    all_fields: Dict[str, Any],
+    previous_state: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    b = extracted_excel_fields.get("capital_contribution_amount") or 0.0
+    d = extracted_excel_fields.get("reinvestable_amount") or 0.0
+    distribution_received = extracted_excel_fields.get("distribution_amount_received") or 0.0
+    tax_expense = extracted_excel_fields.get("tax_expense") or 0.0
+    amount_due = extracted_excel_fields.get("amount_due_from_limited_partner") or 0.0
+ 
+    report_e = all_fields.get("inception_to_date_contributions")
+    report_f = all_fields.get("remaining_commitment")
+ 
+    cumulative_capital_contributions = report_e
+    remaining_commitment = report_f
+    cumulative_cash_flow = None
+ 
+    calculation_sources = {
+        "cumulative_capital_contributions": "from_report_cumulative_value_no_previous_state",
+        "remaining_commitment": "from_report_cumulative_value_no_previous_state",
+        "cash_flow": "current_transaction_cash_flow_no_previous_state",
+        "cumulative_cash_flow": "not_calculated_previous_state_missing",
+    }
+ 
+    current_cash_flow = calculate_current_transaction_cash_flow(
+        capital_contribution_amount=b,
+        distribution_amount_received=distribution_received,
+    )
+ 
+    # Default cash flow is current transaction cash flow.
+    final_cash_flow_for_excel = current_cash_flow
+ 
+    # If previous_state is NOT provided, use report cumulative values for NB fallback.
+    # This is needed when the uploaded report is the first file in DB,
+    # but the report itself already includes previous fund activity.
+    if previous_state is None:
+        report_cumulative_contributions = all_fields.get("inception_to_date_contributions") or 0.0
+        report_cumulative_distributions = all_fields.get("inception_to_date_distributions") or 0.0
+ 
+        if report_cumulative_contributions:
+            cumulative_cash_flow = round(
+                -float(report_cumulative_contributions)
+                + float(report_cumulative_distributions or 0.0),
+                2,
+            )
+            final_cash_flow_for_excel = cumulative_cash_flow
+            calculation_sources["cash_flow"] = "from_report_cumulative_values_no_previous_state"
+            calculation_sources["cumulative_cash_flow"] = "from_report_cumulative_values_no_previous_state"
+ 
+    # If previous_state is provided, use previous DB row values.
+    # This is the normal flow for second, third, fourth... reports.
+    if previous_state:
+        previous_e = previous_state.get("cumulative_capital_contributions")
+        previous_f = previous_state.get("remaining_commitment")
+        previous_cash_flow = previous_state.get("cumulative_cash_flow")
+ 
+        if previous_e is not None:
+            cumulative_capital_contributions = round(float(previous_e) + float(b), 2)
+            calculation_sources["cumulative_capital_contributions"] = "calculated_from_previous_state"
+ 
+        if previous_f is not None:
+            remaining_commitment = round(float(previous_f) - float(b) + float(d), 2)
+            calculation_sources["remaining_commitment"] = "calculated_from_previous_state"
+ 
+        if previous_cash_flow is not None:
+            cumulative_cash_flow = round(float(previous_cash_flow) + float(current_cash_flow), 2)
+            final_cash_flow_for_excel = cumulative_cash_flow
+            calculation_sources["cash_flow"] = "cumulative_cash_flow_calculated_from_previous_state"
+            calculation_sources["cumulative_cash_flow"] = "calculated_from_previous_state"
+ 
+    distribution_not_allocated = round(max(distribution_received - d, 0.0), 2)
+ 
+    calculated_fields = {
+        "cumulative_capital_contributions": cumulative_capital_contributions,
+        "remaining_commitment_formula_value": remaining_commitment,
+        "remaining_commitment": remaining_commitment,
+        "current_transaction_cash_flow": current_cash_flow,
+        "cumulative_cash_flow": cumulative_cash_flow,
+        "cash_flow_for_excel": final_cash_flow_for_excel,
+        "distribution_not_allocated_to_reinvestment": distribution_not_allocated,
+        "remarks": extracted_excel_fields.get("remarks"),
+        "distribution_details": extracted_excel_fields.get("distribution_details", []),
+        "tax_expense": tax_expense,
+        "amount_due_from_limited_partner": amount_due,
+    }
+ 
+    return {
+        "input_values_for_current_row": {
+            "subscription_agreement_effective_date": extracted_excel_fields.get("subscription_agreement_effective_date"),
+            "commitment_amount": extracted_excel_fields.get("commitment_amount"),
+            "transaction_date": extracted_excel_fields.get("transaction_date"),
+            "capital_contribution_amount": b,
+            "distribution_amount_received": distribution_received,
+            "reinvestable_amount": d,
+            "tax_expense": tax_expense,
+            "amount_due_from_limited_partner": amount_due,
+        },
+        "previous_state_used": previous_state,
+        "calculated_excel_fields": calculated_fields,
+        "calculation_sources": calculation_sources,
+    }
+ 
+# ------------------------------------------------------------
+# Validation
+# ------------------------------------------------------------
+ 
+def build_validation(
+    excel_fields: Dict[str, Any],
+    all_fields: Dict[str, Any],
+    breakdown: Dict[str, Any],
+    calculation_result: Dict[str, Any],
+) -> Dict[str, Any]:
+    required_excel_fields = [
+        "subscription_agreement_effective_date",
+        "commitment_amount",
+        "transaction_date",
+        "capital_contribution_amount",
+        "distribution_amount_received",
+        "reinvestable_amount",
+        "cumulative_capital_contributions",
+        "remaining_commitment",
+        "cash_flow",
+        "remarks",
+        "distribution_details",
+    ]
+ 
+    missing_excel_fields: List[str] = []
+    matched_excel_fields: List[str] = []
+ 
+    for field in required_excel_fields:
+        value = excel_fields.get(field)
+        if value is None or value == "":
+            missing_excel_fields.append(field)
+        else:
+            matched_excel_fields.append(field)
+ 
+    capital_call_breakdown_total = round(sum(
+        item["amount"] for item in breakdown.get("capital_call_breakdown", [])
+        if item.get("amount") is not None
+    ), 2)
+ 
+    distribution_breakdown_total = round(sum(
+        item["amount"] for item in breakdown.get("distribution_breakdown", [])
+        if item.get("amount") is not None and item.get("purpose") != "tax_expense"
+    ), 2)
+ 
+    current_contribution = all_fields.get("current_gross_capital_contribution") or 0.0
+    current_distribution = all_fields.get("current_distribution_amount") or 0.0
+    tax_expense = all_fields.get("tax_expense") or 0.0
+    amount_due = all_fields.get("amount_due_from_limited_partner")
+ 
+    # This is a separate report validation only.
+    # It checks report net amount due, but it is NOT used for Excel cash flow.
+    # Report amount due validation based on extracted Excel components.
+    # For NB_110325:
+    #   382,103.72 - 164,182.55 = 217,921.17
+    calculated_amount_due = round(current_contribution - current_distribution + tax_expense, 2)
+    is_amount_due_matched = None
+    if amount_due is not None:
+        is_amount_due_matched = round(calculated_amount_due, 2) == round(amount_due, 2)
+ 
+    report_e = all_fields.get("inception_to_date_contributions")
+    calc_e = calculation_result["calculated_excel_fields"].get("cumulative_capital_contributions")
+    report_f = all_fields.get("remaining_commitment")
+    calc_f = calculation_result["calculated_excel_fields"].get("remaining_commitment")
+ 
+    current_transaction_cash_flow = calculation_result["calculated_excel_fields"].get("current_transaction_cash_flow")
+    cumulative_cash_flow = calculation_result["calculated_excel_fields"].get("cumulative_cash_flow")
+    cash_flow_for_excel = calculation_result["calculated_excel_fields"].get("cash_flow_for_excel")
+ 
+    return {
+        "missing_excel_fields": missing_excel_fields,
+        "matched_excel_fields": matched_excel_fields,
+        "calculation_checks": {
+            "capital_call_breakdown_total": capital_call_breakdown_total,
+            "current_gross_capital_contribution": current_contribution,
+            "is_capital_call_breakdown_matched": round(capital_call_breakdown_total, 2) == round(current_contribution, 2) if current_contribution else None,
+            "distribution_breakdown_total_excluding_tax": distribution_breakdown_total,
+            "current_distribution_amount": current_distribution,
+            "is_distribution_breakdown_matched": round(distribution_breakdown_total, 2) == round(current_distribution, 2) if current_distribution else None,
+            "reported_amount_due": amount_due,
+            "calculated_amount_due_for_report_validation_only": calculated_amount_due,
+            "is_amount_due_matched": is_amount_due_matched,
+            "report_cumulative_capital_contributions": report_e,
+            "calculated_cumulative_capital_contributions": calc_e,
+            "is_cumulative_capital_contributions_matched_with_report": round(report_e, 2) == round(calc_e, 2) if report_e is not None and calc_e is not None else None,
+            "report_remaining_commitment": report_f,
+            "calculated_remaining_commitment": calc_f,
+            "is_remaining_commitment_matched_with_report": round(report_f, 2) == round(calc_f, 2) if report_f is not None and calc_f is not None else None,
+            "current_transaction_cash_flow": current_transaction_cash_flow,
+            "cumulative_cash_flow": cumulative_cash_flow,
+            "cash_flow_for_excel": cash_flow_for_excel,
+            "tax_expense_excluded_from_cash_flow": tax_expense,
+        },
+        "needs_review": True,
+        "warnings": [
+            "For NB reports, capital_contribution_amount is gross contribution used for cumulative contribution calculation.",
+            "current_transaction_cash_flow is calculated as -capital_contribution_amount + distribution_amount_received.",
+            "Tax expense and Amount Due are extracted and validated separately, but they are NOT used in Excel cash flow.",
+            "If previous_state.cumulative_cash_flow is provided, final_excel_fields.cash_flow becomes cumulative cash flow.",
+            "Distributable proceeds are treated as reinvestable because the notice states they are subject to reinvestment.",
+        ],
+    }
+ 
+ 
+# ------------------------------------------------------------
+# Main module function
+# ------------------------------------------------------------
+ 
+def extract_nb_realestate_report(
+    text: str,
+    file_name: str = "",
+    previous_state: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    text = normalize_text(text)
+    all_fields = extract_all_fields(text)
+    breakdown = build_breakdown(all_fields)
+    excel_fields = map_to_excel_fields(all_fields, breakdown)
+    calculation_result = calculate_excel_fields(excel_fields, all_fields, previous_state)
+    validation = build_validation(excel_fields, all_fields, breakdown, calculation_result)
+ 
+    calculated = calculation_result.get("calculated_excel_fields", {})
+ 
+    final_excel_fields = dict(excel_fields)
+    final_excel_fields["cumulative_capital_contributions"] = calculated.get(
+        "cumulative_capital_contributions",
+        final_excel_fields.get("cumulative_capital_contributions"),
+    )
+    final_excel_fields["remaining_commitment_formula_value"] = calculated.get(
+        "remaining_commitment_formula_value",
+        final_excel_fields.get("remaining_commitment_formula_value"),
+    )
+    final_excel_fields["remaining_commitment"] = calculated.get(
+        "remaining_commitment",
+        final_excel_fields.get("remaining_commitment"),
+    )
+ 
+    # IMPORTANT:
+    # Excel cash_flow = cumulative cash flow if previous_state.cumulative_cash_flow was provided.
+    # Otherwise, it remains current transaction cash flow.
+    # Tax expense is never included in this value.
+    final_excel_fields["cash_flow"] = calculated.get(
+        "cash_flow_for_excel",
+        final_excel_fields.get("cash_flow"),
+    )
+ 
+    final_excel_fields["current_transaction_cash_flow"] = calculated.get("current_transaction_cash_flow")
+    final_excel_fields["cumulative_cash_flow"] = calculated.get("cumulative_cash_flow")
+    final_excel_fields["distribution_not_allocated_to_reinvestment"] = calculated.get(
+        "distribution_not_allocated_to_reinvestment",
+        final_excel_fields.get("distribution_not_allocated_to_reinvestment"),
+    )
+ 
+    return {
+        "source_file_name": file_name,
+        "extraction_status": "success",
+        "module_name": "nb_realestate_secondary_opportunities",
+        "document_type": "capital_call_notice_with_deemed_distribution",
+        "company_name": find_company_name(text),
+        "fund_name": detect_fund_name(text),
+        "currency": detect_currency(text),
+        "excel_fields": excel_fields,
+        "all_extracted_fields": all_fields,
+        "breakdown": breakdown,
+        "validation": validation,
+        "calculation_result": {
+            **calculation_result,
+            "final_excel_fields_for_frontend": final_excel_fields,
+        },
+        "final_excel_fields": final_excel_fields,
+    }
+ 
+ 
+# ------------------------------------------------------------
+# CLI runner
+# ------------------------------------------------------------
+ 
+def _load_previous_state_from_arg(raw: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not raw:
+        return None
+ 
+    if os.path.exists(raw):
+        with open(raw, "r", encoding="utf-8") as f:
+            return json.load(f)
+ 
+    return json.loads(raw)
+ 
+ 
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python nb_realestate_module_updated.py '<pdf_path>' [previous_state_json_or_file]")
+        sys.exit(1)
+ 
+    pdf_path = sys.argv[1]
+    previous_state = _load_previous_state_from_arg(sys.argv[2]) if len(sys.argv) >= 3 else None
+ 
+    text = extract_pdf_text(pdf_path)
+    result = extract_nb_realestate_report(
+        text=text,
+        file_name=os.path.basename(pdf_path),
+        previous_state=previous_state,
+    )
+ 
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+ 
+ 

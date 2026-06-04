@@ -28,8 +28,14 @@ async function main() {
   // ── Clear existing data (FK-safe order) ───────────────────────────────────
   await prisma.auditLog.deleteMany()
   await prisma.otpToken.deleteMany()
+  await prisma.calculationResult.deleteMany()
+  await prisma.calculationRule.deleteMany()
+  await prisma.attributeExtractor.deleteMany()
+  await prisma.notification.deleteMany()
   await prisma.investmentTarget.deleteMany()
   await prisma.navRecord.deleteMany()
+  await prisma.sigfSnapshot.deleteMany()
+  await prisma.fundReport.deleteMany()
   await prisma.distribution.deleteMany()
   await prisma.capitalCall.deleteMany()
   await prisma.notice.deleteMany()
@@ -232,6 +238,50 @@ async function main() {
 
   // No distributions yet — fund is early-stage (18.10% drawn, repaying call line)
   // DPI = 0/181,000 = 0.000  (fundFormulas.ts §DPI)
+
+  // ── Fund — Goldman Sachs Vintage X ───────────────────────────────────────────
+  await prisma.fund.create({
+    data: {
+      fundName:      'Vintage X (Flagship) Offshore SCSp',
+      manager:       'Goldman Sachs Asset Management',
+      administrator: 'Goldman Sachs Asset Management',
+      strategy:      'Secondaries',
+      vintageYear:   2024,
+      currency:      'USD',
+      commitmentUsd: 20_000_000,
+      entryFxRate:   154.20,
+      wireBank:      'State Street Bank & Trust co. Boston',
+      wireAba:       '011000028',
+      wireAccountName:   'Vintage X (Flagship) Offshore SCSp',
+      wireAccountNumber: '11841533',
+      wireReference:     'MG149345 Thirdwave Financial Inc.,',
+      isActive:      true,
+    },
+  })
+  console.log('  ✔ Fund created: Vintage X (Flagship) Offshore SCSp (Goldman Sachs)')
+
+  // ── Fund — NB Real Estate Secondary Opportunities Offshore Fund II LP ────────
+  // Neuberger Berman / NB Alternatives Advisers LLC. Drawdown notices are
+  // combined capital call + deemed distribution; commitment from the LP notice.
+  await prisma.fund.create({
+    data: {
+      fundName:      'NB Real Estate Secondary Opportunities Offshore Fund II LP',
+      manager:       'NB Alternatives Advisers LLC',
+      administrator: 'Neuberger Berman',
+      strategy:      'Real Estate Secondaries',
+      vintageYear:   2025,
+      currency:      'USD',
+      commitmentUsd: 5_000_000,
+      wireBank:      'Bank of America, N.A.',
+      wireAba:       '026-009-593',
+      wireSwift:     'BOFAUS3N',
+      wireAccountName:   'NB Real Estate Secondary Opportunities Offshore Fund II LP',
+      wireAccountNumber: '4451668246',
+      wireReference:     'NBI13133',
+      isActive:      true,
+    },
+  })
+  console.log('  ✔ Fund created: NB Real Estate Secondary Opportunities Offshore Fund II LP (Neuberger Berman)')
 
   console.log('\n✅  Database seeded successfully!')
   console.log('\n   Fund:   Siguler Guff Small Buyout Opportunities Fund VI (F), LP')

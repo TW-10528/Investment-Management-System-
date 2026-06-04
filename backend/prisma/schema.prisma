@@ -110,6 +110,9 @@ model CapitalCall {
   investmentAmountUsd Decimal?   @default(0) @db.Decimal(20, 6) @map("investment_amount_usd")
   managementFeeUsd    Decimal?   @default(0) @db.Decimal(20, 6) @map("management_fee_usd")
   expenseUsd          Decimal?   @default(0) @db.Decimal(20, 6) @map("expense_usd")
+  // Manual cash-flow override (col G). When set, the ledger uses this instead of -B + C.
+  // Used for funds whose cash flow is entered by hand until automated extraction exists.
+  manualCashFlowUsd   Decimal?   @db.Decimal(20, 6) @map("manual_cash_flow_usd")
   status              CallStatus @default(pending)
   wireReference       String?    @map("wire_reference")
   wireFeeJpy          Decimal?   @default(0) @db.Decimal(12, 2) @map("wire_fee_jpy")
