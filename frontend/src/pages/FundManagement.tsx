@@ -657,6 +657,7 @@ function shiftDate(dateStr: string, days: number): string {
 function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
   const [rows, setRows]           = useState<LedgerRow[]>([]);
   const [snap, setSnap]           = useState<LedgerSnapshot|null>(null);
+  const [fundName, setFundName]   = useState('');
   const [loading, setLoading]     = useState(true);
   const [editIdx, setEditIdx]     = useState<number|null>(null);
   const [noteText, setNoteText]   = useState('');
@@ -691,6 +692,7 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
         const loaded = r.data.rows ?? [];
         setRows(loaded);
         setSnap(r.data.snapshot ?? null);
+        setFundName(r.data.fund_name ?? '');
         fetchMurcRates(loaded);
       })
       .finally(() => setLoading(false));
@@ -766,6 +768,10 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
 
   if (loading) return <p className="px-5 py-8 text-sm theme-text-muted">Loading ledger…</p>;
 
+  // Distribution-detail columns (Return of Capital / Gain / Interest) are shown for
+  // the five core funds and hidden for Goldman Sachs / Siguler Guff / Capula.
+  const showDetail = !/vintage|goldman|siguler|capula/i.test(fundName);
+
   return (
     <div>
       {/* ── Toolbar ── */}
@@ -819,6 +825,11 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
                   { label: 'F Inv.Cap',    right: true  },
                   { label: 'G Cash Flow',  right: true  },
                   { label: 'H Net Cash',   right: true  },
+                  ...(showDetail ? [
+                    { label: 'Return of Capital', right: true },
+                    { label: 'Gain',              right: true },
+                    { label: 'Interest',          right: true },
+                  ] : []),
                   { label: 'Review',       right: false },
                 ].map((h, hi) => (
                   <th key={hi}
@@ -924,6 +935,15 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
                       <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.violet}}>{fmt.usd(row.investment_capacity)}</td>
                       <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:row.cash_flow<0?C.red:C.emerald}}>{fmt.usd(row.cash_flow)}</td>
                       <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:row.net_cash_position<0?C.red:C.emerald}}>{fmt.usd(row.net_cash_position)}</td>
+
+                      {/* Distribution detail — hidden for Goldman / Siguler / Capula */}
+                      {showDetail && (
+                        <>
+                          <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.return_of_capital ? fmt.usd(row.return_of_capital) : '—'}</td>
+                          <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.gain ? fmt.usd(row.gain) : '—'}</td>
+                          <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.interest ? fmt.usd(row.interest) : '—'}</td>
+                        </>
+                      )}
 
                       {/* Review — inline edit */}
                       <td className="px-3 py-3 min-w-[220px]">
