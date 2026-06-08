@@ -3,13 +3,13 @@
  * Stores: theme, language, currency, compact numbers, date format.
  * All values persist in localStorage.
  */
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useEffect, useState, type ReactNode } from 'react';
 import i18n from '../i18n';
 
 export type Theme      = 'light' | 'dark';
 export type Currency   = 'USD' | 'JPY';
 export type DateFmt    = 'US' | 'ISO' | 'JP';
-export type LangCode   = 'en' | 'ja' | 'tl' | 'zh' | 'ko';
+export type LangCode   = 'en' | 'ja' | 'zh' | 'tl';
 
 interface Prefs {
   theme:          Theme;
@@ -36,12 +36,33 @@ const DEFAULTS: Prefs = {
   dateFormat:     'US',
 };
 
+const VALID_LANGS: LangCode[] = ['en', 'ja', 'zh', 'tl'];
+
+function detectBrowserLang(): LangCode {
+  const langs: readonly string[] = navigator.languages?.length
+    ? navigator.languages
+    : [navigator.language ?? 'en'];
+  for (const lang of langs) {
+    const l = lang.toLowerCase();
+    if (l.startsWith('ja'))                         return 'ja';
+    if (l.startsWith('zh'))                         return 'zh';
+    if (l.startsWith('tl') || l.startsWith('fil')) return 'tl';
+    if (l.startsWith('en'))                         return 'en';
+  }
+  return 'en';
+}
+
 function load(): Prefs {
   try {
     const raw = localStorage.getItem('ims_prefs');
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (!VALID_LANGS.includes(parsed.language)) parsed.language = detectBrowserLang();
+      return { ...DEFAULTS, ...parsed };
+    }
   } catch { /* ignore */ }
-  return { ...DEFAULTS };
+  // No saved prefs → auto-detect from browser
+  return { ...DEFAULTS, language: detectBrowserLang() };
 }
 
 function save(p: Prefs) {
@@ -50,7 +71,7 @@ function save(p: Prefs) {
   localStorage.setItem('ims_language', p.language);
 }
 
-const Ctx = createContext<PrefsCtx>({} as PrefsCtx);
+export const PrefsCtx = createContext<PrefsCtx>({} as PrefsCtx);
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<Prefs>(load);
@@ -79,7 +100,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <Ctx.Provider value={{
+    <PrefsCtx.Provider value={{
       ...prefs,
       setTheme:          t => update({ theme: t }),
       setLanguage:       l => update({ language: l }),
@@ -89,8 +110,6 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       resetAll:          () => { save(DEFAULTS); setPrefs({ ...DEFAULTS }); },
     }}>
       {children}
-    </Ctx.Provider>
+    </PrefsCtx.Provider>
   );
 }
-
-export function usePreferences() { return useContext(Ctx); }

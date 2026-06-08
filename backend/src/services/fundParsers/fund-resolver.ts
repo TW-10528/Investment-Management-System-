@@ -6,11 +6,11 @@ import { prisma } from '../../lib/prisma'
 // ── Fund key → name search patterns ──────────────────────────────────────────
 // Add the remaining 7 funds here when you provide their PDFs.
 const FUND_NAME_PATTERNS: Record<string, string[]> = {
-  'goldman-sachs':  ['Vintage X', 'Goldman Sachs'],
-  'siguler-guff':   ['Siguler Guff'],
-  'nb-real-estate': ['NB Real Estate Secondary Opportunities', 'NB Real Estate'],
-  // 'blackstone':    ['Blackstone'],
-  // 'kkr':           ['KKR'],
+  'goldman-sachs':   ['Vintage X', 'Goldman Sachs'],
+  'siguler-guff':    ['Siguler Guff'],
+  'capula-grv':      ['Capula Global Relative Value Trust', 'Capula'],
+  'dover-street-xi': ['Dover Street XI Feeder Fund', 'Dover Street XI'],
+  // ... remaining 4 funds
 }
 
 export interface ResolvedFund {

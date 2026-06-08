@@ -31,6 +31,7 @@ const MULTI_PAIRS = [
 ];
 
 function MultiCurrencyPanel() {
+  const { t } = useTranslation();
   const [rates,   setRates]   = useState<Record<string, number>>({});
   const [asOf,    setAsOf]    = useState('');
   const [loading, setLoading] = useState(true);
@@ -40,8 +41,8 @@ function MultiCurrencyPanel() {
   async function loadCross() {
     setLoading(true);
     try {
-      const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=JPY,EUR,GBP,AUD');
-      const d   = await res.json();
+      const r = await fxRatesAPI.cross('USD', 'JPY,EUR,GBP,AUD');
+      const d = r.data;
       const usdBase: Record<string, number> = { USD: 1, ...d.rates };
       const out: Record<string, number>     = {};
       MULTI_PAIRS.forEach(p => {
@@ -51,7 +52,6 @@ function MultiCurrencyPanel() {
       setRates(out);
       setAsOf(d.date ?? '');
     } catch {
-      // Fallback: try backend for USD/JPY
       try {
         const r = await fxRatesAPI.live();
         setRates({ 'USD/JPY': r.data.usd_jpy });
@@ -67,13 +67,13 @@ function MultiCurrencyPanel() {
   return (
     <div className="theme-card border rounded-2xl overflow-hidden">
       <div className="px-5 py-3 border-b theme-border flex items-center justify-between">
-        <h2 className="font-semibold theme-text text-sm">Live Multi-Currency Rates</h2>
+        <h2 className="font-semibold theme-text text-sm">{t('fxRates.livePairs')}</h2>
         <div className="flex items-center gap-2">
-          {asOf && <span className="text-xs theme-text-muted">As of {asOf}</span>}
+          {asOf && <span className="text-xs theme-text-muted">{t('dashboard.asOf')} {asOf}</span>}
           <button onClick={loadCross} disabled={loading}
             className="flex items-center gap-1.5 px-2.5 py-1 theme-card border rounded-lg text-xs theme-text-sub hover:theme-text disabled:opacity-50 transition-colors">
             {loading ? <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : '🔄'}
-            Refresh
+            {t('common.refresh')}
           </button>
         </div>
       </div>
@@ -182,6 +182,57 @@ export default function FxRates() {
   const [addForm,     setAddForm]     = useState({ date: '', usd_jpy: '' });
   const [adding,      setAdding]      = useState(false);
   const [showAdd,     setShowAdd]     = useState(false);
+
+  // ── Historical lookup ────────────────────────────────────────────────────
+  const [lookupDate,    setLookupDate]    = useState('');
+  const [lookupFrom,    setLookupFrom]    = useState('USD');
+  const [lookupTo,      setLookupTo]      = useState('JPY');
+  const [lookupResult,  setLookupResult]  = useState<{
+    date: string; mufgRate: number; usdJpy: number;
+    tts?: number; ttb?: number;
+    from: string; to: string; source: 'db' | 'murc';
+  } | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError,   setLookupError]   = useState('');
+  const [saving,        setSaving]        = useState(false);
+  const [saved,         setSaved]         = useState(false);
+
+  async function fetchHistorical() {
+    if (!lookupDate) return;
+    setLookupLoading(true);
+    setLookupResult(null);
+    setLookupError('');
+    setSaved(false);
+    try {
+      const r    = await fxRatesAPI.historical(lookupDate, lookupFrom, lookupTo);
+      const data = r.data;
+      if (!data.mufg_rate) throw new Error();
+      setLookupResult({
+        date: data.date, mufgRate: data.mufg_rate, usdJpy: data.usd_jpy,
+        tts: data.tts, ttb: data.ttb, from: data.from, to: data.to, source: data.source,
+      });
+    } catch (err: any) {
+      setLookupError(err?.response?.data?.detail ?? t('fxRates.lookupNoRate'));
+    } finally {
+      setLookupLoading(false);
+    }
+  }
+
+  async function saveToDb() {
+    if (!lookupResult || lookupResult.source !== 'murc') return;
+    setSaving(true);
+    try {
+      await fxRatesAPI.create({ rate_date: lookupResult.date, usd_jpy: lookupResult.usdJpy, source: 'murc_ttm' });
+      setSaved(true);
+      setLookupResult(r => r ? { ...r, source: 'db' } : r);
+      fetchRates();
+      toast.success(t('fxRates.saved'));
+    } catch {
+      toast.error('Save failed');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   useEffect(() => {
     fetchRates();
@@ -301,6 +352,143 @@ export default function FxRates() {
 
       {/* Multi-currency live panel */}
       <MultiCurrencyPanel />
+
+      {/* ── Historical rate lookup ── */}
+      <div className="theme-card border theme-border rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b theme-border flex items-center gap-2"
+             style={{ background: 'rgba(99,102,241,0.04)' }}>
+          <span className="text-sm">📅</span>
+          <div>
+            <p className="text-sm font-bold theme-text">{t('fxRates.historicalLookup')}</p>
+            <p className="text-xs theme-text-muted">{t('fxRates.historicalSub')}</p>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 flex flex-col sm:flex-row gap-3 items-start sm:items-end flex-wrap">
+          {/* Date input */}
+          <div className="flex-shrink-0">
+            <label className="block text-xs font-semibold theme-text-muted uppercase tracking-wide mb-1.5">
+              {t('fxRates.dateLabel')}
+            </label>
+            <input
+              type="date"
+              value={lookupDate}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={e => { setLookupDate(e.target.value); setLookupResult(null); setLookupError(''); }}
+              className="theme-input border theme-border rounded-xl px-3 py-2.5 text-sm"
+            />
+          </div>
+
+          {/* Pair toggle — USD→JPY or JPY→USD */}
+          <div className="flex-shrink-0">
+            <label className="block text-xs font-semibold theme-text-muted uppercase tracking-wide mb-1.5">
+              Pair
+            </label>
+            <div className="flex items-center gap-1 border theme-border rounded-xl overflow-hidden">
+              {[['USD','JPY'],['JPY','USD']].map(([f, to]) => (
+                <button
+                  key={f+to}
+                  onClick={() => { setLookupFrom(f); setLookupTo(to); setLookupResult(null); setLookupError(''); }}
+                  className={`px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    lookupFrom === f
+                      ? 'bg-indigo-600 text-white'
+                      : 'theme-text-muted hover:theme-text'
+                  }`}
+                >
+                  {f} → {to}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Fetch button */}
+          <button
+            onClick={fetchHistorical}
+            disabled={!lookupDate || lookupLoading}
+            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            {lookupLoading
+              ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{t('fxRates.lookupFetching')}</>
+              : t('fxRates.lookupFetch')}
+          </button>
+
+          {/* Error */}
+          {lookupError && (
+            <p className="text-sm text-red-400 self-end pb-1">{lookupError}</p>
+          )}
+        </div>
+
+        {/* Result — MUFG TTM only */}
+        {lookupResult && (
+          <div className="mx-5 mb-5 rounded-2xl px-6 py-5"
+               style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)', border: '1px solid rgba(99,102,241,0.4)' }}>
+            {/* Header row */}
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest"
+                      style={{ background: 'rgba(99,102,241,0.4)', color: '#a5b4fc' }}>
+                  MUFG TTM
+                </span>
+                {lookupResult.source === 'db' ? (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: 'rgba(16,185,129,0.2)', color: '#34d399' }}>
+                    ✓ Saved in DB
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: 'rgba(245,158,11,0.2)', color: '#fbbf24' }}>
+                    ↗ Live from MURC
+                  </span>
+                )}
+                <p className="text-indigo-300 text-[10px] font-bold uppercase tracking-widest">
+                  {lookupResult.from} / {lookupResult.to} · {lookupResult.date}
+                </p>
+              </div>
+
+              {/* Save to DB button — only when sourced from MURC and not yet saved */}
+              {lookupResult.source === 'murc' && !saved && canEdit && (
+                <button onClick={saveToDb} disabled={saving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors flex-shrink-0"
+                  style={{ background: 'rgba(16,185,129,0.15)', color: '#34d399', border: '1px solid rgba(16,185,129,0.3)' }}>
+                  {saving
+                    ? <><span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Saving…</>
+                    : '💾 Save to DB'}
+                </button>
+              )}
+            </div>
+
+            {/* Main rate */}
+            <p className="text-white text-4xl font-bold tabular-nums">
+              {lookupResult.to === 'JPY'
+                ? lookupResult.mufgRate.toFixed(2)
+                : lookupResult.mufgRate.toFixed(6)}
+            </p>
+            <p className="text-indigo-300 text-sm mt-1">
+              1 {lookupResult.from} = {lookupResult.to === 'JPY'
+                ? lookupResult.mufgRate.toFixed(2)
+                : lookupResult.mufgRate.toFixed(6)} {lookupResult.to}
+            </p>
+
+            {/* TTS / TTB breakdown — shown when fetched from MURC */}
+            {lookupResult.source === 'murc' && lookupResult.tts && lookupResult.ttb && lookupResult.from === 'USD' && (
+              <div className="flex gap-4 mt-3 pt-3 border-t border-indigo-800/50">
+                <div>
+                  <p className="text-indigo-400 text-[10px] uppercase tracking-wide">TTS (Selling)</p>
+                  <p className="text-indigo-200 text-sm font-semibold tabular-nums">{lookupResult.tts.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-indigo-400 text-[10px] uppercase tracking-wide">TTB (Buying)</p>
+                  <p className="text-indigo-200 text-sm font-semibold tabular-nums">{lookupResult.ttb.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-indigo-400 text-[10px] uppercase tracking-wide">TTM = (TTS+TTB)÷2</p>
+                  <p className="text-white text-sm font-bold tabular-nums">{lookupResult.mufgRate.toFixed(2)}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Rate history line chart */}
       <RateChart rates={rates} />

@@ -17,6 +17,7 @@
  *   NetCashFlow            = -$181,000 (no distributions yet)
  *   DPI = 0, TVPI = 0 (no distributions or NAV statement available)
  */
+/// <reference types="node" />
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
@@ -107,7 +108,7 @@ async function main() {
 
   // ── Fund — Siguler Guff (sourced from PDF keyword "Complex Name") ──────────
   // commitmentUsd derived via formula: C = NetCallUsd / CallPct = $49,000 / 0.049
-  const sg = await prisma.fund.create({
+  await prisma.fund.create({
     data: {
       fundName:            'Siguler Guff Small Buyout Opportunities Fund VI (F), LP',
       fundNameJp:          'シグラー・ガフ スモール・バイアウト・オポチュニティーズ ファンドVI(F)',
@@ -131,113 +132,6 @@ async function main() {
     },
   })
   console.log('  ✔ Fund created: Siguler Guff Small Buyout Opportunities Fund VI (F), LP')
-
-  // ── Capital Calls — all 4 extracted from PDF keywords ─────────────────────
-  //
-  // Formula applied per call:
-  //   callPct        ← "capital call equal to X% of commitments"
-  //   netCallUsd     ← "share of this capital call is $X"
-  //   cumulativePct  ← "funded X% of your commitment"
-  //   dueDate        ← "due no later than [Date]"
-  //   noticeDate     ← "Send Date: M/D/YYYY"
-  //
-  // Running balance (fundFormulas.ts §Running Balance Pattern):
-  //   Balance(t) = Balance(t-1) - netCallUsd(t)
-  //   Balance(0) = $1,000,000
-  //   After call 1: $951,000 | call 2: $902,000 | call 3: $852,000 | call 4: $819,000
-  await prisma.capitalCall.createMany({
-    data: [
-      {
-        // PDF: 2026-01-13 Capital Call — INITIALCALL, 4.90% of commitments
-        // cumulative after this call: 4.90%  |  running balance: $951,000
-        fundId:          sg.id,
-        callNumber:      1,
-        noticeDate:      new Date('2026-01-06'),
-        dueDate:         new Date('2026-01-13'),
-        grossCallUsd:    49_000,
-        netCallUsd:      49_000,
-        reinvestableUsd: 0,
-        netCallJpy:      Math.round(49_000 * 154.20),
-        fxRate:          154.20,
-        callPct:         4.90,
-        notes:           'Initial call — 4.90% of commitments. Purpose: repay Fund outstanding capital call line. Cumulative: 4.90%',
-        status:          'paid',
-        paidAt:          new Date('2026-01-13'),
-      },
-      {
-        // PDF: 2026-02-13 Capital Call — 4.90% of commitments, cumulative 9.80%
-        // running balance: $902,000
-        fundId:          sg.id,
-        callNumber:      2,
-        noticeDate:      new Date('2026-02-04'),
-        dueDate:         new Date('2026-02-13'),
-        grossCallUsd:    49_000,
-        netCallUsd:      49_000,
-        reinvestableUsd: 0,
-        netCallJpy:      Math.round(49_000 * 150.80),
-        fxRate:          150.80,
-        callPct:         4.90,
-        notes:           '4.90% of commitments. Purpose: repay Fund outstanding capital call line. Cumulative: 9.80%',
-        status:          'paid',
-        paidAt:          new Date('2026-02-13'),
-      },
-      {
-        // PDF: 2026-03-16 Capital Call — 5.00% of commitments, cumulative 14.80%
-        // running balance: $852,000
-        fundId:          sg.id,
-        callNumber:      3,
-        noticeDate:      new Date('2026-03-05'),
-        dueDate:         new Date('2026-03-16'),
-        grossCallUsd:    50_000,
-        netCallUsd:      50_000,
-        reinvestableUsd: 0,
-        netCallJpy:      Math.round(50_000 * 149.60),
-        fxRate:          149.60,
-        callPct:         5.00,
-        notes:           '5.00% of commitments. Purpose: repay Fund outstanding capital call line. Cumulative: 14.80%',
-        status:          'paid',
-        paidAt:          new Date('2026-03-16'),
-      },
-      {
-        // PDF: 2026-04-17 Capital Call — 3.30% of commitments, cumulative 18.10%
-        // running balance: $819,000
-        fundId:          sg.id,
-        callNumber:      4,
-        noticeDate:      new Date('2026-04-08'),
-        dueDate:         new Date('2026-04-17'),
-        grossCallUsd:    33_000,
-        netCallUsd:      33_000,
-        reinvestableUsd: 0,
-        netCallJpy:      Math.round(33_000 * 152.30),
-        fxRate:          152.30,
-        callPct:         3.30,
-        notes:           '3.30% of commitments. Purpose: repay Fund outstanding capital call line. Cumulative: 18.10%',
-        status:          'paid',
-        paidAt:          new Date('2026-04-17'),
-      },
-      {
-        // PDF: "...2026-05-20 - Capital Call.pdf" — 2.20% of commitments, cumulative 20.30%
-        // Batch_ID: 1,448,423 · running balance: $797,000 (= dry powder)
-        fundId:          sg.id,
-        callNumber:      5,
-        noticeDate:      new Date('2026-05-11'),
-        dueDate:         new Date('2026-05-20'),
-        grossCallUsd:    22_000,
-        netCallUsd:      22_000,
-        reinvestableUsd: 0,
-        netCallJpy:      Math.round(22_000 * 153.90),
-        fxRate:          153.90,
-        callPct:         2.20,
-        notes:           '2.20% of commitments. Purpose: repay Fund outstanding capital call line. Cumulative: 20.30%',
-        status:          'paid',
-        paidAt:          new Date('2026-05-20'),
-      },
-    ],
-  })
-  console.log('  ✔ Capital calls created (5) — all sourced from Siguler Guff PDFs')
-
-  // No distributions yet — fund is early-stage (18.10% drawn, repaying call line)
-  // DPI = 0/181,000 = 0.000  (fundFormulas.ts §DPI)
 
   // ── Fund — Goldman Sachs Vintage X ───────────────────────────────────────────
   await prisma.fund.create({
@@ -283,13 +177,38 @@ async function main() {
   })
   console.log('  ✔ Fund created: NB Real Estate Secondary Opportunities Offshore Fund II LP (Neuberger Berman)')
 
+  // ── Fund — Capula Global Relative Value Trust ─────────────────────────────────
+  await prisma.fund.create({
+    data: {
+      fundName:      'Capula Global Relative Value Trust',
+      manager:       'Capula Investment Management LLP',
+      administrator: 'Capula Investment Management LLP',
+      strategy:      'Global Relative Value',
+      vintageYear:   2025,
+      currency:      'USD',
+      commitmentUsd: 5_000_000,
+      isActive:      true,
+    },
+  })
+  console.log('  ✔ Fund created: Capula Global Relative Value Trust')
+
+  // ── Fund — Dover Street XI Feeder Fund L.P. ───────────────────────────────────
+  await prisma.fund.create({
+    data: {
+      fundName:      'Dover Street XI Feeder Fund L.P.',
+      manager:       'HarbourVest Partners, LLC',
+      administrator: 'HarbourVest Partners, LLC',
+      strategy:      'Secondaries',
+      vintageYear:   2024,
+      currency:      'USD',
+      commitmentUsd: 20_000_000,
+      isActive:      true,
+    },
+  })
+  console.log('  ✔ Fund created: Dover Street XI Feeder Fund L.P.')
+
   console.log('\n✅  Database seeded successfully!')
-  console.log('\n   Fund:   Siguler Guff Small Buyout Opportunities Fund VI (F), LP')
-  console.log('   Commitment:     $1,000,000 USD')
-  console.log('   Paid-in:        $203,000  (20.30% drawn — 5 calls from 5 PDFs)')
-  console.log('   Dry Powder:     $797,000  (79.70% remaining)')
-  console.log('   All 5 calls:    paid')
-  console.log('   DPI:            0.000×')
+  console.log('\n   Funds created (ledger empty — upload PDFs via UI to populate)')
   console.log('\n   Credentials:')
   console.log('   Admin:   admin@thirdwave.co.jp  /  Admin123!')
   console.log('   Finance: finance@thirdwave.co.jp /  Staff123!')

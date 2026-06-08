@@ -3,8 +3,9 @@
 export type FundKey =
   | 'goldman-sachs'
   | 'siguler-guff'
-  | 'nb-real-estate'
-  // ── Add remaining 6 funds here as you provide their PDFs ──
+  | 'capula-grv'
+  | 'dover-street-xi'
+  // ── Add remaining 4 funds here as you provide their PDFs ──
   | 'unknown'
 
 interface FundSignature {
@@ -27,12 +28,14 @@ const SIGNATURES: FundSignature[] = [
     ],
   },
   {
-    key: 'nb-real-estate',
-    patterns: [
-      /NB\s+Real\s+Estate\s+Secondary\s+Opportunities/i,
-    ],
+    key: 'capula-grv',
+    patterns: [/capula\s+global\s+relative\s+value\s+trust|capulaoff2/i],
   },
-  // ── Stubs for remaining 7 funds ─────────────────────────────────────────────
+  {
+    key: 'dover-street-xi',
+    patterns: [/dover\s+street\s+xi\s+feeder\s+fund/i],
+  },
+  // ── Stubs for remaining 4 funds ──────────────────────────────────────────────
   // Add each fund's unique identifying text patterns below.
   // Example:
   // {

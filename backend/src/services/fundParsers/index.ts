@@ -3,21 +3,21 @@
 
 import pdfParse from 'pdf-parse'
 import { detectFundKey } from './detector'
-import { parseGoldmanSachs } from './goldman-sachs'
-import { parseSigulerGuff }  from './siguler-guff'
-import { parseNbRealEstate } from './nb-real-estate'
+import { parseGoldmanSachs }   from './goldman-sachs'
+import { parseSigulerGuff }    from './siguler-guff'
+import { parseCapulaGrv }      from './capula-grv'
+import { parseDoverStreetXi }  from './dover-street-xi'
 import type { ParsedFundNotice } from './types'
 
 export type { ParsedFundNotice }
 
 // ── Dispatch table — add new fund parsers here ────────────────────────────────
 const PARSERS: Record<string, (text: string) => ParsedFundNotice> = {
-  'goldman-sachs':  parseGoldmanSachs,
-  'siguler-guff':   parseSigulerGuff,
-  'nb-real-estate': parseNbRealEstate,
-  // 'blackstone':    parseBlackstone,
-  // 'kkr':           parseKkr,
-  // ... remaining 7 funds
+  'goldman-sachs':   parseGoldmanSachs,
+  'siguler-guff':    parseSigulerGuff,
+  'capula-grv':      parseCapulaGrv,
+  'dover-street-xi': parseDoverStreetXi,
+  // ... remaining 4 funds
 }
 
 // ── Main entry point ──────────────────────────────────────────────────────────

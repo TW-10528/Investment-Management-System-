@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { usePreferences, type Theme, type Currency, type DateFmt, type LangCode } from '../contexts/PreferencesContext';
+import { usePreferences } from '../contexts/usePreferences';
+import type { Theme, Currency, DateFmt, LangCode } from '../contexts/PreferencesContext';
 import { LANGUAGES } from '../i18n';
 import toast from 'react-hot-toast';
 

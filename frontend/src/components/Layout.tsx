@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { usersAPI } from '../services/api';
-import { usePreferences } from '../contexts/PreferencesContext';
+import { usePreferences } from '../contexts/usePreferences';
 import { LANGUAGES } from '../i18n';
 import SettingsModal from './SettingsModal';
 import NotificationBell from './NotificationBell';
@@ -108,7 +108,7 @@ export default function Layout() {
         <nav className="flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto">
           <p className="text-[10px] font-bold uppercase tracking-widest px-2.5 mb-2.5"
              style={{ color: 'rgba(255,255,255,0.2)' }}>
-            Navigation
+            {t('nav.navigation')}
           </p>
           {NAV.map(({ to, key, icon, end, badge }) => {
             const badgeCount = badge === 'users' ? pendingUsers : 0;

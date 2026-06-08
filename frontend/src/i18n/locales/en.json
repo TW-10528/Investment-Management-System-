@@ -1,5 +1,6 @@
 {
   "nav": {
+    "navigation": "Navigation",
     "dashboard": "Dashboard",
     "funds": "Funds",
     "notices": "Notices",
@@ -66,7 +67,11 @@
     "usdJpy": "USD / JPY Rate",
     "liveRate": "Live market rate",
     "stored": "Stored",
-    "noStrategyData": "No strategy data"
+    "noStrategyData": "No strategy data",
+    "underManagement": "under management",
+    "portfolioTotal": "Portfolio Total",
+    "available": "available",
+    "grossCommitment": "gross LP commitment"
   },
   "notices": {
     "title": "Notice Processing",
@@ -175,7 +180,8 @@
     "yes": "Yes",
     "no": "No",
     "error": "An error occurred",
-    "success": "Success"
+    "success": "Success",
+    "refresh": "Refresh"
   },
   "settings": {
     "title": "Settings & Preferences",
@@ -211,7 +217,19 @@
     "joined": "Joined",
     "lastLogin": "Last Login",
     "awaitingApproval": "users awaiting approval",
-    "reviewNow": "Review now →"
+    "reviewNow": "Review now →",
+    "addNewUser": "+ Add New User",
+    "addUser": "+ Add User",
+    "activeStatus": "Active",
+    "inactiveStatus": "Inactive",
+    "reactivate": "↺ Reactivate",
+    "you": "You",
+    "newRegistration": "New Registration",
+    "approveAs": "Approve as:",
+    "accessOverview": "Access Level Overview",
+    "pendingWord": "pending",
+    "loadingUsers": "Loading users…",
+    "deactivateAction": "⊘ Deactivate"
   },
   "funds": {
     "title": "Fund Management",
@@ -246,7 +264,23 @@
     "deactivateConfirm": "Deactivate \"{{name}}\"? This will hide it from the active list.",
     "createFund": "Create Fund",
     "updateFund": "Update Fund",
-    "viewOnly": "View only — contact Finance or Admin to make changes"
+    "viewOnly": "View only — contact Finance or Admin to make changes",
+    "backToAll": "← All funds",
+    "selectToView": "select a fund to view its details",
+    "hideInactive": "Hide inactive",
+    "showInactive": "Show inactive ({{count}})",
+    "noFundsCreate": "Click \"+ Add Fund\" to create your first fund.",
+    "viewOnlyMode": "You are in view-only mode. Log in as Admin or Finance Manager to edit."
+  },
+  "fundUpload": {
+    "title": "Upload a fund document",
+    "subtitle": "Pick the fund, drop its capital-call / distribution PDF, and it's parsed and filed under that fund automatically.",
+    "docTypeLabel": "1 · Document type",
+    "whichFund": "2 · Which fund?",
+    "dropPdf": "Drop a PDF here or click to browse",
+    "processing": "Processing…",
+    "upload": "Upload",
+    "capitalAndDist": "Capital & Distribution"
   },
   "capitalCalls": {
     "title": "Capital Calls",
@@ -264,7 +298,32 @@
     "approve": "Approve",
     "markPaid": "Mark Paid",
     "noCalls": "No capital calls found for",
-    "viewOnly": "View only — contact Finance or Admin to approve or mark as paid"
+    "viewOnly": "View only — contact Finance or Admin to approve or mark as paid",
+    "newCall": "New Capital Call",
+    "createDesc": "Create a new capital call record",
+    "selectFund": "Select fund…",
+    "grossCallAmt": "Gross Call Amount (USD)",
+    "callPctLabel": "Or: Call % of Commitment",
+    "autoFills": "Auto-fills gross amount",
+    "distOffset": "Distribution Offset (USD)",
+    "reinvestableAmt": "Reinvestable Amount (USD)",
+    "reducesNet": "Reduces net call",
+    "addsBack": "Adds back to net",
+    "usdJpyRate": "USD / JPY Rate",
+    "initialStatus": "Initial Status",
+    "pendingNew": "Pending (new entry)",
+    "paidHistorical": "Paid (historical entry)",
+    "calcNetCall": "Calculated Net Call",
+    "allAmountsUsd": "All amounts in USD unless stated",
+    "creating": "Creating…",
+    "createCall": "Create Capital Call",
+    "newButton": "+ New Capital Call",
+    "createFirst": "+ Create First Capital Call",
+    "statusAll": "All",
+    "statusPending": "Pending",
+    "statusApproved": "Approved",
+    "statusPaid": "Paid",
+    "statusCancelled": "Cancelled"
   },
   "distributions": {
     "title": "Distributions",
@@ -293,6 +352,13 @@
     "addMufg": "Add MUFG TTM Rate",
     "rateHistory": "Rate History (90 days)",
     "entries": "entries",
+    "livePairs": "Live Multi-Currency Rates",
+    "historicalLookup": "Historical Rate Lookup",
+    "historicalSub": "Look up the MUFG TTM rate recorded for any date",
+    "lookupFetch": "Fetch Rate",
+    "lookupFetching": "Fetching…",
+    "lookupNearestDay": "Nearest trading day",
+    "lookupNoRate": "No MUFG TTM rate has been entered for this date — use + Add Rate to record it",
     "noHistory": "No rate history found",
     "saveRate": "Save Rate",
     "saving": "Saving…",

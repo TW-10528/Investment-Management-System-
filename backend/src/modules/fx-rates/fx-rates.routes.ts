@@ -43,6 +43,80 @@ router.get('/live', async (c) => {
   }
 })
 
+// GET /cross?from=USD&to=JPY,EUR,GBP,AUD  — proxies Frankfurter for multi-currency panel
+router.get('/cross', async (c) => {
+  const from = c.req.query('from') || 'USD'
+  const to   = c.req.query('to')   || 'JPY,EUR,GBP,AUD'
+  try {
+    const res  = await fetch(`https://api.frankfurter.app/latest?from=${from}&to=${to}`)
+    if (!res.ok) return c.json({ detail: 'Cross rate unavailable' }, 503)
+    const data = await res.json()
+    return c.json(data)
+  } catch {
+    return c.json({ detail: 'Cross rate fetch failed' }, 503)
+  }
+})
+
+// ── MURC scraper: fetches TTS+TTB for USD/JPY on a given date, returns TTM ──
+async function fetchMurcUsdJpy(date: string): Promise<{ tts: number; ttb: number; ttm: number } | null> {
+  try {
+    const [yyyy, mm, dd] = date.split('-')
+    if (!yyyy || !mm || !dd) return null
+    const id = yyyy.slice(2) + mm + dd   // YYMMDD e.g. "240610"
+
+    const res = await fetch(`https://www.murc-kawasesouba.jp/fx/past/index.php?id=${id}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IMS/1.0)' }
+    })
+    if (!res.ok) return null
+
+    const html = await res.text()
+
+    // HTML: <td class="t_center">USD</td><td class="t_right">158.01 </td><td class="t_right">156.01 </td>
+    const m = html.match(/USD<\/td>\s*<td[^>]*>([\d.]+)\s*<\/td>\s*<td[^>]*>([\d.]+)\s*<\/td>/)
+    if (!m) return null
+
+    const tts = parseFloat(m[1])
+    const ttb = parseFloat(m[2])
+    if (isNaN(tts) || isNaN(ttb)) return null
+
+    const ttm = Math.round((tts + ttb) / 2 * 100) / 100
+    return { tts, ttb, ttm }
+  } catch {
+    return null
+  }
+}
+
+// GET /historical?date=2024-06-10&from=USD&to=JPY
+// 1. Checks DB for stored MUFG TTM rate.
+// 2. If not found, scrapes MURC website to compute TTM = (TTS+TTB)/2.
+// 3. Returns rate + source so frontend can offer "Save to DB".
+router.get('/historical', async (c) => {
+  const date = c.req.query('date')
+  const from = c.req.query('from') || 'USD'
+  const to   = c.req.query('to')   || 'JPY'
+  if (!date) return c.json({ detail: 'date required' }, 400)
+
+  const isUsdJpy = (from === 'USD' && to === 'JPY') || (from === 'JPY' && to === 'USD')
+  if (!isUsdJpy) return c.json({ detail: 'MUFG TTM is only available for USD/JPY' }, 404)
+
+  // ── 1. DB lookup ──────────────────────────────────────────────────────────
+  const stored = await prisma.fxRate.findFirst({
+    where: { rateDate: { gte: new Date(date + 'T00:00:00Z'), lte: new Date(date + 'T23:59:59Z') } },
+  })
+  if (stored) {
+    const usdJpy   = parseFloat(stored.usdJpy.toString())
+    const mufgRate = from === 'USD' ? usdJpy : Math.round((1 / usdJpy) * 1e8) / 1e8
+    return c.json({ date, from, to, mufg_rate: mufgRate, usd_jpy: usdJpy, source: 'db' })
+  }
+
+  // ── 2. MURC scrape ────────────────────────────────────────────────────────
+  const murc = await fetchMurcUsdJpy(date)
+  if (!murc) return c.json({ detail: 'No MUFG TTM rate found for this date (not a trading day or not yet published)' }, 404)
+
+  const mufgRate = from === 'USD' ? murc.ttm : Math.round((1 / murc.ttm) * 1e8) / 1e8
+  return c.json({ date, from, to, mufg_rate: mufgRate, usd_jpy: murc.ttm, tts: murc.tts, ttb: murc.ttb, source: 'murc' })
+})
+
 // GET /history
 router.get('/history', async (c) => {
   const days   = parseInt(c.req.query('days') ?? '90')

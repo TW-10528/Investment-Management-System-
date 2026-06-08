@@ -1029,7 +1029,7 @@ export default function FundManagement() {
           {selectedFund && (
             <button onClick={() => setSelectedFundId(null)}
               className="text-sm theme-text-muted hover:theme-text transition-colors mb-1">
-              ← All funds
+              {t('funds.backToAll')}
             </button>
           )}
           <h1 className="text-xl font-bold theme-text">
@@ -1037,9 +1037,9 @@ export default function FundManagement() {
           </h1>
           {!selectedFund && (
             <p className="text-sm theme-text-muted mt-0.5">
-              {activeCount} active fund{activeCount!==1?'s':''}
-              {inactiveCount>0 && ` · ${inactiveCount} inactive`}
-              {' · select a fund to view its details'}
+              {activeCount} {t('dashboard.activeFunds')}
+              {inactiveCount > 0 && ` · ${t('funds.showInactive', { count: inactiveCount })}`}
+              {' · '}{t('funds.selectToView')}
             </p>
           )}
         </div>
@@ -1048,13 +1048,13 @@ export default function FundManagement() {
             {inactiveCount > 0 && (
               <button onClick={() => setShowInactive(v=>!v)}
                 className="text-sm px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text transition-colors">
-                {showInactive ? 'Hide inactive' : `Show inactive (${inactiveCount})`}
+                {showInactive ? t('funds.hideInactive') : t('funds.showInactive', { count: inactiveCount })}
               </button>
             )}
             {canEdit && (
               <button onClick={() => setShowWizard(true)}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
-                + Add Fund
+                {t('funds.addFund')}
               </button>
             )}
           </div>
@@ -1065,7 +1065,7 @@ export default function FundManagement() {
       {!canEdit && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
           <span>🔒</span>
-          <span>You are in view-only mode. Log in as Admin or Finance Manager to edit.</span>
+          <span>{t('funds.viewOnlyMode')}</span>
         </div>
       )}
 
@@ -1097,7 +1097,7 @@ export default function FundManagement() {
           {/* Search */}
           <div className="relative max-w-sm">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 theme-text-sub">🔍</span>
-            <input type="text" placeholder="Search funds…" value={search}
+            <input type="text" placeholder={t('funds.search')} value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 theme-input rounded-xl text-sm" />
           </div>
@@ -1109,8 +1109,8 @@ export default function FundManagement() {
           ) : filtered.length === 0 ? (
             <div className="text-center py-20 theme-text-muted">
               <p className="text-5xl mb-4">🏦</p>
-              <p className="text-base font-medium">No funds found</p>
-              {canEdit && <p className="text-sm mt-2">Click "+ Add Fund" to create your first fund.</p>}
+              <p className="text-base font-medium">{t('funds.noFunds')}</p>
+              {canEdit && <p className="text-sm mt-2">{t('funds.noFundsCreate')}</p>}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">

@@ -1108,10 +1108,10 @@ export default function Notices() {
   const rejected = notices.filter(n => n.status === 'rejected');
 
   const TABS = [
-    { key: 'all',      label: 'All',      count: notices.length },
-    { key: 'pending',  label: 'Pending',  count: pending.length  },
-    { key: 'approved', label: 'Approved', count: approved.length },
-    { key: 'rejected', label: 'Rejected', count: rejected.length },
+    { key: 'all',      label: t('notices.all'),      count: notices.length },
+    { key: 'pending',  label: t('notices.pending'),  count: pending.length  },
+    { key: 'approved', label: t('notices.approved'), count: approved.length },
+    { key: 'rejected', label: t('notices.rejected'), count: rejected.length },
   ] as const;
 
   return (

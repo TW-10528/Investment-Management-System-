@@ -316,11 +316,11 @@ export default function Dashboard() {
 
       {/* ── Portfolio KPIs ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <KpiCard label="Active Funds"      value={String(data.total_funds)}            sub="under management" />
-        <KpiCard label="Total Commitment"  value={usd(data.total_commitment_usd)}      sub="gross LP commitment" />
-        <KpiCard label="Total Paid-in"     value={usd(data.total_called_usd)}          sub={pct(data.drawn_pct) + ' drawn'} />
-        <KpiCard label="Dry Powder"        value={usd(data.dry_powder_usd)}            sub={pct(100 - data.drawn_pct) + ' available'} color={C.slate} bg={C.slateBg} bdr={C.slateBdr} />
-        <KpiCard label="Total Distributed" value={usd(data.total_received_usd)}       sub={`DPI ${data.dpi.toFixed(3)}×`} color={C.emerald} bg={C.emeraldBg} bdr={C.emeraldBdr} />
+        <KpiCard label={t('dashboard.activeFunds')}      value={String(data.total_funds)}            sub={t('dashboard.underManagement')} />
+        <KpiCard label={t('dashboard.totalCommitment')}  value={usd(data.total_commitment_usd)}      sub={t('dashboard.grossCommitment')} />
+        <KpiCard label={t('dashboard.paidIn')}           value={usd(data.total_called_usd)}          sub={pct(data.drawn_pct) + ' ' + t('dashboard.drawn')} />
+        <KpiCard label={t('dashboard.dryPowder')}        value={usd(data.dry_powder_usd)}            sub={pct(100 - data.drawn_pct) + ' ' + t('dashboard.available')} color={C.slate} bg={C.slateBg} bdr={C.slateBdr} />
+        <KpiCard label={t('dashboard.totalDistributed')} value={usd(data.total_received_usd)}        sub={`DPI ${data.dpi.toFixed(3)}×`} color={C.emerald} bg={C.emeraldBg} bdr={C.emeraldBdr} />
       </div>
 
       {/* ── FX Rate ── */}
@@ -332,7 +332,7 @@ export default function Dashboard() {
           <div className="px-5 py-3 border-b theme-divider flex items-center justify-between"
                style={{ background: C.indigoBg }}>
             <div>
-              <h2 className="text-sm font-bold theme-text">Fund Portfolio</h2>
+              <h2 className="text-sm font-bold theme-text">{t('dashboard.fundPortfolio')}</h2>
               <p className="text-[10px] theme-text-muted mt-0.5">{activeFunds.length} active fund{activeFunds.length!==1?'s':''} · updates every 30s</p>
             </div>
             <Link to="/funds" className="text-xs font-medium" style={{ color: C.indigo }}>Edit funds →</Link>
@@ -341,8 +341,16 @@ export default function Dashboard() {
             <table className="w-full text-sm">
               <thead className="border-b theme-divider" style={{ background: 'var(--color-header-bg)' }}>
                 <tr>
-                  {['Fund','Commitment','Paid-in','Dry Powder','Distributed','DPI','Drawn'].map(h => (
-                    <th key={h} className={`px-${h==='Fund'?5:4} py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide ${h==='Fund'?'text-left':'text-right'} ${h==='Drawn'?'min-w-[140px]':''}`}>{h}</th>
+                  {[
+                    { key: 'fund',        label: t('common.fund'),                   left: true,  wide: false },
+                    { key: 'commitment',  label: t('dashboard.commitment'),           left: false, wide: false },
+                    { key: 'paidIn',      label: t('dashboard.paidIn'),              left: false, wide: false },
+                    { key: 'dryPowder',   label: t('dashboard.dryPowder'),           left: false, wide: false },
+                    { key: 'distributed', label: t('dashboard.totalDistributed'),    left: false, wide: false },
+                    { key: 'dpi',         label: 'DPI',                              left: false, wide: false },
+                    { key: 'drawn',       label: t('dashboard.drawn'),               left: false, wide: true  },
+                  ].map(h => (
+                    <th key={h.key} className={`px-${h.left?5:4} py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide ${h.left?'text-left':'text-right'} ${h.wide?'min-w-[140px]':''}`}>{h.label}</th>
                   ))}
                 </tr>
               </thead>
@@ -351,7 +359,7 @@ export default function Dashboard() {
               </tbody>
               <tfoot className="border-t theme-divider" style={{ background: 'rgba(99,102,241,0.03)' }}>
                 <tr>
-                  <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">Portfolio Total</td>
+                  <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">{t('dashboard.portfolioTotal')}</td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{usd(data.total_commitment_usd)}</td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{usd(data.total_called_usd)}</td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold theme-text-muted">{usd(data.dry_powder_usd)}</td>

@@ -1,7 +1,7 @@
 // Shared output type for all fund-specific PDF parsers.
 // Fields map directly to calculationEngine.ts Transaction + FundSnapshot.
 
-import type { NbRealEstateReport } from './nb-real-estate/types'
+import type { DoverReport } from './dover-street-xi/types'
 
 export interface InvestmentTarget {
   projectName: string
@@ -52,8 +52,8 @@ export interface ParsedFundNotice {
   confidenceGrade: 'high' | 'medium' | 'low'
   rawText?:        string             // optional for debugging
 
-  // ── Rich per-fund report (NB Real Estate) ──────────────────────────────────
+  // ── Rich per-fund reports ────────────────────────────────────────────────────
   // Full extractor output (breakdown, calculated Excel fields, validation).
-  // Stored on Notice.extractedData.nbReport and shown on the document detail panel.
-  nbReport?:       NbRealEstateReport
+  // Stored on Notice.extractedData and shown on the document detail panel.
+  doverReport?:    DoverReport
 }

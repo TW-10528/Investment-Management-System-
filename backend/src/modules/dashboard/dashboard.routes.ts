@@ -23,10 +23,12 @@ router.get('/summary', async (c) => {
 
   const today        = new Date()
   today.setHours(0, 0, 0, 0)
+  const todayEnd     = new Date(today)
+  todayEnd.setHours(23, 59, 59, 999)
   const pendingCalls = await prisma.capitalCall.findMany({ where: { status: { in: ['pending', 'approved'] } } })
   const overdueCalls = pendingCalls
-    .filter(cc => new Date(cc.dueDate) < today)
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())  // oldest first
+    .filter(cc => { const d = new Date(cc.dueDate); return d >= today && d <= todayEnd; })
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
 
   const latestFx = await prisma.fxRate.findFirst({ orderBy: { rateDate: 'desc' } })
 

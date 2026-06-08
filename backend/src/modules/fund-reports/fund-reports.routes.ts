@@ -13,7 +13,7 @@ import { auth } from '../../middleware/auth'
 import { canEdit } from '../../middleware/guard'
 import { prisma } from '../../lib/prisma'
 import { parseFundPdf } from '../../services/fundParsers/index'
-import { parseNbRealEstate } from '../../services/fundParsers/nb-real-estate/index'
+import { parseDoverStreetXi } from '../../services/fundParsers/dover-street-xi/index'
 import { resolveFund } from '../../services/fundParsers/fund-resolver'
 import { CalculationEngine } from '../../services/calculationEngine'
 import { notifyAllAdmins, notifyUser } from '../../services/notificationService'
@@ -80,7 +80,7 @@ router.post('/upload', async (c) => {
   if (parsed.fundKey === 'unknown') {
     return c.json({
       detail: 'Fund not recognised. This PDF does not match any registered fund template.',
-      hint:   'Supported funds: Goldman Sachs (Vintage X), Siguler Guff, NB Real Estate Secondary Opportunities Fund II',
+      hint:   'Supported funds: Goldman Sachs (Vintage X), Siguler Guff',
     }, 422)
   }
 
@@ -102,15 +102,14 @@ router.post('/upload', async (c) => {
     }, 422)
   }
 
-  // ── NB Real Estate — chain the cumulative formulas across notices ───────────
-  // The friend's module computes cumulative contributions / remaining commitment /
-  // cumulative cash flow from the PREVIOUS row's stored values. Re-run the parser
-  // with the latest prior NB report's cumulatives so each new notice continues the
-  // running totals (the per-row B/C/D ledger is still owned by CalculationEngine).
-  if (parsed.fundKey === 'nb-real-estate' && parsed.rawText) {
-    const previousState = await latestNbPreviousState(resolvedFund.id)
+  // ── Dover Street XI — chain cumulative E/F/cash-flow across notices ─────────
+  // Same pattern as NB: re-run with the previous notice's final_excel_fields so
+  // cumulative_capital_contributions, remaining_commitment, and cumulative_cash_flow
+  // continue correctly rather than falling back to the report's own inception values.
+  if (parsed.fundKey === 'dover-street-xi' && parsed.rawText) {
+    const previousState = await latestDoverPreviousState(resolvedFund.id)
     if (previousState) {
-      const reparsed = parseNbRealEstate(parsed.rawText, previousState)
+      const reparsed = parseDoverStreetXi(parsed.rawText, previousState, originalName)
       reparsed.rawText = parsed.rawText
       Object.assign(parsed, reparsed)
     }
@@ -292,15 +291,14 @@ function docDate(n: any): number {
   return Number.isNaN(t) ? 0 : t
 }
 
-// Latest stored NB cumulatives for a fund — feeds the next notice's running totals.
-// Returns null when this is the first NB report (extractor then falls back to the
-// report's own inception-to-date values).
-async function latestNbPreviousState(fundId: string) {
+// Latest stored Dover cumulatives — feeds the next notice's running totals.
+// Returns null on the first upload; extractor falls back to the report's own values.
+async function latestDoverPreviousState(fundId: string) {
   const notices = await prisma.notice.findMany({ where: { fundId } })
-  const nbDocs = notices
-    .filter(n => (n.extractedData as any)?.nbReport?.final_excel_fields)
+  const doverDocs = notices
+    .filter(n => (n.extractedData as any)?.doverReport?.final_excel_fields)
     .sort((a, b) => docDate(b) - docDate(a))   // newest first
-  const f = (nbDocs[0]?.extractedData as any)?.nbReport?.final_excel_fields
+  const f = (doverDocs[0]?.extractedData as any)?.doverReport?.final_excel_fields
   if (!f) return null
   return {
     cumulative_capital_contributions: f.cumulative_capital_contributions ?? null,
@@ -310,13 +308,11 @@ async function latestNbPreviousState(fundId: string) {
 }
 
 // ── GET /:id ───────────────────────────────────────────────────────────────────
-// Includes the rich NB report (breakdown, calculated Excel fields, validation)
-// when present, so the document detail panel can render it.
 router.get('/:id', async (c) => {
   const n = await prisma.notice.findUnique({ where: { id: c.req.param('id') } })
   if (!n) return c.json({ detail: 'Report not found' }, 404)
-  const nbReport = (n.extractedData as any)?.nbReport ?? null
-  return c.json({ ...reportDict(n), nb_report: nbReport })
+  const doverReport = (n.extractedData as any)?.doverReport ?? null
+  return c.json({ ...reportDict(n), dover_report: doverReport })
 })
 
 // ── POST /:id/approve ──────────────────────────────────────────────────────────
