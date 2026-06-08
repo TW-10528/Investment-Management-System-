@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { fundsAPI } from '../services/api';
+import { fundsAPI, fxRatesAPI } from '../services/api';
 import type { FundDetail, FundSummary, LedgerRow, LedgerSnapshot } from '../types/index';
 import { fmt, strategyBg, strategyColor } from '../lib/format';
 import AddFundWizard from '../components/AddFundWizard';
@@ -90,6 +90,14 @@ function DelBtn({ onClick }: { onClick: () => void }) {
   );
 }
 
+function PenIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+    </svg>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CAPITAL CALLS TAB
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,6 +105,32 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
   const [calls, setCalls] = useState<any[]>([]);
   const [form,  setForm]  = useState<any|null>(null);
   const [saving, setSaving] = useState(false);
+  const [currency, setCurrency] = useState<'USD'|'JPY'>('USD');
+  const [murcRate, setMurcRate] = useState<number>(() => {
+    const s = localStorage.getItem('murc_fx_rate');
+    return s ? Number(s) : 0;
+  });
+  const [murcEditing, setMurcEditing] = useState(false);
+  const [murcInput, setMurcInput] = useState('');
+
+  function saveMurcRate() {
+    const val = Number(murcInput);
+    if (val > 0) {
+      setMurcRate(val);
+      localStorage.setItem('murc_fx_rate', String(val));
+      toast.success('MURC rate saved');
+    }
+    setMurcEditing(false);
+  }
+
+  function fmtCallAmt(usd: number, rowFx?: number | string | null) {
+    if (currency === 'JPY') {
+      const rate = rowFx ? Number(rowFx) : murcRate;
+      if (!rate) return '¥—';
+      return '¥' + Math.round(usd * rate).toLocaleString('ja-JP');
+    }
+    return '$' + usd.toLocaleString();
+  }
 
   const load = useCallback(() =>
     fundsAPI.getCalls(fundId).then(r => setCalls(r.data)).catch(() => {}), [fundId]);
@@ -132,18 +166,57 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
   return (
     <div>
       {/* toolbar */}
-      <div className="px-5 py-3 flex items-center justify-between border-b theme-border"
+      <div className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap border-b theme-border"
            style={{ background: C.indigoBg }}>
         <p className="text-sm font-semibold theme-text">
           Capital Calls
           <span className="ml-2 text-xs font-normal theme-text-muted">{calls.length} records</span>
         </p>
-        {canEdit && !form && (
-          <button onClick={() => setForm({ status: 'pending' })}
-            className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
-            + Add Capital Call
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* MURC rate editor */}
+          {murcEditing ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs theme-text-muted whitespace-nowrap">MURC Rate (¥/USD):</span>
+              <input
+                type="number"
+                className="theme-input rounded px-2 py-1 text-xs w-24 border theme-border"
+                placeholder="154.20"
+                step="0.01"
+                value={murcInput}
+                onChange={e => setMurcInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveMurcRate(); if (e.key === 'Escape') setMurcEditing(false); }}
+                autoFocus
+              />
+              <button onClick={saveMurcRate}
+                className="px-2 py-1 rounded text-xs bg-indigo-600 text-white font-semibold">Save</button>
+              <button onClick={() => setMurcEditing(false)}
+                className="text-xs theme-text-muted px-1 hover:text-red-400">✕</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setMurcInput(murcRate > 0 ? String(murcRate) : ''); setMurcEditing(true); }}
+              className="p-1.5 rounded hover:bg-white/10 transition-colors theme-text-muted hover:text-amber-400"
+              title={murcRate > 0 ? `MURC Rate: ¥${murcRate.toFixed(2)} / USD — click to edit` : 'Set MURC FX Rate'}>
+              <PenIcon />
+            </button>
+          )}
+          {/* Currency toggle */}
+          <button
+            onClick={() => setCurrency(c => c === 'USD' ? 'JPY' : 'USD')}
+            className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors ${
+              currency === 'JPY'
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25 hover:bg-indigo-500/20'
+            }`}>
+            {currency === 'USD' ? 'USD → JPY' : 'JPY → USD'}
           </button>
-        )}
+          {canEdit && !form && (
+            <button onClick={() => setForm({ status: 'pending' })}
+              className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+              + Add Capital Call
+            </button>
+          )}
+        </div>
       </div>
 
       {/* inline form */}
@@ -211,7 +284,10 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
           <table className="w-full text-sm">
             <thead style={{ background:'var(--color-header-bg)' }}>
               <tr className="border-b theme-border text-xs">
-                {['#','Notice Date','Due Date','Call %','B · Capital','C · Dist','G · Cash Flow','FX Rate','Status',''].map(h=>(
+                {['#','Notice Date','Due Date','Call %',
+                  currency==='USD' ? 'B · Capital (USD)' : 'B · Capital (JPY)',
+                  currency==='USD' ? 'C · Dist (USD)'    : 'C · Dist (JPY)',
+                  'G · Cash Flow','FX Rate','Status',''].map(h=>(
                   <th key={h} className={`px-4 py-2.5 font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h===''||h==='#'?'text-left':'text-right'}`}>{h}</th>
                 ))}
               </tr>
@@ -225,8 +301,12 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                   <td className="px-4 py-3 text-right theme-text-muted">{cc.notice_date}</td>
                   <td className="px-4 py-3 text-right theme-text-muted">{cc.due_date}</td>
                   <td className="px-4 py-3 text-right theme-text">{cc.call_pct!=null ? `${Number(cc.call_pct).toFixed(2)}%` : '—'}</td>
-                  <td className="px-4 py-3 text-right font-semibold" style={{color:C.indigo}}>${Number(cc.gross_call_usd??cc.net_call_usd).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right" style={{color:C.emerald}}>{Number(cc.distribution_usd??0)>0 ? `$${Number(cc.distribution_usd).toLocaleString()}` : '—'}</td>
+                  <td className="px-4 py-3 text-right font-semibold" style={{color:C.indigo}}>
+                    {fmtCallAmt(Number(cc.gross_call_usd??cc.net_call_usd), cc.fx_rate)}
+                  </td>
+                  <td className="px-4 py-3 text-right" style={{color:C.emerald}}>
+                    {Number(cc.distribution_usd??0)>0 ? fmtCallAmt(Number(cc.distribution_usd), cc.fx_rate) : '—'}
+                  </td>
                   <td className="px-4 py-3 text-right font-semibold" style={{color: cf<0?C.red:C.emerald}}>
                     {cf<0?'−$':'$'}{Math.abs(cf).toLocaleString()}
                     {cc.manual_cash_flow_usd!=null && <span className="ml-1 text-[9px] font-bold px-1 rounded" style={{color:C.amber,background:'rgba(217,119,6,0.12)'}} title="Manual cash-flow entry">M</span>}
@@ -244,6 +324,17 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                 </tr>
               );})}
             </tbody>
+            {murcRate > 0 && (
+              <tfoot>
+                <tr style={{ background:'rgba(217,119,6,0.06)' }}>
+                  <td colSpan={10} className="px-4 py-2 text-xs border-t theme-border">
+                    <span className="font-semibold" style={{color:C.amber}}>MURC FX Rate:</span>
+                    <span className="theme-text-muted ml-1.5">1 USD = ¥{murcRate.toFixed(2)}</span>
+                    {currency==='JPY' && <span className="ml-2 text-[10px] theme-text-muted">(applied to Capital &amp; Distribution columns)</span>}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       ) : (
@@ -263,6 +354,33 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
   const [dists, setDists] = useState<any[]>([]);
   const [form,  setForm]  = useState<any|null>(null);
   const [saving, setSaving] = useState(false);
+  const [currency, setCurrency] = useState<'USD'|'JPY'>('USD');
+  const [murcRate, setMurcRate] = useState<number>(() => {
+    const s = localStorage.getItem('murc_fx_rate');
+    return s ? Number(s) : 0;
+  });
+  const [murcEditing, setMurcEditing] = useState(false);
+  const [murcInput, setMurcInput] = useState('');
+
+  function saveMurcRate() {
+    const val = Number(murcInput);
+    if (val > 0) {
+      setMurcRate(val);
+      localStorage.setItem('murc_fx_rate', String(val));
+      toast.success('MURC rate saved');
+    }
+    setMurcEditing(false);
+  }
+
+  function fmtDistAmt(d: any) {
+    if (currency === 'JPY') {
+      if (d.amount_jpy) return '¥' + Number(d.amount_jpy).toLocaleString('ja-JP');
+      const rate = d.fx_rate ? Number(d.fx_rate) : murcRate;
+      if (!rate) return '¥—';
+      return '¥' + Math.round(Number(d.amount_usd) * rate).toLocaleString('ja-JP');
+    }
+    return '$' + Number(d.amount_usd).toLocaleString();
+  }
 
   const load = useCallback(() =>
     fundsAPI.getDists(fundId).then(r => setDists(r.data)).catch(() => {}), [fundId]);
@@ -288,19 +406,58 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
 
   return (
     <div>
-      <div className="px-5 py-3 flex items-center justify-between border-b theme-border"
+      <div className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap border-b theme-border"
            style={{ background: C.emeraldBg }}>
         <p className="text-sm font-semibold theme-text">
           Distributions
           <span className="ml-2 text-xs font-normal theme-text-muted">{dists.length} records</span>
           {total > 0 && <span className="ml-3 font-semibold" style={{color:C.emerald}}>${total.toLocaleString()}</span>}
         </p>
-        {canEdit && !form && (
-          <button onClick={() => setForm({dist_type:'Income'})}
-            className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
-            + Add Distribution
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* MURC rate editor */}
+          {murcEditing ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs theme-text-muted whitespace-nowrap">MURC Rate (¥/USD):</span>
+              <input
+                type="number"
+                className="theme-input rounded px-2 py-1 text-xs w-24 border theme-border"
+                placeholder="154.20"
+                step="0.01"
+                value={murcInput}
+                onChange={e => setMurcInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveMurcRate(); if (e.key === 'Escape') setMurcEditing(false); }}
+                autoFocus
+              />
+              <button onClick={saveMurcRate}
+                className="px-2 py-1 rounded text-xs bg-indigo-600 text-white font-semibold">Save</button>
+              <button onClick={() => setMurcEditing(false)}
+                className="text-xs theme-text-muted px-1 hover:text-red-400">✕</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setMurcInput(murcRate > 0 ? String(murcRate) : ''); setMurcEditing(true); }}
+              className="p-1.5 rounded hover:bg-white/10 transition-colors theme-text-muted hover:text-amber-400"
+              title={murcRate > 0 ? `MURC Rate: ¥${murcRate.toFixed(2)} / USD — click to edit` : 'Set MURC FX Rate'}>
+              <PenIcon />
+            </button>
+          )}
+          {/* Currency toggle */}
+          <button
+            onClick={() => setCurrency(c => c === 'USD' ? 'JPY' : 'USD')}
+            className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors ${
+              currency === 'JPY'
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/20'
+            }`}>
+            {currency === 'USD' ? 'USD → JPY' : 'JPY → USD'}
           </button>
-        )}
+          {canEdit && !form && (
+            <button onClick={() => setForm({dist_type:'Income'})}
+              className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+              + Add Distribution
+            </button>
+          )}
+        </div>
       </div>
 
       {form && (
@@ -335,7 +492,9 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
           <table className="w-full text-sm">
             <thead style={{ background:'var(--color-header-bg)' }}>
               <tr className="border-b theme-border text-xs">
-                {['Date','Type','Amount (USD)','Amount (JPY)','Reinvestable','FX Rate',''].map(h=>(
+                {['Date','Type',
+                  currency==='USD' ? 'Amount (USD)' : 'Amount (JPY)',
+                  'Reinvestable','FX Rate',''].map(h=>(
                   <th key={h} className={`px-4 py-2.5 font-semibold theme-text-muted uppercase tracking-wide ${h===''?'text-left':'text-right'}`}>{h}</th>
                 ))}
               </tr>
@@ -345,8 +504,7 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                 <tr key={d.id} className="theme-row-hover">
                   <td className="px-4 py-3 text-right theme-text-muted">{d.distribution_date}</td>
                   <td className="px-4 py-3 text-right theme-text">{d.dist_type}</td>
-                  <td className="px-4 py-3 text-right font-semibold" style={{color:C.emerald}}>${Number(d.amount_usd).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right theme-text-muted">¥{Number(d.amount_jpy).toLocaleString('ja-JP')}</td>
+                  <td className="px-4 py-3 text-right font-semibold" style={{color:C.emerald}}>{fmtDistAmt(d)}</td>
                   <td className="px-4 py-3 text-right theme-text-muted">${Number(d.reinvestable_usd).toLocaleString()}</td>
                   <td className="px-4 py-3 text-right theme-text-muted">{d.fx_rate ? Number(d.fx_rate).toFixed(2):'—'}</td>
                   <td className="px-4 py-3">
@@ -360,6 +518,17 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                 </tr>
               ))}
             </tbody>
+            {murcRate > 0 && (
+              <tfoot>
+                <tr style={{ background:'rgba(217,119,6,0.06)' }}>
+                  <td colSpan={6} className="px-4 py-2 text-xs border-t theme-border">
+                    <span className="font-semibold" style={{color:C.amber}}>MURC FX Rate:</span>
+                    <span className="theme-text-muted ml-1.5">1 USD = ¥{murcRate.toFixed(2)}</span>
+                    {currency==='JPY' && <span className="ml-2 text-[10px] theme-text-muted">(applied to Amount column)</span>}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       ) : (
@@ -476,25 +645,135 @@ function NavTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LEDGER TAB (read-only computed columns B C D E F G H)
-// ─────────────────────────────────────────────────────────────────────────────
-function LedgerTab({ fundId }: { fundId:string }) {
-  const [rows, setRows] = useState<LedgerRow[]>([]);
-  const [snap, setSnap] = useState<LedgerSnapshot|null>(null);
-  const [loading, setLoading] = useState(true);
+// Pure UTC date shift — module-level so it works for any fund/row count without re-creation
+function shiftDate(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
 
-  useEffect(() => {
+// LEDGER TAB — B Called / B (¥) / C Received / C (¥) adjacent columns, notes edit
+// FX column shows the MURC TTM rate for each transaction date (auto-fetched)
+// ─────────────────────────────────────────────────────────────────────────────
+function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
+  const [rows, setRows]           = useState<LedgerRow[]>([]);
+  const [snap, setSnap]           = useState<LedgerSnapshot|null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [editIdx, setEditIdx]     = useState<number|null>(null);
+  const [noteText, setNoteText]   = useState('');
+  const [saving, setSaving]       = useState(false);
+  // murcRates: MURC TTM USD/JPY rate keyed by YYYY-MM-DD, fetched per transaction date
+  const [murcRates, setMurcRates]     = useState<Record<string, number>>({});
+  const [rateLoading, setRateLoading] = useState(false);
+  const [editDateIdx, setEditDateIdx] = useState<number|null>(null);
+  const [editDateVal, setEditDateVal] = useState('');
+  const [dateSaving,  setDateSaving]  = useState(false);
+
+  async function fetchMurcRates(loaded: LedgerRow[]) {
+    if (!loaded.length) return;
+    const uniqueDates = [...new Set(loaded.map(r => r.date))];
+    setRateLoading(true);
+    const results = await Promise.allSettled(
+      uniqueDates.map(date =>
+        fxRatesAPI.historical(date, 'USD', 'JPY')
+          .then((r: any) => ({ date, rate: r.data.usd_jpy as number }))
+      )
+    );
+    const map: Record<string, number> = {};
+    results.forEach(r => { if (r.status === 'fulfilled' && r.value.rate) map[r.value.date] = r.value.rate; });
+    setMurcRates(map);
+    setRateLoading(false);
+  }
+
+  function loadLedger() {
     setLoading(true);
     fundsAPI.ledger(fundId)
-      .then(r => { setRows(r.data.rows??[]); setSnap(r.data.snapshot??null); })
+      .then(r => {
+        const loaded = r.data.rows ?? [];
+        setRows(loaded);
+        setSnap(r.data.snapshot ?? null);
+        fetchMurcRates(loaded);
+      })
       .finally(() => setLoading(false));
+  }
+  useEffect(() => {
+    // Reset any open editors when the fund changes
+    setEditIdx(null);
+    setEditDateIdx(null);
+    setEditDateVal('');
+    loadLedger();
   }, [fundId]);
+
+  function jpyStr(usd: number, rate: number | null | undefined): string {
+    if (!usd || !rate) return '—';
+    return '¥' + Math.round(usd * rate).toLocaleString('ja-JP');
+  }
+
+  function openNote(row: LedgerRow, idx: number) {
+    setEditIdx(idx);
+    setNoteText(row.notes ?? '');
+  }
+
+  async function saveDate(row: LedgerRow, rowIdx: number, newDate: string) {
+    setDateSaving(true);
+    try {
+      if (row.tx_type === 'capital_call' && row.call_id) {
+        await fundsAPI.updateCall(fundId, row.call_id, { due_date: newDate });
+      } else if (row.tx_type === 'distribution' && row.dist_id) {
+        await fundsAPI.updateDist(fundId, row.dist_id, { distribution_date: newDate });
+      }
+      // Optimistic: update the row date in-place without a full reload
+      setRows(prev => prev.map((r, idx) => idx === rowIdx ? { ...r, date: newDate } : r));
+      // Fetch MURC rate for the new date if not already cached
+      if (!murcRates[newDate]) {
+        fxRatesAPI.historical(newDate, 'USD', 'JPY')
+          .then((r: any) => { if (r.data?.usd_jpy) setMurcRates(prev => ({ ...prev, [newDate]: r.data.usd_jpy })); })
+          .catch(() => {});
+      }
+      toast.success('Date updated');
+      setEditDateIdx(null);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? 'Failed to update date');
+    } finally { setDateSaving(false); }
+  }
+
+  async function saveNote(row: LedgerRow, text: string) {
+    setSaving(true);
+    try {
+      if (row.tx_type === 'capital_call' && row.call_id) {
+        await fundsAPI.updateCall(fundId, row.call_id, { notes: text });
+      } else if (row.tx_type === 'distribution' && row.dist_id) {
+        await fundsAPI.updateDist(fundId, row.dist_id, { notes: text });
+      }
+      toast.success(text ? 'Note saved' : 'Note deleted');
+      setEditIdx(null); loadLedger();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? 'Failed to save note');
+    } finally { setSaving(false); }
+  }
+
+  // Date range per row:
+  //   min = day after previous row's date (no lower bound for first row)
+  //   max = day before next row's date    (no upper bound for last row)
+  function getDateRange(rowIdx: number): { min: string; max: string } {
+    const min = rowIdx > 0 && rows[rowIdx - 1]?.date
+      ? shiftDate(rows[rowIdx - 1].date, 1)
+      : '';
+    const max = rowIdx < rows.length - 1 && rows[rowIdx + 1]?.date
+      ? shiftDate(rows[rowIdx + 1].date, -1)
+      : '';
+    return { min, max };
+  }
 
   if (loading) return <p className="px-5 py-8 text-sm theme-text-muted">Loading ledger…</p>;
 
   return (
     <div>
-      {/* Snapshot */}
+      {/* ── Toolbar ── */}
+      <div className="px-5 py-3 border-b theme-border" style={{ background:'rgba(79,70,229,0.04)' }}>
+        <p className="text-sm font-semibold theme-text">Ledger</p>
+      </div>
+
+      {/* ── Snapshot KPIs ── */}
       {snap && (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 divide-x theme-border border-b theme-border"
              style={{ background:'rgba(79,70,229,0.04)' }}>
@@ -507,7 +786,7 @@ function LedgerTab({ fundId }: { fundId:string }) {
             ['F Inv.Cap',   fmt.usd(snap.investment_capacity, true)],
             ['H Net Cash',  fmt.usd(snap.net_cash_position, true)],
             ['DPI',         snap.dpi.toFixed(3)+'×'],
-          ].map(([label, value])=>(
+          ].map(([label, value]) => (
             <div key={String(label)} className="px-3 py-2.5">
               <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{label}</p>
               <p className="text-sm font-bold tabular-nums theme-text mt-0.5">{value}</p>
@@ -520,42 +799,177 @@ function LedgerTab({ fundId }: { fundId:string }) {
         <div className="px-5 py-12 text-center">
           <p className="text-3xl mb-3 opacity-20">📋</p>
           <p className="text-sm theme-text-muted">No paid transactions yet.</p>
-          <p className="text-xs theme-text-muted mt-1">Add capital calls or distributions and mark them as paid.</p>
+          <p className="text-xs theme-text-muted mt-1">Upload a PDF or add capital calls / distributions and mark them as paid.</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-sm">
             <thead style={{ background:'var(--color-header-bg)' }}>
               <tr className="border-b theme-border">
-                {['Date','Description','FX','B Called','C Received','D Reinvest',
-                  'E Cum.Called','F Inv.Cap','G Cash Flow','H Net Cash','JPY Called','JPY Recv'].map(h=>(
-                  <th key={h} className="px-3 py-2.5 text-[9px] font-semibold theme-text-muted uppercase tracking-wide text-right first:text-left whitespace-nowrap">{h}</th>
+                {[
+                  { label: 'Date',         right: false },
+                  { label: 'Description',  right: false },
+                  { label: 'FX',           right: true  },
+                  { label: 'B Called',     right: true  },
+                  { label: 'B (¥)',        right: true  },
+                  { label: 'C Received',   right: true  },
+                  { label: 'C (¥)',        right: true  },
+                  { label: 'D Reinvest',   right: true  },
+                  { label: 'E Cum.Called', right: true  },
+                  { label: 'F Inv.Cap',    right: true  },
+                  { label: 'G Cash Flow',  right: true  },
+                  { label: 'H Net Cash',   right: true  },
+                  { label: 'Review',       right: false },
+                ].map((h, hi) => (
+                  <th key={hi}
+                    className={`px-3 py-2.5 text-[10px] font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h.right ? 'text-right' : 'text-left'}`}>
+                    {h.label}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y theme-border">
-              {rows.map((row,i) => {
-                const isCall = row.tx_type === 'capital_call';
+              {rows.map((row, i) => {
+                const isCall    = row.tx_type === 'capital_call';
+                const isEditing = editIdx === i;
+                const hasId     = !!(row.call_id || row.dist_id);
+                const { min: rowDateMin, max: rowDateMax } = getDateRange(i);
+
                 return (
-                  <tr key={i} className="theme-row-hover">
-                    <td className="px-3 py-2.5 theme-text-muted whitespace-nowrap">{fmt.date(row.date)}</td>
-                    <td className="px-3 py-2.5">
-                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded mr-1.5 ${isCall?'bg-red-500/15 text-red-400':'bg-emerald-500/15 text-emerald-400'}`}>
-                        {isCall?'↓ Call':'↑ Dist'}
-                      </span>
-                      <span className="theme-text-muted">{row.description}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{fmt.rate(row.fx_rate)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:row.capital_paid_in?C.red:'inherit'}}>{row.capital_paid_in?fmt.usd(row.capital_paid_in):'—'}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:row.capital_received?C.emerald:'inherit'}}>{row.capital_received?fmt.usd(row.capital_received):'—'}</td>
-                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{row.reinvestable?fmt.usd(row.reinvestable):'—'}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:C.indigo}}>{fmt.usd(row.cumulative_called)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:C.violet}}>{fmt.usd(row.investment_capacity)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:row.cash_flow<0?C.red:C.emerald}}>{fmt.usd(row.cash_flow)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:row.net_cash_position<0?C.red:C.emerald}}>{fmt.usd(row.net_cash_position)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{row.capital_paid_jpy?fmt.jpy(row.capital_paid_jpy):'—'}</td>
-                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{row.capital_received_jpy?fmt.jpy(row.capital_received_jpy):'—'}</td>
-                  </tr>
+                    <tr key={`row-${i}`} className="theme-row-hover transition-colors">
+
+                      {/* Date — click to edit; range locked to this row's sliding 3-row window */}
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        {canEdit && hasId && editDateIdx === i ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="date"
+                              autoFocus
+                              value={editDateVal}
+                              min={rowDateMin}
+                              max={rowDateMax}
+                              onChange={e => setEditDateVal(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter' && editDateVal) saveDate(row, i, editDateVal); if (e.key === 'Escape') setEditDateIdx(null); }}
+                              className="theme-input border theme-border rounded px-2 py-0.5 text-xs"
+                            />
+                            <button onClick={() => { if (editDateVal) saveDate(row, i, editDateVal); }} disabled={dateSaving || !editDateVal}
+                              className="text-xs px-1.5 py-0.5 bg-indigo-600 text-white rounded disabled:opacity-40">
+                              {dateSaving ? '…' : '✓'}
+                            </button>
+                            <button onClick={() => setEditDateIdx(null)} className="text-xs theme-text-muted hover:text-red-400">✕</button>
+                          </div>
+                        ) : (
+                          <span
+                            className={`theme-text-muted ${canEdit && hasId && editIdx === null && editDateIdx === null ? 'cursor-pointer hover:text-indigo-400 hover:underline' : ''}`}
+                            onClick={() => { if (canEdit && hasId && editIdx === null && editDateIdx === null) { setEditDateIdx(i); setEditDateVal(row.date); } }}
+                            title={canEdit && hasId && rowDateMin ? `Allowed: ${rowDateMin} → ${rowDateMax}` : undefined}
+                          >
+                            {fmt.date(row.date)}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Description */}
+                      <td className="px-3 py-3 min-w-[180px]">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded mr-1.5 ${isCall?'bg-red-500/15 text-red-400':'bg-emerald-500/15 text-emerald-400'}`}>
+                          {isCall?'↓ Call':'↑ Dist'}
+                        </span>
+                        <span className="theme-text text-base">{row.description}</span>
+                      </td>
+
+                      {/* FX — MURC TTM rate for this transaction date */}
+                      <td className="px-3 py-3 text-right font-mono theme-text-muted whitespace-nowrap">
+                        {rateLoading
+                          ? <span className="opacity-40 text-xs">…</span>
+                          : murcRates[row.date]
+                            ? <span title="MURC TTM rate for this date">{murcRates[row.date].toFixed(2)}</span>
+                            : <span title="No MURC rate found for this date">{fmt.rate(row.fx_rate)}</span>}
+                      </td>
+
+                      {/* B Called (USD) */}
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color: row.capital_paid_in ? C.red : 'inherit'}}>
+                        {row.capital_paid_in ? fmt.usd(row.capital_paid_in) : <span className="theme-text-muted">—</span>}
+                      </td>
+
+                      {/* B (¥) — JPY using MURC rate for this date */}
+                      <td className="px-3 py-3 text-right font-mono" style={{color: row.capital_paid_in ? 'rgba(239,68,68,0.65)' : 'inherit'}}>
+                        {row.capital_paid_in
+                          ? rateLoading
+                            ? <span className="opacity-40 text-xs">…</span>
+                            : jpyStr(row.capital_paid_in, murcRates[row.date] ?? row.fx_rate)
+                          : <span className="theme-text-muted">—</span>}
+                      </td>
+
+                      {/* C Received (USD) */}
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color: row.capital_received ? C.emerald : 'inherit'}}>
+                        {row.capital_received ? fmt.usd(row.capital_received) : <span className="theme-text-muted">—</span>}
+                      </td>
+
+                      {/* C (¥) — JPY using MURC rate for this date */}
+                      <td className="px-3 py-3 text-right font-mono" style={{color: row.capital_received ? 'rgba(16,185,129,0.65)' : 'inherit'}}>
+                        {row.capital_received
+                          ? rateLoading
+                            ? <span className="opacity-40 text-xs">…</span>
+                            : jpyStr(row.capital_received, murcRates[row.date] ?? row.fx_rate)
+                          : <span className="theme-text-muted">—</span>}
+                      </td>
+
+                      {/* D Reinvest */}
+                      <td className="px-3 py-3 text-right font-mono theme-text-muted">
+                        {row.reinvestable ? fmt.usd(row.reinvestable) : '—'}
+                      </td>
+
+                      {/* E–H computed */}
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.indigo}}>{fmt.usd(row.cumulative_called)}</td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.violet}}>{fmt.usd(row.investment_capacity)}</td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:row.cash_flow<0?C.red:C.emerald}}>{fmt.usd(row.cash_flow)}</td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:row.net_cash_position<0?C.red:C.emerald}}>{fmt.usd(row.net_cash_position)}</td>
+
+                      {/* Review — inline edit */}
+                      <td className="px-3 py-3 min-w-[220px]">
+                        {isEditing ? (
+                          <div className="flex flex-col gap-1.5">
+                            <input
+                              type="text"
+                              autoFocus
+                              placeholder="Type your review…"
+                              className="theme-input rounded px-2 py-1.5 text-base border theme-border w-full"
+                              value={noteText}
+                              onChange={e => setNoteText(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') saveNote(row, noteText); if (e.key === 'Escape') setEditIdx(null); }}
+                            />
+                            <div className="flex items-center gap-1.5">
+                              <button onClick={() => saveNote(row, noteText)} disabled={saving}
+                                className="px-2.5 py-1 rounded text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 transition-colors">
+                                {saving ? '…' : 'Save'}
+                              </button>
+                              {row.notes && (
+                                <button onClick={() => saveNote(row, '')} disabled={saving}
+                                  className="px-2.5 py-1 rounded text-xs text-red-400 hover:bg-red-500/10 border border-red-500/30 transition-colors">
+                                  Delete
+                                </button>
+                              )}
+                              <button onClick={() => setEditIdx(null)}
+                                className="px-2 py-1 text-xs theme-text-muted hover:text-red-400 transition-colors">
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-start gap-2 group">
+                            <span className={`text-base flex-1 ${row.notes ? 'theme-text' : 'theme-text-muted opacity-40 italic'}`}>
+                              {row.notes || '—'}
+                            </span>
+                            {canEdit && hasId && editIdx === null && editDateIdx === null && (
+                              <button onClick={() => openNote(row, i)}
+                                className="opacity-0 group-hover:opacity-100 flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium theme-text-muted hover:text-indigo-400 hover:bg-indigo-500/10 border theme-border transition-all">
+                                Edit
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
                 );
               })}
             </tbody>
@@ -914,7 +1328,7 @@ function FundSection({
         {tab==='calls'         && <CallsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='distributions' && <DistsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='nav'           && <NavTab      fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
-        {tab==='ledger'        && <LedgerTab   fundId={fundId} />}
+        {tab==='ledger'        && <LedgerTab   fundId={fundId} canEdit={canEdit} />}
         {tab==='details'       && <DetailsTab  detail={detail} canEdit={canEdit} fundId={fundId} onSaved={onChanged} />}
         {tab==='wire'          && <WireTab     detail={detail} canEdit={canEdit} fundId={fundId} onSaved={onChanged} />}
       </div>

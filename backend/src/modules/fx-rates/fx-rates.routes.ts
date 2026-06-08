@@ -117,6 +117,49 @@ router.get('/historical', async (c) => {
   return c.json({ date, from, to, mufg_rate: mufgRate, usd_jpy: murc.ttm, tts: murc.tts, ttb: murc.ttb, source: 'murc' })
 })
 
+// GET /monthly?year=YYYY
+// Returns one MUFG TTM rate per month (last trading day) for the given year.
+// Checks DB first; falls back to MURC scrape.
+router.get('/monthly', async (c) => {
+  const now  = new Date()
+  const year = parseInt(c.req.query('year') ?? String(now.getFullYear()))
+  const currentYear  = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+
+  const lastMonth = year === currentYear ? currentMonth : 12
+
+  async function rateForMonth(month: number): Promise<{ month: number; date: string; usd_jpy: number; source: string } | null> {
+    const isCurrentMonth = year === currentYear && month === currentMonth
+    const lastDay = isCurrentMonth
+      ? now.getDate()
+      : new Date(year, month, 0).getDate()
+
+    for (let day = lastDay; day >= Math.max(lastDay - 7, 1); day--) {
+      const d = new Date(year, month - 1, day)
+      if (d > now) continue
+      if (d.getDay() === 0 || d.getDay() === 6) continue
+
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+
+      const stored = await prisma.fxRate.findFirst({
+        where: { rateDate: { gte: new Date(dateStr + 'T00:00:00Z'), lte: new Date(dateStr + 'T23:59:59Z') } },
+      })
+      if (stored) return { month, date: dateStr, usd_jpy: parseFloat(stored.usdJpy.toString()), source: 'db' }
+
+      const murc = await fetchMurcUsdJpy(dateStr)
+      if (murc) return { month, date: dateStr, usd_jpy: murc.ttm, source: 'murc' }
+    }
+    return null
+  }
+
+  const results: ({ month: number; date: string; usd_jpy: number; source: string } | null)[] = []
+  for (let m = 1; m <= lastMonth; m++) {
+    results.push(await rateForMonth(m))
+  }
+
+  return c.json({ year, rates: results.filter(Boolean) })
+})
+
 // GET /history
 router.get('/history', async (c) => {
   const days   = parseInt(c.req.query('days') ?? '90')
