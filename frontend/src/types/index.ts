@@ -14,11 +14,13 @@ export interface FundSummary {
   currency?: string;
   commitment_usd: number;
   total_called_usd: number;
+  total_called_jpy?: number;
   drawn_pct: number;
   unfunded_usd: number;
   investment_capacity: number;
   net_cash_position: number;
   total_received_usd: number;
+  total_received_jpy?: number;
   dpi: number;
   is_active?: boolean;
 }
@@ -58,6 +60,9 @@ export interface LedgerRow {
   net_cash_position: number;   // H
   capital_paid_jpy: number;
   capital_received_jpy: number;
+  return_of_capital?: number;
+  gain?: number;
+  interest?: number;
   call_id?: string;
   dist_id?: string;
   wire_reference?: string;

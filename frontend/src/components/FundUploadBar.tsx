@@ -136,7 +136,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
             ) : (
               <>
                 <p className="text-sm font-semibold theme-text">📄 Drop a PDF here or click to browse</p>
-                <p className="text-[10px] theme-text-muted mt-1">Siguler Guff, Goldman Sachs or NB Real Estate notices</p>
+                <p className="text-[10px] theme-text-muted mt-1">NB Real Estate, Hamilton Lane, Dover Street or SDG notices</p>
               </>
             )}
           </div>

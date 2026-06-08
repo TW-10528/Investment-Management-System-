@@ -72,6 +72,12 @@ export const fundsAPI = {
   createNavRecord:(id: string, d: any)   => api.post(`/funds/${id}/nav-records`, d),
   updateNavRecord:(id: string, nId: string, d: any) => api.patch(`/funds/${id}/nav-records/${nId}`, d),
   deleteNavRecord:(id: string, nId: string)         => api.delete(`/funds/${id}/nav-records/${nId}`),
+  // Commitments (per-fund sub-grouping — e.g. SDG)
+  getCommitments:   (id: string)         => api.get(`/funds/${id}/commitments`),
+  createCommitment: (id: string, d: any) => api.post(`/funds/${id}/commitments`, d),
+  updateCommitment: (id: string, cid: string, d: any) => api.patch(`/funds/${id}/commitments/${cid}`, d),
+  deleteCommitment: (id: string, cid: string)         => api.delete(`/funds/${id}/commitments/${cid}`),
+  commitmentLedger: (id: string, cid: string)         => api.get(`/funds/${id}/commitments/${cid}/ledger`),
 };
 
 // ── Capital Calls ─────────────────────────────────────────────────────────────
@@ -168,9 +174,9 @@ export const noticesAPI = {
 export const fundReportsAPI = {
   list:   (fundId: string)                  => api.get('/fund-reports', { params: { fund_id: fundId } }),
   get:    (id: string)                      => api.get(`/fund-reports/${id}`),
-  upload: (fundId: string, formData: FormData, noticeType?: string) =>
+  upload: (fundId: string, formData: FormData, noticeType?: string, commitmentId?: string) =>
     api.post('/fund-reports/upload', formData, {
-      params:  { fund_id: fundId, ...(noticeType ? { notice_type: noticeType } : {}) },
+      params:  { fund_id: fundId, ...(noticeType ? { notice_type: noticeType } : {}), ...(commitmentId ? { commitment_id: commitmentId } : {}) },
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   delete: (id: string)                      => api.delete(`/fund-reports/${id}`),
@@ -195,12 +201,6 @@ export const rulesAPI = {
   updateExtractor:  (id: string, data: any)         => api.put(`/rules/extractors/${id}`, data),
   deleteExtractor:  (id: string)                    => api.delete(`/rules/extractors/${id}`),
   testExtractor:    (data: any)                     => api.post('/rules/extractors/test', data),
-  loadPreset:       (preset: string)                => api.post(`/rules/presets/${preset}`),
-};
-
-// ── Siguler Guff — PDF-parsed sigf.ts calculations ───────────────────────────
-export const sigulerGuffAPI = {
-  analysis: () => api.get('/siguler-guff/analysis'),
 };
 
 // ── Fund PDF — generic upload + per-fund analysis ────────────────────────────

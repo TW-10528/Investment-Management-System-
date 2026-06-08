@@ -170,7 +170,7 @@ router.post('/upload', async (c) => {
   let extractedData: any
   let resolvedFundId = fundId ?? null
 
-  const fundParsed = await parseFundPdf(buffer)
+  const fundParsed = await parseFundPdf(buffer, file.name)
   if (fundParsed.fundKey !== 'unknown') {
     // Known fund — use fund-specific extraction
     const { rawText: _, ...stored } = fundParsed

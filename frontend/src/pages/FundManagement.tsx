@@ -528,7 +528,8 @@ function LedgerTab({ fundId }: { fundId:string }) {
             <thead style={{ background:'var(--color-header-bg)' }}>
               <tr className="border-b theme-border">
                 {['Date','Description','FX','B Called','C Received','D Reinvest',
-                  'E Cum.Called','F Inv.Cap','G Cash Flow','H Net Cash','JPY Called','JPY Recv'].map(h=>(
+                  'E Cum.Called','F Inv.Cap','G Cash Flow','H Net Cash','L Dist Not Reinv',
+                  'Return of Capital','Gain','Interest'].map(h=>(
                   <th key={h} className="px-3 py-2.5 text-[9px] font-semibold theme-text-muted uppercase tracking-wide text-right first:text-left whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -553,8 +554,10 @@ function LedgerTab({ fundId }: { fundId:string }) {
                     <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:C.violet}}>{fmt.usd(row.investment_capacity)}</td>
                     <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:row.cash_flow<0?C.red:C.emerald}}>{fmt.usd(row.cash_flow)}</td>
                     <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:row.net_cash_position<0?C.red:C.emerald}}>{fmt.usd(row.net_cash_position)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{row.capital_paid_jpy?fmt.jpy(row.capital_paid_jpy):'—'}</td>
-                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{row.capital_received_jpy?fmt.jpy(row.capital_received_jpy):'—'}</td>
+                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{row.capital_received?fmt.usd(row.capital_received-(row.reinvestable??0)):'—'}</td>
+                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{row.return_of_capital?fmt.usd(row.return_of_capital):'—'}</td>
+                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{row.gain?fmt.usd(row.gain):'—'}</td>
+                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{row.interest?fmt.usd(row.interest):'—'}</td>
                   </tr>
                 );
               })}
@@ -956,17 +959,24 @@ function FundCard({ fund, detail, onClick }: { fund: FundSummary; detail?: FundD
         <span className="theme-text-muted text-lg flex-shrink-0">→</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t theme-border">
-        {[
-          ['Commitment', fmt.usd(commitment, true)],
-          ['Drawn',      `${drawn.toFixed(1)}%`],
-          ['DPI',        `${Number(summary.dpi ?? 0).toFixed(2)}×`],
-        ].map(([label, value]) => (
-          <div key={label}>
-            <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{label}</p>
-            <p className="text-sm font-bold tabular-nums theme-text mt-0.5">{value}</p>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t theme-border">
+        {(() => {
+          const netCash = Number(summary.net_cash_position ?? (Number(summary.total_received_usd ?? 0) - Number(summary.total_called_usd ?? 0)));
+          const cells: [string, string, string?][] = [
+            ['Commitment', fmt.usd(commitment, true)],
+            ['Net Cash',   fmt.usd(netCash, true), netCash < 0 ? '#ef4444' : '#10b981'],
+            ['Drawn',      `${drawn.toFixed(1)}%`],
+            ['DPI',        `${Number(summary.dpi ?? 0).toFixed(2)}×`],
+          ];
+          return cells.map(([label, value, color]) => (
+            <div key={label}>
+              <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{label}</p>
+              <p className="text-sm font-bold tabular-nums mt-0.5" style={color ? { color } : undefined}>
+                <span className={color ? '' : 'theme-text'}>{value}</span>
+              </p>
+            </div>
+          ));
+        })()}
       </div>
     </button>
   );

@@ -1,0 +1,3 @@
+
+# OCR language models (downloaded, ~27MB) — re-fetch with the curl in pdfOcr.ts header
+ocr-langs/

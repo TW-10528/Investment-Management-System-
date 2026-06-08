@@ -72,6 +72,10 @@ export interface NbExcelFields {
   net_management_fee:                           number
   additional_payment_due_to_subsequent_closing: number | null
   additional_payment_received:                  number
+  // Finance-detail columns (ROC = LP share of proceeds, gain, interest).
+  return_of_capital:                            number
+  gain:                                         number
+  interest:                                     number
   // filled in by calculateExcelFields → extractNbRealestateReport
   current_transaction_cash_flow?:               number | null
   cumulative_cash_flow?:                        number | null

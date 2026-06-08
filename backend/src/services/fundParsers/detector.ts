@@ -1,10 +1,12 @@
 // Fund detector — identifies which fund a PDF belongs to from its raw text.
 
 export type FundKey =
-  | 'goldman-sachs'
-  | 'siguler-guff'
   | 'nb-real-estate'
-  // ── Add remaining 6 funds here as you provide their PDFs ──
+  | 'hamilton-lane'
+  | 'hamilton-strategic'
+  | 'dover-street'
+  | 'sdg-lps'
+  // ── Add remaining funds here as you provide their PDFs ──
   | 'unknown'
 
 interface FundSignature {
@@ -14,25 +16,45 @@ interface FundSignature {
 
 const SIGNATURES: FundSignature[] = [
   {
-    key: 'goldman-sachs',
-    patterns: [
-      /goldman\s+sachs/i,
-      /vintage\s+x/i,
-    ],
-  },
-  {
-    key: 'siguler-guff',
-    patterns: [
-      /siguler\s+guff/i,
-    ],
-  },
-  {
     key: 'nb-real-estate',
     patterns: [
       /NB\s+Real\s+Estate\s+Secondary\s+Opportunities/i,
     ],
   },
-  // ── Stubs for remaining 7 funds ─────────────────────────────────────────────
+  {
+    key: 'hamilton-lane',
+    patterns: [
+      /Hamilton\s+Lane\s+Secondary\s+Fund/i,
+    ],
+  },
+  {
+    key: 'hamilton-strategic',
+    patterns: [
+      /Hamilton\s+Lane\s+Strategic\s+Opportunities/i,
+    ],
+  },
+  {
+    key: 'dover-street',
+    patterns: [
+      /Dover\s+Street\s+XI/i,
+    ],
+  },
+  {
+    // SDGs 投資事業有限責任組合 — Japanese JPY fund (Thirdwave / サードウェーブ).
+    // Keyed on two markers that OCR recovers reliably: the Japanese LPS phrase plus
+    // the サード (Thirdwave) investor name. "SDGs" itself is NOT used because OCR
+    // misreads the G (e.g. "SDos"/"SDCs"); no other fund in this system is Japanese,
+    // so these two together are unambiguous.
+    key: 'sdg-lps',
+    patterns: [
+      /投資事業有限責任組合/,
+      // Either the SDG marker (G is OCR-misread as o/C, so allow SD[GOC]s) or the
+      // サード (Thirdwave) investor name. Text-layer PDFs match the former; scanned
+      // OCR'd ones reliably match the latter.
+      /サード|SD[GOC]s/i,
+    ],
+  },
+  // ── Stubs for remaining funds ───────────────────────────────────────────────
   // Add each fund's unique identifying text patterns below.
   // Example:
   // {

@@ -120,6 +120,10 @@ def save_investment_transaction(fund_id: int, result: dict):
                     cumulative_cash_flow,
                     cash_flow,
  
+                    return_of_capital,
+                    gain,
+                    interest,
+ 
                     distribution_not_allocated_to_reinvestment,
                     remarks,
  
@@ -132,6 +136,7 @@ def save_investment_transaction(fund_id: int, result: dict):
                 VALUES (
                     %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s,
+                    %s, %s, %s,
                     %s, %s, %s,
                     %s, %s, %s,
                     %s, %s,
@@ -161,6 +166,10 @@ def save_investment_transaction(fund_id: int, result: dict):
                     final_fields.get("current_transaction_cash_flow"),
                     final_fields.get("cumulative_cash_flow"),
                     final_fields.get("cash_flow"),
+ 
+                    final_fields.get("return_of_capital"),
+                    final_fields.get("gain"),
+                    final_fields.get("interest"),
  
                     final_fields.get("distribution_not_allocated_to_reinvestment"),
                     final_fields.get("remarks"),

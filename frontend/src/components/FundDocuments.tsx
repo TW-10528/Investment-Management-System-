@@ -5,8 +5,9 @@
  * Deleting a document reverses the capital call / distribution it created, so the
  * fund's ledger/KPIs and the dashboard refresh via onChanged().
  *
- * NB Real Estate documents can be expanded to reveal the rich extractor output
- * (capital-call / distribution breakdown, calculated Excel fields, validation).
+ * NB Real Estate and Hamilton Lane documents can be expanded to reveal the rich
+ * extractor output (capital-call / distribution breakdown, calculated Excel
+ * fields, validation).
  */
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { fundReportsAPI } from '../services/api';
@@ -42,7 +43,10 @@ function docTime(d: any): number {
 
 const money = (v: any) => (v == null || v === '' ? '—' : fmt.usd(Number(v)));
 
-// ── NB rich-report detail panel ────────────────────────────────────────────────
+// Funds whose documents carry a rich extractor report (expandable detail panel).
+const RICH_REPORT_FUNDS = ['nb-real-estate', 'hamilton-lane', 'hamilton-strategic', 'dover-street', 'sdg-lps'];
+
+// ── Rich-report detail panel (NB Real Estate / Hamilton Lane) ──────────────────
 function Bool({ v }: { v: boolean | null | undefined }) {
   if (v == null) return <span className="theme-text-muted">—</span>;
   return v
@@ -80,7 +84,9 @@ function NbReportPanel({ report }: { report: any }) {
   const val    = report?.validation ?? {};
   const checks = val?.calculation_checks ?? {};
 
-  const excelRows: [string, any][] = [
+  // Core B–G fields are common to every rich report; the trailing rows are
+  // fund-specific and simply render "—" when a field is absent.
+  const excelRows = ([
     ['B · Capital Contribution',    f.capital_contribution_amount],
     ['C · Distribution Received',   f.distribution_amount_received],
     ['D · Reinvestable',            f.reinvestable_amount],
@@ -88,20 +94,32 @@ function NbReportPanel({ report }: { report: any }) {
     ['F · Remaining Commitment',    f.remaining_commitment],
     ['G · Current Cash Flow',       f.current_transaction_cash_flow],
     ['Cumulative Cash Flow',        f.cumulative_cash_flow],
+    // NB Real Estate specific
     ['Net Management Fee',          f.net_management_fee],
     ['Management Fee Rebate',       f.management_fee_rebate],
     ['Additional Payment',          f.additional_payment_due_to_subsequent_closing],
     ['Tax Expense (excl. cash flow)', f.tax_expense],
     ['Amount Due from LP',          f.amount_due_from_limited_partner],
-  ];
+    // Hamilton Lane specific
+    ['Return of Capital',           f.return_of_capital],
+    ['Realized Gain',               f.gain],
+    ['Investment Income',           f.interest_other],
+    ['Sub. Close Interest Payable', f.subsequent_close_interest_payable],
+    ['Sub. Close Interest Recv.',   f.subsequent_close_interest_receivable],
+    // Hamilton Strategic / both Hamiltons
+    ['Actual Payment Amount',       f.actual_payment_amount],
+    ['Distribution Not Reinvested', f.distribution_not_allocated_to_reinvestment],
+  ] as [string, any][]).filter(([, v]) => v != null);
 
-  const checkRows: [string, boolean | null | undefined][] = [
-    ['Capital-call breakdown total matches', checks.is_capital_call_breakdown_matched],
-    ['Distribution breakdown total matches', checks.is_distribution_breakdown_matched],
+  // NB and Hamilton use slightly different check keys; read whichever exists.
+  const checkRows: [string, boolean | null | undefined][] = ([
+    ['Capital-call breakdown total matches', checks.is_capital_call_breakdown_matched ?? checks.is_capital_call_breakdown_matched_to_excel_B],
+    ['Distribution breakdown total matches', checks.is_distribution_breakdown_matched ?? checks.is_distribution_detail_total_matched],
     ['Reported amount due matches',          checks.is_amount_due_matched],
+    ['Cash flow vs transaction total',       checks.is_current_cash_flow_matched_with_transaction_total],
     ['Cumulative contributions vs report',   checks.is_cumulative_capital_contributions_matched_with_report],
     ['Remaining commitment vs report',       checks.is_remaining_commitment_matched_with_report],
-  ];
+  ] as [string, boolean | null | undefined][]).filter(([, v]) => v !== undefined);
 
   return (
     <div className="p-5 space-y-5" style={{ background: 'rgba(99,102,241,0.04)' }}>
@@ -171,7 +189,7 @@ export default function FundDocuments({ fundId, canEdit, onChanged }: Props) {
       setLoadingDetail(true);
       try {
         const r = await fundReportsAPI.get(doc.id);
-        setReports(prev => ({ ...prev, [doc.id]: r.data?.nb_report ?? null }));
+        setReports(prev => ({ ...prev, [doc.id]: r.data?.fund_report ?? null }));
       } catch {
         setReports(prev => ({ ...prev, [doc.id]: null }));
       } finally {
@@ -227,7 +245,7 @@ export default function FundDocuments({ fundId, canEdit, onChanged }: Props) {
                 const amount = doc.notice_type === 'distribution' ? doc.distribution_usd
                              : doc.notice_type === 'financial_statement' ? null
                              : doc.gross_call_usd;
-                const isNb = doc.fund_key === 'nb-real-estate';
+                const isNb = RICH_REPORT_FUNDS.includes(doc.fund_key);
                 const open = expandedId === doc.id;
                 return (
                   <Fragment key={doc.id}>

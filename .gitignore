@@ -4,6 +4,8 @@ backend/*.pyc
 backend/.env
 frontend/node_modules/
 frontend/dist/
-*.envbackend/node_modules/
+*.env
+backend/node_modules/
+node_modules/
 backend/*.db
 backend/uploads/

@@ -347,6 +347,13 @@ function mapToExcelFields(a: NbAllFields, breakdown: NbBreakdown): NbExcelFields
 
   const currentTransactionCashFlow = calculateCurrentTransactionCashFlow(capitalContributionAmount, distributionAmountReceived)
 
+  // Finance-detail columns (ported from the updated nb_realestate_logic).
+  // Return of Capital = LP share of distributable proceeds (deemed distribution).
+  // Gain = 0 for NB. Interest = additional payment received (offset, negative in report).
+  const returnOfCapital = a.limited_partner_share_of_distributable_proceeds ?? 0
+  const gain = 0
+  const interest = a.additional_payment_received ?? 0
+
   const remarksParts = ['NB Real Estate capital call/drawdown notice.']
   if (distributionAmountReceived) remarksParts.push('Includes deemed distribution subject to reinvestment.')
   if (a.management_fee_amount) remarksParts.push('Includes net management fee capital contribution.')
@@ -374,6 +381,9 @@ function mapToExcelFields(a: NbAllFields, breakdown: NbBreakdown): NbExcelFields
     net_management_fee:                           a.net_management_fee ?? 0,
     additional_payment_due_to_subsequent_closing: a.additional_payment_due_to_subsequent_closing,
     additional_payment_received:                  a.additional_payment_received ?? 0,
+    return_of_capital:                            returnOfCapital,
+    gain:                                         gain,
+    interest:                                     interest,
   }
 }
 

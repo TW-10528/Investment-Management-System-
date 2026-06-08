@@ -23,6 +23,8 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.16",
     "pdf-parse": "^1.1.1",
+    "pdf-to-png-converter": "^3.18.0",
+    "tesseract.js": "^7.0.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

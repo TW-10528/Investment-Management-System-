@@ -124,7 +124,6 @@ export default function RulesEngine() {
   const [running,    setRunning]    = useState(false);
 
   const [showAttrPanel,  setShowAttrPanel]  = useState(false);
-  const [loadingPreset,  setLoadingPreset]  = useState(false);
   const [pageTab,       setPageTab]       = useState<PageTab>('rules');
 
   // Extractors state
@@ -287,28 +286,6 @@ export default function RulesEngine() {
     }
   }
 
-  /* ── Load preset ───────────────────────────────────────────────────────── */
-  async function loadSigulerGuffPreset() {
-    if (!confirm('Load Siguler Guff preset? This will create 4 keyword extractors and 6 calculation rules (skips any that already exist).')) return;
-    setLoadingPreset(true);
-    try {
-      const res = await rulesAPI.loadPreset('siguler-guff');
-      const { created, skipped } = res.data;
-      toast.success(
-        `Preset loaded — ${created.extractors.length} extractor(s) and ${created.rules.length} rule(s) created` +
-        (skipped.extractors.length + skipped.rules.length > 0 ? ` (${skipped.extractors.length + skipped.rules.length} already existed)` : '')
-      );
-      // Refresh
-      const [r, e] = await Promise.all([rulesAPI.list(), rulesAPI.listExtractors()]);
-      setRules(r.data);
-      setExtractors(e.data);
-    } catch (e: any) {
-      toast.error(e.response?.data?.detail ?? 'Failed to load preset');
-    } finally {
-      setLoadingPreset(false);
-    }
-  }
-
   /* ── Extractor helpers ─────────────────────────────────────────────────── */
   function openNewExt() {
     setExtForm(blankExtractor());
@@ -435,14 +412,6 @@ export default function RulesEngine() {
             className="px-3 py-2 text-xs font-medium theme-card border rounded-xl hover:bg-white/5 transition-colors theme-text-muted">
             {showAttrPanel ? 'Hide' : 'Show'} Variables
           </button>
-          {canEdit && (
-            <button onClick={loadSigulerGuffPreset} disabled={loadingPreset}
-              className="px-3 py-2 text-xs font-medium border rounded-xl hover:bg-white/5 transition-colors disabled:opacity-50"
-              style={{ borderColor: 'rgba(99,102,241,0.3)', color: '#6366f1' }}
-              title="Load Siguler Guff keyword extractors and calculation rules">
-              {loadingPreset ? '…' : '⚡ Load Siguler Guff Preset'}
-            </button>
-          )}
           {canEdit && (
             <button onClick={openNew}
               className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-500 transition-colors">

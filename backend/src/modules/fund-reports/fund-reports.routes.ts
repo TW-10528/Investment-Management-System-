@@ -14,6 +14,10 @@ import { canEdit } from '../../middleware/guard'
 import { prisma } from '../../lib/prisma'
 import { parseFundPdf } from '../../services/fundParsers/index'
 import { parseNbRealEstate } from '../../services/fundParsers/nb-real-estate/index'
+import { parseHamiltonLane } from '../../services/fundParsers/hamilton-lane/index'
+import { parseHamiltonStrategic } from '../../services/fundParsers/hamilton-strategic/index'
+import { parseDoverStreet } from '../../services/fundParsers/dover-street/index'
+import { parseSdgLps } from '../../services/fundParsers/sdg-lps/index'
 import { resolveFund } from '../../services/fundParsers/fund-resolver'
 import { CalculationEngine } from '../../services/calculationEngine'
 import { notifyAllAdmins, notifyUser } from '../../services/notificationService'
@@ -21,6 +25,12 @@ import { config } from '../../config/index'
 
 const router = new Hono<HonoEnv>()
 router.use('*', auth)
+
+// Upload folder name per fund (defaults to the fundKey with hyphens → spaces).
+// Override here when a fund should store its PDFs under a friendlier name.
+const FUND_FOLDER_NAMES: Record<string, string> = {
+  'hamilton-strategic': 'hamilton lane strategic',
+}
 
 // ── Serialiser ────────────────────────────────────────────────────────────────
 
@@ -75,12 +85,12 @@ router.post('/upload', async (c) => {
 
   // Detect + resolve the fund BEFORE touching disk, so unrecognised PDFs leave
   // no artifacts and each file lands in its own fund's folder.
-  const parsed = await parseFundPdf(buffer)
+  const parsed = await parseFundPdf(buffer, originalName)
 
   if (parsed.fundKey === 'unknown') {
     return c.json({
       detail: 'Fund not recognised. This PDF does not match any registered fund template.',
-      hint:   'Supported funds: Goldman Sachs (Vintage X), Siguler Guff, NB Real Estate Secondary Opportunities Fund II',
+      hint:   'Supported funds: NB Real Estate Secondary Opportunities Fund II, Hamilton Lane Secondary Fund VI-B, Hamilton Lane Strategic Opportunities Fund IX-B, Dover Street XI Feeder Fund, SDGs 投資事業有限責任組合',
     }, 422)
   }
 
@@ -102,22 +112,42 @@ router.post('/upload', async (c) => {
     }, 422)
   }
 
-  // ── NB Real Estate — chain the cumulative formulas across notices ───────────
-  // The friend's module computes cumulative contributions / remaining commitment /
+  // Optional commitment this PDF belongs to (funds with per-commitment grouping,
+  // e.g. the SDG fund). Validated against the resolved fund.
+  let commitmentId: string | null = c.req.query('commitment_id') || null
+  if (commitmentId) {
+    const cm = await prisma.commitment.findUnique({ where: { id: commitmentId } })
+    if (!cm || cm.fundId !== resolvedFund.id) {
+      return c.json({ detail: 'The selected commitment does not belong to this fund.' }, 422)
+    }
+  }
+
+  // ── NB Real Estate / Hamilton Lane — chain cumulative formulas across notices ─
+  // These modules compute cumulative contributions / remaining commitment /
   // cumulative cash flow from the PREVIOUS row's stored values. Re-run the parser
-  // with the latest prior NB report's cumulatives so each new notice continues the
+  // with the latest prior report's cumulatives so each new notice continues the
   // running totals (the per-row B/C/D ledger is still owned by CalculationEngine).
-  if (parsed.fundKey === 'nb-real-estate' && parsed.rawText) {
-    const previousState = await latestNbPreviousState(resolvedFund.id)
+  const RICH_FUNDS = ['nb-real-estate', 'hamilton-lane', 'hamilton-strategic', 'dover-street', 'sdg-lps']
+  if (RICH_FUNDS.includes(parsed.fundKey) && parsed.rawText) {
+    // Chain within the same commitment when one is selected, so each commitment's
+    // cumulative totals run independently.
+    const previousState = await latestFundPreviousState(resolvedFund.id, commitmentId)
     if (previousState) {
-      const reparsed = parseNbRealEstate(parsed.rawText, previousState)
+      const reparsed =
+        parsed.fundKey === 'nb-real-estate'    ? parseNbRealEstate(parsed.rawText, previousState)
+        : parsed.fundKey === 'hamilton-lane'   ? parseHamiltonLane(parsed.rawText, previousState)
+        : parsed.fundKey === 'hamilton-strategic' ? parseHamiltonStrategic(parsed.rawText, previousState)
+        : parsed.fundKey === 'dover-street'    ? parseDoverStreet(parsed.rawText, previousState, originalName)
+        : parseSdgLps(parsed.rawText, previousState, originalName)
       reparsed.rawText = parsed.rawText
       Object.assign(parsed, reparsed)
     }
   }
 
-  // ── Write the file into the fund's own folder (e.g. uploads/goldman sachs/) ──
-  const fundFolder = parsed.fundKey.replace(/-/g, ' ')          // goldman-sachs → "goldman sachs"
+  // ── Write the file into the fund's own folder (e.g. uploads/nb real estate/) ──
+  // Folder name defaults to the fundKey with spaces; override per fund where a
+  // friendlier name is wanted (Hamilton Strategic → "hamilton lane strategic").
+  const fundFolder = FUND_FOLDER_NAMES[parsed.fundKey] ?? parsed.fundKey.replace(/-/g, ' ')  // dover-street → "dover street"
   const folderPath = path.join(config.uploadDir, fundFolder)
   if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true })
   const relPath  = path.join(fundFolder, `${Date.now()}_${safe}`)  // stored on the notice; delete reuses it
@@ -154,15 +184,17 @@ router.post('/upload', async (c) => {
       // ── Capital Calls section — the call portion (column B) ──────────────────
       if (wantCall) {
         const grossUsd = parseFloat(String(parsed.grossCallUsd ?? 0))   // B
-        const existing = await tx.capitalCall.findFirst({ where: { fundId: resolvedFund.id, dueDate } })
+        const existing = await tx.capitalCall.findFirst({ where: { fundId: resolvedFund.id, dueDate, commitmentId } })
         if (existing) {
           made.callId = existing.id
           made.deduplicated = true
         } else {
-          const last = await tx.capitalCall.findFirst({ where: { fundId: resolvedFund.id }, orderBy: { callNumber: 'desc' } })
+          // Call numbering is per-commitment (or fund-level when no commitment).
+          const last = await tx.capitalCall.findFirst({ where: { fundId: resolvedFund.id, commitmentId }, orderBy: { callNumber: 'desc' } })
           const cc = await tx.capitalCall.create({
             data: {
               fundId:              resolvedFund.id,
+              commitmentId,
               callNumber:          (last?.callNumber ?? 0) + 1,
               noticeDate:          parsed.noticeDate ? new Date(parsed.noticeDate) : new Date(),
               dueDate,
@@ -178,6 +210,9 @@ router.post('/upload', async (c) => {
               investmentAmountUsd: grossUsd,
               managementFeeUsd:    parseFloat(String(parsed.managementFeeUsd ?? 0)),
               expenseUsd:          parseFloat(String(parsed.taxExpenseUsd ?? 0)),
+              returnOfCapitalUsd:  parseFloat(String(parsed.returnOfCapitalUsd ?? 0)),
+              gainUsd:             parseFloat(String(parsed.gainUsd ?? 0)),
+              interestUsd:         parseFloat(String(parsed.interestUsd ?? 0)),
               fxRate,
               netCallJpy:          Math.round(grossUsd * fxRate),
               wireReference:       parsed.wireReference ?? null,
@@ -200,7 +235,7 @@ router.post('/upload', async (c) => {
         const amtUsd = noticeType === 'capital_and_distribution'
           ? parseFloat(String(parsed.distributionUsd ?? 0))
           : parseFloat(String(parsed.distributionUsd || parsed.grossCallUsd || 0))
-        const existing = await tx.distribution.findFirst({ where: { fundId: resolvedFund.id, distributionDate: dueDate } })
+        const existing = await tx.distribution.findFirst({ where: { fundId: resolvedFund.id, distributionDate: dueDate, commitmentId } })
         if (existing) {
           made.distId = existing.id
           made.deduplicated = true
@@ -208,12 +243,16 @@ router.post('/upload', async (c) => {
           const dist = await tx.distribution.create({
             data: {
               fundId:           resolvedFund.id,
+              commitmentId,
               distributionDate: dueDate,
               distType:         'Income',
               amountUsd:        amtUsd,
               amountJpy:        Math.round(amtUsd * fxRate),
               fxRate,
               reinvestableUsd:  parseFloat(String(parsed.reinvestableUsd ?? 0)),
+              returnOfCapitalUsd: parseFloat(String(parsed.returnOfCapitalUsd ?? 0)),
+              gainUsd:            parseFloat(String(parsed.gainUsd ?? 0)),
+              interestUsd:        parseFloat(String(parsed.interestUsd ?? 0)),
               isRecallable:     false,
             },
           })
@@ -230,6 +269,7 @@ router.post('/upload', async (c) => {
           status:        'approved',
           approvedAt:    new Date(),
           fundId:        resolvedFund.id,       // auto-linked to the single fund record
+          commitmentId,                         // optional per-commitment grouping
           extractedData: { ...storedData, createdCallId: made.callId ?? null, createdDistId: made.distId ?? null } as any,
           confidence:    parsed.confidence,
           uploadedBy:    user.email,
@@ -267,9 +307,42 @@ router.post('/upload', async (c) => {
   }, 201)
 })
 
+// ── Filesystem reconciliation ──────────────────────────────────────────────────
+// Keep the document list in sync with the uploads/ folder: if a stored PDF was
+// removed directly from the backend's uploads directory, treat that document as
+// deleted — reverse the capital call / distribution it created and drop the Notice
+// record — so it disappears from the frontend and the ledger + dashboard recompute
+// automatically (same effect as DELETE /:id, but triggered by the missing file).
+async function reconcileOrphanedNotices() {
+  // Safety: never mass-delete if the uploads root itself is missing/unmounted —
+  // that would make every file look "deleted" and wipe all documents + ledgers.
+  if (!fs.existsSync(config.uploadDir)) return
+
+  const notices = await prisma.notice.findMany()
+  for (const n of notices) {
+    if (!n.filename) continue                                   // no backing file to track
+    const filepath = path.join(config.uploadDir, n.filename)
+    if (fs.existsSync(filepath)) continue                       // file still present → keep
+
+    // The stored PDF is gone from disk → reverse it like a normal delete.
+    const d = (n.extractedData as any) ?? {}
+    try {
+      if (d.createdCallId) await prisma.capitalCall.deleteMany({ where: { id: d.createdCallId } })
+      if (d.createdDistId) await prisma.distribution.deleteMany({ where: { id: d.createdDistId } })
+      await prisma.notice.delete({ where: { id: n.id } })
+      console.info(`[fund-reports] reconciled orphaned document ${n.id} (${n.filename}) — file removed from uploads/`)
+    } catch (e) {
+      console.error('[fund-reports] reconcile failed for notice', n.id, e)
+    }
+  }
+}
+
 // ── GET / — list all fund report notices ──────────────────────────────────────
 // Sorted by the document's own date (notice/due date), OLDEST first → latest last.
 router.get('/', async (c) => {
+  // Reflect any files deleted directly from the uploads/ folder before listing.
+  try { await reconcileOrphanedNotices() } catch (e) { console.error('[fund-reports] reconcile error (non-fatal):', e) }
+
   const { fund_key, status, fund_id } = c.req.query()
 
   const notices = await prisma.notice.findMany()
@@ -292,15 +365,17 @@ function docDate(n: any): number {
   return Number.isNaN(t) ? 0 : t
 }
 
-// Latest stored NB cumulatives for a fund — feeds the next notice's running totals.
-// Returns null when this is the first NB report (extractor then falls back to the
-// report's own inception-to-date values).
-async function latestNbPreviousState(fundId: string) {
-  const notices = await prisma.notice.findMany({ where: { fundId } })
-  const nbDocs = notices
-    .filter(n => (n.extractedData as any)?.nbReport?.final_excel_fields)
+// Latest stored cumulatives for a fund (NB / Hamilton) — feeds the next notice's
+// running totals. Returns null when this is the first rich report (the extractor
+// then falls back to the report's own report-cumulative values).
+async function latestFundPreviousState(fundId: string, commitmentId: string | null = null) {
+  // When a commitment is selected, chain only within that commitment so each
+  // commitment's running totals are independent.
+  const notices = await prisma.notice.findMany({ where: { fundId, commitmentId } })
+  const docs = notices
+    .filter(n => (n.extractedData as any)?.fundReport?.final_excel_fields)
     .sort((a, b) => docDate(b) - docDate(a))   // newest first
-  const f = (nbDocs[0]?.extractedData as any)?.nbReport?.final_excel_fields
+  const f = (docs[0]?.extractedData as any)?.fundReport?.final_excel_fields
   if (!f) return null
   return {
     cumulative_capital_contributions: f.cumulative_capital_contributions ?? null,
@@ -310,13 +385,13 @@ async function latestNbPreviousState(fundId: string) {
 }
 
 // ── GET /:id ───────────────────────────────────────────────────────────────────
-// Includes the rich NB report (breakdown, calculated Excel fields, validation)
-// when present, so the document detail panel can render it.
+// Includes the rich fund report (breakdown, calculated Excel fields, validation)
+// when present, so the document detail panel can render it (NB / Hamilton).
 router.get('/:id', async (c) => {
   const n = await prisma.notice.findUnique({ where: { id: c.req.param('id') } })
   if (!n) return c.json({ detail: 'Report not found' }, 404)
-  const nbReport = (n.extractedData as any)?.nbReport ?? null
-  return c.json({ ...reportDict(n), nb_report: nbReport })
+  const fundReport = (n.extractedData as any)?.fundReport ?? null
+  return c.json({ ...reportDict(n), fund_report: fundReport })
 })
 
 // ── POST /:id/approve ──────────────────────────────────────────────────────────

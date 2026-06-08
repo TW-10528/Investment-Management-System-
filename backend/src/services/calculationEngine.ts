@@ -33,6 +33,10 @@ export interface Transaction {
   callId?:         string
   distId?:         string
   wireReference?:  string | null
+  // Finance-detail columns (carried through to the ledger row).
+  returnOfCapital?: Decimal | null
+  gain?:            Decimal | null
+  interest?:        Decimal | null
 }
 
 export interface LedgerRow extends Transaction {
@@ -180,8 +184,11 @@ export class CalculationEngine {
       }
     }
 
-    const { snapshot } = CalculationEngine.buildLedger(commitment, txns)
+    const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns)
     const f = (d: Decimal) => parseFloat(d.toString())
+    // JPY totals (sum of each row's B×fx / C×fx) for the dashboard's per-fund view.
+    const totalCalledJpy   = rows.reduce((s, r) => s.plus(r.capitalPaidJpy),     new Decimal(0))
+    const totalReceivedJpy = rows.reduce((s, r) => s.plus(r.capitalReceivedJpy), new Decimal(0))
 
     return {
       fund_id:             fund.id,
@@ -194,6 +201,8 @@ export class CalculationEngine {
       commitment_usd:      f(commitment),
       total_called_usd:    f(snapshot.totalCalledUsd),
       total_received_usd:  f(snapshot.totalReceivedUsd),
+      total_called_jpy:    f(totalCalledJpy),
+      total_received_jpy:  f(totalReceivedJpy),
       drawn_pct:           f(snapshot.drawnPct),
       unfunded_usd:        f(snapshot.unfundedUsd),
       investment_capacity: f(snapshot.investmentCapacity),

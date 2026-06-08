@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { dashboardAPI, fxRatesAPI, fundPdfAPI } from '../services/api';
+import { dashboardAPI, fxRatesAPI } from '../services/api';
 import type { DashboardData, FundSummary } from '../types/index';
 import { fmt } from '../lib/format';
 import toast from 'react-hot-toast';
@@ -47,11 +47,21 @@ function FundRow({ fund }: { fund: FundSummary }) {
       <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>
         {usd(fund.total_called_usd)}
       </td>
+      <td className="px-4 py-3 text-right text-xs tabular-nums theme-text-muted">
+        {fund.total_called_jpy ? fmt.jpy(fund.total_called_jpy) : '—'}
+      </td>
       <td className="px-4 py-3 text-right text-sm tabular-nums theme-text-muted">
         {usd(fund.unfunded_usd ?? fund.commitment_usd - fund.total_called_usd)}
       </td>
       <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.emerald }}>
         {usd(fund.total_received_usd)}
+      </td>
+      <td className="px-4 py-3 text-right text-xs tabular-nums theme-text-muted">
+        {fund.total_received_jpy ? fmt.jpy(fund.total_received_jpy) : '—'}
+      </td>
+      <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold"
+          style={{ color: (fund.net_cash_position ?? 0) < 0 ? C.red : C.emerald }}>
+        {usd(fund.net_cash_position ?? (fund.total_received_usd - fund.total_called_usd))}
       </td>
       <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">
         {(fund.dpi ?? 0).toFixed(3)}×
@@ -66,90 +76,6 @@ function FundRow({ fund }: { fund: FundSummary }) {
         </div>
       </td>
     </tr>
-  );
-}
-
-/* ── sigf.ts analysis panel ──────────────────────────────────────────────── */
-function SigfPanel({ sigfData }: { sigfData: any }) {
-  const t = sigfData.totals;
-  const calls: any[] = sigfData.calls ?? [];
-  const commitment: number = sigfData.commitment ?? 0;
-  const utilPct = commitment > 0 ? ((t.cumulative_drawn / commitment) * 100).toFixed(2) : '0.00';
-
-  return (
-    <div className="theme-card border rounded-2xl overflow-hidden">
-      {/* header */}
-      <div className="px-5 py-3 border-b theme-divider flex items-center gap-2 flex-wrap"
-           style={{ background: 'rgba(99,102,241,0.04)' }}>
-        <span className="text-[9px] font-black px-1.5 py-0.5 rounded font-mono"
-              style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
-          {sigfData.fund_code}
-        </span>
-        <p className="text-sm font-bold theme-text flex-1 truncate">{sigfData.fund_name}</p>
-        <span className="text-[9px] theme-text-muted">{calls.length} calls · sigf.ts</span>
-      </div>
-
-      {/* 4 column totals */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x theme-divider border-b theme-divider">
-        {[
-          { col:'E', label:'Cumulative Drawn',    val: '$'+t.cumulative_drawn?.toLocaleString(),    color: C.indigo },
-          { col:'F', label:'Investment Capacity', val: '$'+t.investment_capacity?.toLocaleString(), color: C.emerald },
-          { col:'G', label:'Net Cash Flow',       val: '−$'+Math.abs(t.net_cash_flow??0).toLocaleString(), color: C.red },
-          { col:'L', label:'Non-Recallable Dist', val: '$'+(t.non_recallable_dist??0).toLocaleString(),     color: C.slate },
-        ].map(m => (
-          <div key={m.col} className="px-4 py-3">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-[8px] font-black px-1 py-0.5 rounded font-mono"
-                    style={{ background: 'rgba(255,255,255,0.07)', color: m.color }}>
-                col {m.col}
-              </span>
-              <p className="text-[9px] font-semibold theme-text-muted uppercase tracking-wide">{m.label}</p>
-            </div>
-            <p className="text-base font-bold tabular-nums" style={{ color: m.color }}>{m.val}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* deployment bar */}
-      <div className="px-5 py-3 border-b theme-divider">
-        <div className="flex items-center justify-between text-[10px] theme-text-muted mb-1">
-          <span>Commitment utilization · (E / ${commitment.toLocaleString()}) × 100</span>
-          <span className="font-bold" style={{ color: C.indigo }}>{utilPct}%</span>
-        </div>
-        <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--color-card-border)' }}>
-          <div className="h-full rounded-full transition-all duration-700"
-               style={{ width: `${utilPct}%`, background: C.indigo }} />
-        </div>
-      </div>
-
-      {/* per-call table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead style={{ background: 'var(--color-header-bg)' }}>
-            <tr className="border-b theme-divider">
-              {['#','Due Date','Call %','Paid (B)','E — Cum. Drawn','F — Inv. Capacity','G — Net CF','L — NR Dist','Cumul %'].map(h => (
-                <th key={h} className={`px-4 py-2 text-[9px] font-semibold theme-text-muted uppercase tracking-wide ${h==='#'?'text-left':'text-right'}`}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y theme-divider">
-            {calls.map((cc: any) => (
-              <tr key={cc.call_number} className="theme-row-hover">
-                <td className="px-4 py-2.5 font-bold theme-text">#{cc.call_number}</td>
-                <td className="px-4 py-2.5 text-right theme-text-muted">{cc.due_date}</td>
-                <td className="px-4 py-2.5 text-right theme-text">{cc.call_pct?.toFixed(2)}%</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.red }}>${cc.paid?.toLocaleString()}</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.indigo }}>${cc.cumulative_drawn?.toLocaleString()}</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.emerald }}>${cc.investment_capacity?.toLocaleString()}</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.red }}>−${Math.abs(cc.net_cash_flow??0).toLocaleString()}</td>
-                <td className="px-4 py-2.5 text-right theme-text-muted">${(cc.non_recallable_dist??0).toLocaleString()}</td>
-                <td className="px-4 py-2.5 text-right theme-text-muted">{cc.cumulative_pct?.toFixed(2)}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
   );
 }
 
@@ -204,7 +130,6 @@ function OverdueAlert({ calls }: { calls: DashboardData['overdue_calls'] }) {
 export default function Dashboard() {
   const { t } = useTranslation();
   const [data,        setData]        = useState<DashboardData | null>(null);
-  const [sigfList,    setSigfList]    = useState<any[]>([]);
   const [liveRate,    setLiveRate]    = useState<number | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
   const [loading,     setLoading]     = useState(true);
@@ -225,24 +150,11 @@ export default function Dashboard() {
     }
   }, []);
 
-  const loadSigf = useCallback(async () => {
-    try {
-      const reg = await fundPdfAPI.registered();
-      const codes: string[] = reg.data.map((f: any) => f.fund_code);
-      const results = await Promise.allSettled(codes.map((c: string) => fundPdfAPI.analysis(c)));
-      const merged: any[] = [];
-      results.forEach((r, i) => {
-        if (r.status === 'fulfilled') merged.push({ ...r.value.data, fund_code: codes[i] });
-      });
-      setSigfList(merged);
-    } catch { /* non-fatal */ }
-  }, []);
-
-  useEffect(() => { loadDashboard(); loadSigf(); }, [loadDashboard, loadSigf]);
+  useEffect(() => { loadDashboard(); }, [loadDashboard]);
   useEffect(() => {
-    const id = setInterval(() => { loadDashboard(true); loadSigf(); }, REFRESH_MS);
+    const id = setInterval(() => { loadDashboard(true); }, REFRESH_MS);
     return () => clearInterval(id);
-  }, [loadDashboard, loadSigf]);
+  }, [loadDashboard]);
 
   async function fetchLive() {
     setLiveLoading(true);
@@ -299,7 +211,7 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => { loadDashboard(true); loadSigf(); }} disabled={refreshing}
+          <button onClick={() => { loadDashboard(true); }} disabled={refreshing}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border theme-divider theme-text-muted hover:theme-text transition-colors disabled:opacity-40">
             🔄 Refresh
           </button>
@@ -341,7 +253,7 @@ export default function Dashboard() {
             <table className="w-full text-sm">
               <thead className="border-b theme-divider" style={{ background: 'var(--color-header-bg)' }}>
                 <tr>
-                  {['Fund','Commitment','Paid-in','Dry Powder','Distributed','DPI','Drawn'].map(h => (
+                  {['Fund','Commitment','Paid-in','Paid-in (¥)','Dry Powder','Distributed','Distributed (¥)','Net Cash','DPI','Drawn'].map(h => (
                     <th key={h} className={`px-${h==='Fund'?5:4} py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide ${h==='Fund'?'text-left':'text-right'} ${h==='Drawn'?'min-w-[140px]':''}`}>{h}</th>
                   ))}
                 </tr>
@@ -354,28 +266,20 @@ export default function Dashboard() {
                   <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">Portfolio Total</td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{usd(data.total_commitment_usd)}</td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{usd(data.total_called_usd)}</td>
+                  <td className="px-4 py-2.5 text-right text-xs font-bold theme-text-muted">{fmt.jpy(activeFunds.reduce((s, f) => s + (f.total_called_jpy ?? 0), 0))}</td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold theme-text-muted">{usd(data.dry_powder_usd)}</td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.emerald }}>{usd(data.total_received_usd)}</td>
+                  <td className="px-4 py-2.5 text-right text-xs font-bold theme-text-muted">{fmt.jpy(activeFunds.reduce((s, f) => s + (f.total_received_jpy ?? 0), 0))}</td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold"
+                      style={{ color: (data.total_received_usd - data.total_called_usd) < 0 ? C.red : C.emerald }}>
+                    {usd(data.total_received_usd - data.total_called_usd)}
+                  </td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{data.dpi.toFixed(3)}×</td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{pct(data.drawn_pct)}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
-        </div>
-      )}
-
-      {/* ── sigf.ts analysis — one panel per registered fund ── */}
-      {sigfList.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold theme-text">sigf.ts Fund Analysis</h2>
-            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8', border:'1px solid rgba(99,102,241,0.25)' }}>
-              PDF-sourced · auto-updates
-            </span>
-          </div>
-          {sigfList.map((sd: any) => <SigfPanel key={sd.fund_code} sigfData={sd} />)}
         </div>
       )}
 
