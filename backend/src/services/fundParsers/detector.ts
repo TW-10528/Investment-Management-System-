@@ -4,8 +4,7 @@ export type FundKey =
   | 'goldman-sachs'
   | 'siguler-guff'
   | 'capula-grv'
-  | 'dover-street-xi'
-  // ── Add remaining 4 funds here as you provide their PDFs ──
+  // ── Add remaining funds here as you provide their PDFs ──
   | 'unknown'
 
 interface FundSignature {
@@ -31,11 +30,7 @@ const SIGNATURES: FundSignature[] = [
     key: 'capula-grv',
     patterns: [/capula\s+global\s+relative\s+value\s+trust|capulaoff2/i],
   },
-  {
-    key: 'dover-street-xi',
-    patterns: [/dover\s+street\s+xi\s+feeder\s+fund/i],
-  },
-  // ── Stubs for remaining 4 funds ──────────────────────────────────────────────
+  // ── Stubs for remaining funds ─────────────────────────────────────────────────
   // Add each fund's unique identifying text patterns below.
   // Example:
   // {

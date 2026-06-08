@@ -13,7 +13,7 @@ import { auth } from '../../middleware/auth'
 import { canEdit } from '../../middleware/guard'
 import { prisma } from '../../lib/prisma'
 import { parseFundPdf } from '../../services/fundParsers/index'
-import { parseDoverStreetXi } from '../../services/fundParsers/dover-street-xi/index'
+import { parsePdf }     from '../../services/pdfParser'
 import { resolveFund } from '../../services/fundParsers/fund-resolver'
 import { CalculationEngine } from '../../services/calculationEngine'
 import { notifyAllAdmins, notifyUser } from '../../services/notificationService'
@@ -73,69 +73,93 @@ router.post('/upload', async (c) => {
   const safe         = originalName.replace(/[^a-zA-Z0-9._-]/g, '_')
   const buffer       = Buffer.from(await file.arrayBuffer())
 
-  // Detect + resolve the fund BEFORE touching disk, so unrecognised PDFs leave
-  // no artifacts and each file lands in its own fund's folder.
-  const parsed = await parseFundPdf(buffer)
-
-  if (parsed.fundKey === 'unknown') {
-    return c.json({
-      detail: 'Fund not recognised. This PDF does not match any registered fund template.',
-      hint:   'Supported funds: Goldman Sachs (Vintage X), Siguler Guff',
-    }, 422)
-  }
-
-  // Auto-resolve to the single Fund DB record for this fundKey
-  const resolvedFund = await resolveFund(parsed.fundKey)
-  if (!resolvedFund) {
-    return c.json({
-      detail: `Fund "${parsed.fundName}" was recognised but has no matching record in the database. Create the fund first.`,
-      fund_key: parsed.fundKey,
-    }, 422)
-  }
-
-  // If the upload was scoped to a specific fund tab, make sure the PDF matches it.
+  // ── Try fund-specific parser first ───────────────────────────────────────────
+  const parsed      = await parseFundPdf(buffer)
   const scopedFundId = c.req.query('fund_id')
-  if (scopedFundId && scopedFundId !== resolvedFund.id) {
-    return c.json({
-      detail: `This PDF was detected as "${resolvedFund.fundName}", which doesn't match the fund you're uploading under. Upload it under the correct fund.`,
-      fund_key: parsed.fundKey,
-    }, 422)
-  }
 
-  // ── Dover Street XI — chain cumulative E/F/cash-flow across notices ─────────
-  // Same pattern as NB: re-run with the previous notice's final_excel_fields so
-  // cumulative_capital_contributions, remaining_commitment, and cumulative_cash_flow
-  // continue correctly rather than falling back to the report's own inception values.
-  if (parsed.fundKey === 'dover-street-xi' && parsed.rawText) {
-    const previousState = await latestDoverPreviousState(resolvedFund.id)
-    if (previousState) {
-      const reparsed = parseDoverStreetXi(parsed.rawText, previousState, originalName)
-      reparsed.rawText = parsed.rawText
-      Object.assign(parsed, reparsed)
+  // Determine the resolved fund and the data we'll store.
+  // Known fund → auto-resolve from PDF content.
+  // Unknown fund + user-supplied fund_id → trust the user's selection and fall
+  //   back to the generic parser to extract whatever amounts/dates are present.
+  let resolvedFund: { id: string; fundName: string; commitmentUsd: number } | null = null
+  let storedData:  Record<string, any>
+
+  if (parsed.fundKey !== 'unknown') {
+    const { rawText: _, ...clean } = parsed
+    storedData = clean
+
+    resolvedFund = await resolveFund(parsed.fundKey)
+    if (!resolvedFund) {
+      return c.json({
+        detail:   `Fund "${parsed.fundName}" was recognised in the PDF but has no matching record in the database. Create the fund first.`,
+        fund_key: parsed.fundKey,
+      }, 422)
+    }
+
+    // If the user scoped the upload to a specific fund, make sure the PDF matches.
+    if (scopedFundId && scopedFundId !== resolvedFund.id) {
+      return c.json({
+        detail:   `This PDF was detected as "${resolvedFund.fundName}", which doesn't match the fund you uploaded under. Please upload it under the correct fund.`,
+        fund_key: parsed.fundKey,
+      }, 422)
+    }
+  } else {
+    // Unknown fund — require an explicit fund_id so we know where to file it.
+    if (!scopedFundId) {
+      return c.json({
+        detail: 'This PDF was not recognised as a known fund template. Please select which fund it belongs to before uploading.',
+        hint:   'Use the fund selector to assign it, then try again.',
+      }, 422)
+    }
+
+    const fund = await prisma.fund.findUnique({
+      where:  { id: scopedFundId },
+      select: { id: true, fundName: true, commitmentUsd: true },
+    })
+    if (!fund) return c.json({ detail: 'Selected fund not found.' }, 404)
+
+    resolvedFund = { id: fund.id, fundName: fund.fundName, commitmentUsd: parseFloat(fund.commitmentUsd.toString()) }
+
+    // Use generic parser to extract whatever amounts/dates are in the PDF.
+    const generic = await parsePdf(buffer)
+    storedData = {
+      fundKey:         'generic',
+      fundName:        fund.fundName,
+      noticeType:      generic.noticeType,
+      noticeDate:      generic.dates?.[0]  ?? null,
+      dueDate:         generic.dueDate     ?? generic.dates?.[1] ?? generic.dates?.[0] ?? null,
+      grossCallUsd:    generic.grossCallUsd ?? generic.amounts?.[0] ?? 0,
+      distributionUsd: generic.distributionUsd ?? (generic.noticeType === 'distribution' ? (generic.amounts?.[0] ?? 0) : 0),
+      reinvestableUsd: generic.reinvestableUsd ?? 0,
+      commitmentUsd:   0,
+      totalCalledUsd:  0,
+      unfundedUsd:     0,
+      callPct:         generic.callPct ?? 0,
+      wireReference:   generic.wireReference ?? null,
+      investmentTargets: generic.investmentTargets ?? [],
+      confidence:      generic.confidence,
+      confidenceGrade: generic.confidenceGrade,
     }
   }
 
-  // ── Write the file into the fund's own folder (e.g. uploads/goldman sachs/) ──
-  const fundFolder = parsed.fundKey.replace(/-/g, ' ')          // goldman-sachs → "goldman sachs"
+  // ── Write the file into the fund's own folder ─────────────────────────────────
+  const fundFolder = (parsed.fundKey !== 'unknown' ? parsed.fundKey : resolvedFund.fundName)
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
   const folderPath = path.join(config.uploadDir, fundFolder)
   if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true })
-  const relPath  = path.join(fundFolder, `${Date.now()}_${safe}`)  // stored on the notice; delete reuses it
+  const relPath  = path.join(fundFolder, `${Date.now()}_${safe}`)
   const filepath = path.join(config.uploadDir, relPath)
   fs.writeFileSync(filepath, buffer)
 
-  // Strip rawText before storing
-  const { rawText: _, ...storedData } = parsed
-
-  // Step 1 of the two-step flow: the user classifies the document type; the
-  // parser's guess is only a fallback. This decides which record gets created.
+  // The user's explicit document-type choice always wins; parser guess is fallback.
   const ALLOWED_TYPES = ['capital_call', 'distribution', 'capital_and_distribution', 'financial_statement']
   const reqType    = c.req.query('notice_type')
-  const noticeType = reqType && ALLOWED_TYPES.includes(reqType) ? reqType : parsed.noticeType
+  const noticeType = reqType && ALLOWED_TYPES.includes(reqType) ? reqType : (storedData.noticeType ?? 'capital_call')
 
   // ── Auto-create the ledger record + document atomically (no approval step) ──
   const latestFx = await prisma.fxRate.findFirst({ orderBy: { rateDate: 'desc' } })
   const fxRate   = latestFx ? parseFloat(latestFx.usdJpy.toString()) : 150
-  const dueDate  = parsed.dueDate ? new Date(parsed.dueDate) : new Date()
+  const dueDate  = storedData.dueDate ? new Date(storedData.dueDate) : new Date()
 
   let notice
   let created: Record<string, any> = {}
@@ -152,41 +176,38 @@ router.post('/upload', async (c) => {
 
       // ── Capital Calls section — the call portion (column B) ──────────────────
       if (wantCall) {
-        const grossUsd = parseFloat(String(parsed.grossCallUsd ?? 0))   // B
-        const existing = await tx.capitalCall.findFirst({ where: { fundId: resolvedFund.id, dueDate } })
+        const grossUsd = parseFloat(String(storedData.grossCallUsd ?? 0))   // B
+        const existing = await tx.capitalCall.findFirst({ where: { fundId: resolvedFund!.id, dueDate } })
         if (existing) {
           made.callId = existing.id
           made.deduplicated = true
         } else {
-          const last = await tx.capitalCall.findFirst({ where: { fundId: resolvedFund.id }, orderBy: { callNumber: 'desc' } })
+          const last = await tx.capitalCall.findFirst({ where: { fundId: resolvedFund!.id }, orderBy: { callNumber: 'desc' } })
           const cc = await tx.capitalCall.create({
             data: {
-              fundId:              resolvedFund.id,
+              fundId:              resolvedFund!.id,
               callNumber:          (last?.callNumber ?? 0) + 1,
-              noticeDate:          parsed.noticeDate ? new Date(parsed.noticeDate) : new Date(),
+              noticeDate:          storedData.noticeDate ? new Date(storedData.noticeDate) : new Date(),
               dueDate,
               executionDate:       dueDate,
-              callPct:             parseFloat(String(parsed.callPct ?? 0)),
+              callPct:             parseFloat(String(storedData.callPct ?? 0)),
               grossCallUsd:        grossUsd,
               netCallUsd:          grossUsd,
-              // The distribution is recorded in its own section, so the call row carries
-              // only B (its cash flow is -B). For a combined notice the C lands on the
-              // Distribution record below.
               distributionUsd:     0,
               reinvestableUsd:     0,
               investmentAmountUsd: grossUsd,
-              managementFeeUsd:    parseFloat(String(parsed.managementFeeUsd ?? 0)),
-              expenseUsd:          parseFloat(String(parsed.taxExpenseUsd ?? 0)),
+              managementFeeUsd:    parseFloat(String(storedData.managementFeeUsd ?? 0)),
+              expenseUsd:          parseFloat(String(storedData.taxExpenseUsd ?? 0)),
               fxRate,
               netCallJpy:          Math.round(grossUsd * fxRate),
-              wireReference:       parsed.wireReference ?? null,
+              wireReference:       storedData.wireReference ?? null,
               status:              'approved',
             },
           })
           made.callId = cc.id
-          for (const it of (parsed.investmentTargets ?? [])) {
+          for (const it of (storedData.investmentTargets ?? [])) {
             await tx.investmentTarget.create({
-              data: { fundId: resolvedFund.id, projectName: it.projectName, amountUsd: it.amountUsd ?? null, sector: it.sector ?? null },
+              data: { fundId: resolvedFund!.id, projectName: it.projectName, amountUsd: it.amountUsd ?? null, sector: it.sector ?? null },
             })
           }
         }
@@ -194,25 +215,23 @@ router.post('/upload', async (c) => {
 
       // ── Distributions section — the distribution portion (column C) ──────────
       if (wantDist) {
-        // For a combined notice the C is the dedicated distribution figure; for a
-        // standalone distribution use it, else any $ the parser found.
         const amtUsd = noticeType === 'capital_and_distribution'
-          ? parseFloat(String(parsed.distributionUsd ?? 0))
-          : parseFloat(String(parsed.distributionUsd || parsed.grossCallUsd || 0))
-        const existing = await tx.distribution.findFirst({ where: { fundId: resolvedFund.id, distributionDate: dueDate } })
+          ? parseFloat(String(storedData.distributionUsd ?? 0))
+          : parseFloat(String(storedData.distributionUsd || storedData.grossCallUsd || 0))
+        const existing = await tx.distribution.findFirst({ where: { fundId: resolvedFund!.id, distributionDate: dueDate } })
         if (existing) {
           made.distId = existing.id
           made.deduplicated = true
         } else {
           const dist = await tx.distribution.create({
             data: {
-              fundId:           resolvedFund.id,
+              fundId:           resolvedFund!.id,
               distributionDate: dueDate,
               distType:         'Income',
               amountUsd:        amtUsd,
               amountJpy:        Math.round(amtUsd * fxRate),
               fxRate,
-              reinvestableUsd:  parseFloat(String(parsed.reinvestableUsd ?? 0)),
+              reinvestableUsd:  parseFloat(String(storedData.reinvestableUsd ?? 0)),
               isRecallable:     false,
             },
           })
@@ -228,9 +247,9 @@ router.post('/upload', async (c) => {
           noticeType,
           status:        'approved',
           approvedAt:    new Date(),
-          fundId:        resolvedFund.id,       // auto-linked to the single fund record
+          fundId:        resolvedFund!.id,
           extractedData: { ...storedData, createdCallId: made.callId ?? null, createdDistId: made.distId ?? null } as any,
-          confidence:    parsed.confidence,
+          confidence:    storedData.confidence ?? null,
           uploadedBy:    user.email,
         },
       })
@@ -252,7 +271,7 @@ router.post('/upload', async (c) => {
       title:   'New Fund Report Processed',
       message: `${user.email} uploaded a ${noticeType.replace('_', ' ')} for ${resolvedFund.fundName} — the ledger and dashboard updated automatically.`,
       link:    `/funds/${resolvedFund.id}`,
-      metadata: { notice_id: notice.id, fund_key: parsed.fundKey, fund_id: resolvedFund.id },
+      metadata: { notice_id: notice.id, fund_key: storedData.fundKey ?? 'generic', fund_id: resolvedFund!.id },
     })
   } catch (e) {
     console.error('[fund-reports/upload] notify failed (non-fatal):', e)
@@ -260,8 +279,8 @@ router.post('/upload', async (c) => {
 
   return c.json({
     ...reportDict(notice),
-    fund_id:   resolvedFund.id,
-    fund_name: resolvedFund.fundName,
+    fund_id:   resolvedFund!.id,
+    fund_name: resolvedFund!.fundName,
     created,
   }, 201)
 })
@@ -291,28 +310,11 @@ function docDate(n: any): number {
   return Number.isNaN(t) ? 0 : t
 }
 
-// Latest stored Dover cumulatives — feeds the next notice's running totals.
-// Returns null on the first upload; extractor falls back to the report's own values.
-async function latestDoverPreviousState(fundId: string) {
-  const notices = await prisma.notice.findMany({ where: { fundId } })
-  const doverDocs = notices
-    .filter(n => (n.extractedData as any)?.doverReport?.final_excel_fields)
-    .sort((a, b) => docDate(b) - docDate(a))   // newest first
-  const f = (doverDocs[0]?.extractedData as any)?.doverReport?.final_excel_fields
-  if (!f) return null
-  return {
-    cumulative_capital_contributions: f.cumulative_capital_contributions ?? null,
-    remaining_commitment:             f.remaining_commitment ?? null,
-    cumulative_cash_flow:             f.cumulative_cash_flow ?? null,
-  }
-}
-
 // ── GET /:id ───────────────────────────────────────────────────────────────────
 router.get('/:id', async (c) => {
   const n = await prisma.notice.findUnique({ where: { id: c.req.param('id') } })
   if (!n) return c.json({ detail: 'Report not found' }, 404)
-  const doverReport = (n.extractedData as any)?.doverReport ?? null
-  return c.json({ ...reportDict(n), dover_report: doverReport })
+  return c.json(reportDict(n))
 })
 
 // ── POST /:id/approve ──────────────────────────────────────────────────────────

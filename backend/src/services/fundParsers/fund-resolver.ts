@@ -9,8 +9,7 @@ const FUND_NAME_PATTERNS: Record<string, string[]> = {
   'goldman-sachs':   ['Vintage X', 'Goldman Sachs'],
   'siguler-guff':    ['Siguler Guff'],
   'capula-grv':      ['Capula Global Relative Value Trust', 'Capula'],
-  'dover-street-xi': ['Dover Street XI Feeder Fund', 'Dover Street XI'],
-  // ... remaining 4 funds
+  // ... remaining funds
 }
 
 export interface ResolvedFund {

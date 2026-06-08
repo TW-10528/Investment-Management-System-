@@ -2,8 +2,7 @@
  * FundDocuments — per-fund document list (read + delete).
  * Uploading is handled by the shared FundUploadBar at the top of the funds page.
  * Documents are shown OLDEST first → latest last (by notice/due date).
- * Deleting a document reverses the capital call / distribution it created, so the
- * fund's ledger/KPIs and the dashboard refresh via onChanged().
+ * Deleting a document reverses the capital call / distribution it created.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { fundReportsAPI } from '../services/api';
@@ -31,7 +30,6 @@ function gradeStyle(grade: string) {
   return 'text-slate-400 bg-slate-500/10 border-slate-500/25';
 }
 
-// Oldest first: sort by due date, then notice date.
 function docTime(d: any): number {
   const t = new Date(d.due_date || d.notice_date || 0).getTime();
   return Number.isNaN(t) ? 0 : t;
@@ -80,7 +78,7 @@ export default function FundDocuments({ fundId, canEdit, onChanged }: Props) {
       ) : docs.length === 0 ? (
         <div className="px-5 py-8 text-center">
           <p className="text-sm theme-text-muted">No documents uploaded yet.</p>
-          {canEdit && <p className="text-xs theme-text-muted mt-1">Use “Upload a fund document” at the top of the page to add one.</p>}
+          {canEdit && <p className="text-xs theme-text-muted mt-1">Use "Upload a fund document" at the top of the page to add one.</p>}
         </div>
       ) : (
         <div className="overflow-x-auto">

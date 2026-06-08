@@ -74,6 +74,7 @@ router.get('/:id/ledger', async (c) => {
       manualCashFlow:  cc.manualCashFlowUsd != null ? new Decimal(cc.manualCashFlowUsd.toString()) : null,
       callId:          cc.id,
       wireReference:   cc.wireReference,
+      notes:           cc.notes,
     })),
     ...distributions.map((d: any) => ({
       date:            d.distributionDate,
@@ -84,6 +85,7 @@ router.get('/:id/ledger', async (c) => {
       capitalReceived: new Decimal(d.amountUsd.toString()),
       reinvestable:    new Decimal(d.reinvestableUsd.toString()),
       distId:          d.id,
+      notes:           d.notes,
     })),
   ]
 
@@ -115,6 +117,7 @@ router.get('/:id/ledger', async (c) => {
       call_id:             (txns[i] as any)?.callId,
       dist_id:             (txns[i] as any)?.distId,
       wire_reference:      (txns[i] as any)?.wireReference,
+      notes:               (txns[i] as any)?.notes ?? null,
     })),
     snapshot: {
       commitment_usd:      f(snapshot.commitmentUsd),

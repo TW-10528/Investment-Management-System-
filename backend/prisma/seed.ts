@@ -154,29 +154,6 @@ async function main() {
   })
   console.log('  ✔ Fund created: Vintage X (Flagship) Offshore SCSp (Goldman Sachs)')
 
-  // ── Fund — NB Real Estate Secondary Opportunities Offshore Fund II LP ────────
-  // Neuberger Berman / NB Alternatives Advisers LLC. Drawdown notices are
-  // combined capital call + deemed distribution; commitment from the LP notice.
-  await prisma.fund.create({
-    data: {
-      fundName:      'NB Real Estate Secondary Opportunities Offshore Fund II LP',
-      manager:       'NB Alternatives Advisers LLC',
-      administrator: 'Neuberger Berman',
-      strategy:      'Real Estate Secondaries',
-      vintageYear:   2025,
-      currency:      'USD',
-      commitmentUsd: 5_000_000,
-      wireBank:      'Bank of America, N.A.',
-      wireAba:       '026-009-593',
-      wireSwift:     'BOFAUS3N',
-      wireAccountName:   'NB Real Estate Secondary Opportunities Offshore Fund II LP',
-      wireAccountNumber: '4451668246',
-      wireReference:     'NBI13133',
-      isActive:      true,
-    },
-  })
-  console.log('  ✔ Fund created: NB Real Estate Secondary Opportunities Offshore Fund II LP (Neuberger Berman)')
-
   // ── Fund — Capula Global Relative Value Trust ─────────────────────────────────
   await prisma.fund.create({
     data: {
@@ -191,21 +168,6 @@ async function main() {
     },
   })
   console.log('  ✔ Fund created: Capula Global Relative Value Trust')
-
-  // ── Fund — Dover Street XI Feeder Fund L.P. ───────────────────────────────────
-  await prisma.fund.create({
-    data: {
-      fundName:      'Dover Street XI Feeder Fund L.P.',
-      manager:       'HarbourVest Partners, LLC',
-      administrator: 'HarbourVest Partners, LLC',
-      strategy:      'Secondaries',
-      vintageYear:   2024,
-      currency:      'USD',
-      commitmentUsd: 20_000_000,
-      isActive:      true,
-    },
-  })
-  console.log('  ✔ Fund created: Dover Street XI Feeder Fund L.P.')
 
   console.log('\n✅  Database seeded successfully!')
   console.log('\n   Funds created (ledger empty — upload PDFs via UI to populate)')

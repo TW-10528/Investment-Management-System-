@@ -136,7 +136,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
             ) : (
               <>
                 <p className="text-sm font-semibold theme-text">📄 {t('fundUpload.dropPdf')}</p>
-                <p className="text-[10px] theme-text-muted mt-1">Siguler Guff, Goldman Sachs or NB Real Estate notices</p>
+                <p className="text-[10px] theme-text-muted mt-1">Siguler Guff or Goldman Sachs notices</p>
               </>
             )}
           </div>
