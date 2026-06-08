@@ -11,8 +11,9 @@ const FUND_NAME_PATTERNS: Record<string, string[]> = {
   'hamilton-strategic': ['Hamilton Lane Strategic Opportunities', 'Strategic Opportunities Fund IX'],
   'dover-street':   ['Dover Street XI', 'Dover Street'],
   'sdg-lps':        ['SDGs 投資事業有限責任組合', 'SDG'],
-  // 'blackstone':    ['Blackstone'],
-  // 'kkr':           ['KKR'],
+  'goldman-sachs':  ['Vintage X', 'Goldman Sachs'],
+  'siguler-guff':   ['Siguler Guff'],
+  'capula-grv':     ['Capula Global Relative Value Trust', 'Capula'],
 }
 
 export interface ResolvedFund {

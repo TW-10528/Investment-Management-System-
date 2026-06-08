@@ -106,11 +106,14 @@ export const distributionsAPI = {
 
 // ── FX Rates ─────────────────────────────────────────────────────────────────
 export const fxRatesAPI = {
-  list:    ()              => api.get('/fx-rates/'),
-  latest:  ()              => api.get('/fx-rates/latest'),
-  live:    ()              => api.get('/fx-rates/live'),
-  history: (days?: number) => api.get(`/fx-rates/history${days ? `?days=${days}` : ''}`),
-  create:  (data: any)     => api.post('/fx-rates/', data),
+  list:       ()                                    => api.get('/fx-rates/'),
+  latest:     ()                                    => api.get('/fx-rates/latest'),
+  live:       ()                                    => api.get('/fx-rates/live'),
+  history:    (days?: number)                       => api.get(`/fx-rates/history${days ? `?days=${days}` : ''}`),
+  create:     (data: any)                           => api.post('/fx-rates/', data),
+  cross:      (from: string, to: string)            => api.get(`/fx-rates/cross?from=${from}&to=${to}`),
+  historical: (date: string, from: string, to: string) => api.get(`/fx-rates/historical?date=${date}&from=${from}&to=${to}`),
+  monthly:    (year?: number)                          => api.get(`/fx-rates/monthly${year ? `?year=${year}` : ''}`),
 };
 
 // ── Users ─────────────────────────────────────────────────────────────────────

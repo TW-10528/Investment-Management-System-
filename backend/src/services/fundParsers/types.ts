@@ -62,7 +62,7 @@ export interface ParsedFundNotice {
   confidenceGrade: 'high' | 'medium' | 'low'
   rawText?:        string             // optional for debugging
 
-  // ── Rich per-fund report (NB Real Estate, Hamilton Lane) ───────────────────
+  // ── Rich per-fund report (NB Real Estate, Hamilton Lane, Dover, SDG) ───────
   // Full extractor output (breakdown, calculated Excel fields, validation).
   // Stored on Notice.extractedData.fundReport and shown on the document detail panel.
   fundReport?:     NbRealEstateReport | HamiltonLaneReport | HamiltonStrategicReport | DoverStreetReport | SdgLpsReport

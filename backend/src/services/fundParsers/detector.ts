@@ -6,6 +6,9 @@ export type FundKey =
   | 'hamilton-strategic'
   | 'dover-street'
   | 'sdg-lps'
+  | 'goldman-sachs'
+  | 'siguler-guff'
+  | 'capula-grv'
   // ── Add remaining funds here as you provide their PDFs ──
   | 'unknown'
 
@@ -53,6 +56,23 @@ const SIGNATURES: FundSignature[] = [
       // OCR'd ones reliably match the latter.
       /サード|SD[GOC]s/i,
     ],
+  },
+  {
+    key: 'goldman-sachs',
+    patterns: [
+      /goldman\s+sachs/i,
+      /vintage\s+x/i,
+    ],
+  },
+  {
+    key: 'siguler-guff',
+    patterns: [
+      /siguler\s+guff/i,
+    ],
+  },
+  {
+    key: 'capula-grv',
+    patterns: [/capula\s+global\s+relative\s+value\s+trust|capulaoff2/i],
   },
   // ── Stubs for remaining funds ───────────────────────────────────────────────
   // Add each fund's unique identifying text patterns below.

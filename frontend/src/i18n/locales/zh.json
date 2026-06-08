@@ -1,5 +1,6 @@
 {
   "nav": {
+    "navigation": "导航",
     "dashboard": "控制台",
     "funds": "基金",
     "notices": "通知处理",
@@ -8,6 +9,7 @@
     "fxRates": "汇率",
     "investments": "投资目标",
     "calculator": "计算工具",
+    "rulesEngine": "规则引擎",
     "users": "用户管理",
     "signOut": "退出登录",
     "viewOnly": "仅查看"
@@ -55,7 +57,11 @@
     "usdJpy": "美元/日元汇率",
     "liveRate": "实时市场汇率",
     "stored": "存储",
-    "noStrategyData": "暂无策略数据"
+    "noStrategyData": "暂无策略数据",
+    "underManagement": "管理中",
+    "portfolioTotal": "投资组合合计",
+    "available": "可用",
+    "grossCommitment": "总LP承诺额"
   },
   "notices": {
     "title": "通知处理",
@@ -164,7 +170,8 @@
     "yes": "是",
     "no": "否",
     "error": "发生错误",
-    "success": "成功"
+    "success": "成功",
+    "refresh": "刷新"
   },
   "settings": {
     "title": "设置与偏好",
@@ -200,7 +207,19 @@
     "joined": "加入日期",
     "lastLogin": "最后登录",
     "awaitingApproval": "人待审批",
-    "reviewNow": "立即审核 →"
+    "reviewNow": "立即审核 →",
+    "addNewUser": "+ 新建用户",
+    "addUser": "+ 添加用户",
+    "activeStatus": "活跃",
+    "inactiveStatus": "非活跃",
+    "reactivate": "↺ 重新启用",
+    "you": "您",
+    "newRegistration": "新注册",
+    "approveAs": "批准为：",
+    "accessOverview": "访问级别概览",
+    "pendingWord": "待处理",
+    "loadingUsers": "加载用户中…",
+    "deactivateAction": "⊘ 停用"
   },
   "funds": {
     "title": "基金管理",
@@ -235,7 +254,23 @@
     "deactivateConfirm": "停用「{{name}}」？该基金将从活跃列表中隐藏。",
     "createFund": "创建基金",
     "updateFund": "更新基金",
-    "viewOnly": "仅查看 — 如需修改请联系财务部门或管理员"
+    "viewOnly": "仅查看 — 如需修改请联系财务部门或管理员",
+    "backToAll": "← 全部基金",
+    "selectToView": "选择基金查看详情",
+    "hideInactive": "隐藏非活跃",
+    "showInactive": "显示非活跃（{{count}}个）",
+    "noFundsCreate": "点击「+ 添加基金」创建您的第一只基金。",
+    "viewOnlyMode": "仅查看模式。请以管理员或财务经理身份登录以进行编辑。"
+  },
+  "fundUpload": {
+    "title": "上传基金文件",
+    "subtitle": "选择基金，拖放出资要求/分配PDF，系统自动解析并归档至该基金。",
+    "docTypeLabel": "1 · 文件类型",
+    "whichFund": "2 · 选择基金",
+    "dropPdf": "将PDF拖放至此或点击选择",
+    "processing": "处理中…",
+    "upload": "上传",
+    "capitalAndDist": "出资要求＆分配"
   },
   "capitalCalls": {
     "title": "出资要求",
@@ -253,7 +288,32 @@
     "approve": "批准",
     "markPaid": "标记已付",
     "noCalls": "未找到出资要求：",
-    "viewOnly": "仅查看 — 如需批准或标记付款请联系财务部门或管理员"
+    "viewOnly": "仅查看 — 如需批准或标记付款请联系财务部门或管理员",
+    "newCall": "新建出资要求",
+    "createDesc": "创建新的出资要求记录",
+    "selectFund": "选择基金…",
+    "grossCallAmt": "总出资要求金额（USD）",
+    "callPctLabel": "或：承诺额的百分比",
+    "autoFills": "自动填写总金额",
+    "distOffset": "分配抵扣（USD）",
+    "reinvestableAmt": "可再投资金额（USD）",
+    "reducesNet": "减少净出资额",
+    "addsBack": "加回净额",
+    "usdJpyRate": "USD / JPY 汇率",
+    "initialStatus": "初始状态",
+    "pendingNew": "待定（新条目）",
+    "paidHistorical": "已付（历史记录）",
+    "calcNetCall": "计算净出资额",
+    "allAmountsUsd": "除非另有说明，所有金额均为USD",
+    "creating": "创建中…",
+    "createCall": "创建出资要求",
+    "newButton": "+ 新建出资要求",
+    "createFirst": "+ 创建第一个出资要求",
+    "statusAll": "全部",
+    "statusPending": "待定",
+    "statusApproved": "已批准",
+    "statusPaid": "已付",
+    "statusCancelled": "已取消"
   },
   "distributions": {
     "title": "分配",
@@ -282,6 +342,13 @@
     "addMufg": "添加三菱UFJ TTM汇率",
     "rateHistory": "汇率历史（90天）",
     "entries": "条记录",
+    "livePairs": "实时多货币汇率",
+    "historicalLookup": "历史汇率查询",
+    "historicalSub": "查询指定日期已记录的MUFG TTM汇率",
+    "lookupFetch": "获取汇率",
+    "lookupFetching": "获取中…",
+    "lookupNearestDay": "最近交易日",
+    "lookupNoRate": "该日期尚未录入MUFG TTM汇率 — 请使用「+ 添加汇率」进行录入",
     "noHistory": "未找到汇率历史",
     "saveRate": "保存",
     "saving": "保存中…",

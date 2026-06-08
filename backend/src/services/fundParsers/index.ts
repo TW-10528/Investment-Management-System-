@@ -8,6 +8,9 @@ import { parseHamiltonLane } from './hamilton-lane'
 import { parseHamiltonStrategic } from './hamilton-strategic'
 import { parseDoverStreet } from './dover-street'
 import { parseSdgLps } from './sdg-lps'
+import { parseGoldmanSachs } from './goldman-sachs'
+import { parseSigulerGuff } from './siguler-guff'
+import { parseCapulaGrv } from './capula-grv'
 import { textWithOcrFallback } from '../ocr/pdfOcr'
 import type { ParsedFundNotice } from './types'
 
@@ -15,14 +18,14 @@ export type { ParsedFundNotice }
 
 // ── Dispatch table — add new fund parsers here ────────────────────────────────
 const PARSERS: Record<string, (text: string) => ParsedFundNotice> = {
-  'nb-real-estate':    parseNbRealEstate,
-  'hamilton-lane':     parseHamiltonLane,
+  'nb-real-estate':     parseNbRealEstate,
+  'hamilton-lane':      parseHamiltonLane,
   'hamilton-strategic': parseHamiltonStrategic,
-  'dover-street':      parseDoverStreet,
-  'sdg-lps':           parseSdgLps,
-  // 'blackstone':    parseBlackstone,
-  // 'kkr':           parseKkr,
-  // ... remaining 3 funds
+  'dover-street':       parseDoverStreet,
+  'sdg-lps':            parseSdgLps,
+  'goldman-sachs':      parseGoldmanSachs,
+  'siguler-guff':       parseSigulerGuff,
+  'capula-grv':         parseCapulaGrv,
 }
 
 // ── Main entry point ──────────────────────────────────────────────────────────

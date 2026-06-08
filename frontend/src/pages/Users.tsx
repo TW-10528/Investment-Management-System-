@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { usersAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -226,6 +227,7 @@ function UserModal({ mode, user, onClose, onSaved }: {
 
 /* ── Main Users Page ─────────────────────────────────────────────────────── */
 export default function Users() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const raw  = localStorage.getItem('user') || '{}';
   const me   = (() => { try { return JSON.parse(raw); } catch { return {}; } })();
@@ -359,10 +361,10 @@ export default function Users() {
         <td className="px-4 py-3.5">
           {u.status === 'active'
             ? <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> {t('users.activeStatus')}
               </span>
             : <span className="flex items-center gap-1.5 theme-text-muted text-xs font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" /> Inactive
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" /> {t('users.inactiveStatus')}
               </span>
           }
         </td>
@@ -371,19 +373,19 @@ export default function Users() {
           <div className="flex items-center gap-2 justify-end">
             <button onClick={() => { setEditTarget(u); setModal('edit'); }}
               className="pill-btn theme-card theme-divider theme-text-muted hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400">
-              ✎ Edit
+              ✎ {t('common.edit')}
             </button>
             {isMe ? (
-              <span className="text-xs theme-text-sub px-2">You</span>
+              <span className="text-xs theme-text-sub px-2">{t('users.you')}</span>
             ) : u.status === 'active' ? (
               <button onClick={() => doDeactivate(u)} disabled={busy}
                 className="pill-btn border-transparent text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 disabled:opacity-40">
-                {busy ? '…' : '⊘ Deactivate'}
+                {busy ? '…' : t('users.deactivateAction')}
               </button>
             ) : (
               <button onClick={() => doReactivate(u)} disabled={busy}
                 className="pill-btn border-transparent text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-300 dark:hover:border-emerald-700 disabled:opacity-40">
-                {busy ? '…' : '↺ Reactivate'}
+                {busy ? '…' : t('users.reactivate')}
               </button>
             )}
           </div>
@@ -399,10 +401,10 @@ export default function Users() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-bold theme-text flex items-center gap-2">
-            👥 User Management
+            👥 {t('users.title')}
             {pending.length > 0 && (
               <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-semibold animate-pulse-glow">
-                {pending.length} pending
+                {pending.length} {t('users.pendingWord')}
               </span>
             )}
           </h1>
@@ -413,13 +415,13 @@ export default function Users() {
         <div className="flex items-center gap-2">
           <button onClick={() => fetchUsers()}
             className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border theme-divider theme-text-muted hover:border-indigo-400 hover:text-indigo-500 transition-colors text-sm font-medium">
-            ↻ Refresh
+            ↻ {t('common.refresh')}
           </button>
           <button
             onClick={() => { setEditTarget(null); setModal('add'); }}
             className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
           >
-            + Add User
+            {t('users.addUser')}
           </button>
         </div>
       </div>
@@ -441,7 +443,7 @@ export default function Users() {
 
       {/* ── Access Level Legend ─────────────────────────────────────────────── */}
       <div className="theme-card border rounded-xl p-4">
-        <p className="text-xs font-bold theme-text-muted uppercase tracking-wider mb-3">Access Level Overview</p>
+        <p className="text-xs font-bold theme-text-muted uppercase tracking-wider mb-3">{t('users.accessOverview')}</p>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {ROLES.map(r => (
             <div key={r.value} className={`rounded-lg border px-3 py-2.5 ${r.bg}`}>
@@ -458,7 +460,7 @@ export default function Users() {
       {loading ? (
         <div className="flex items-center justify-center py-16 gap-3 theme-text-muted">
           <span className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-          Loading users…
+          {t('users.loadingUsers')}
         </div>
       ) : (
         <div className="space-y-6">
@@ -467,11 +469,11 @@ export default function Users() {
           {pending.length > 0 && (
             <div>
               <div className="flex items-center gap-3 mb-3">
-                <h2 className="text-sm font-bold theme-text">Pending Approval</h2>
+                <h2 className="text-sm font-bold theme-text">{t('users.pending')}</h2>
                 <span className="bg-amber-500 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
                   {pending.length}
                 </span>
-                <span className="theme-text-sub text-xs">Assign a role and approve or reject each request</span>
+                <span className="theme-text-sub text-xs">{t('users.approveAs')} {t('users.role')}</span>
               </div>
               <div className="space-y-3">
                 {pending.map(u => {
@@ -490,7 +492,7 @@ export default function Users() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-bold theme-text">{u.full_name}</p>
                             <span className="text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
-                              New Registration
+                              {t('users.newRegistration')}
                             </span>
                           </div>
                           <p className="theme-text-muted text-sm">{u.email}</p>
@@ -538,14 +540,14 @@ export default function Users() {
                               ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                               : '✓'
                             }
-                            Approve
+                            {t('users.approve')}
                           </button>
                           <button
                             onClick={() => doReject(u)}
                             disabled={busy}
                             className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 text-sm font-semibold rounded-xl transition-colors disabled:opacity-40"
                           >
-                            ✕ Reject
+                            ✕ {t('users.reject')}
                           </button>
                         </div>
                       </div>

@@ -66,6 +66,7 @@ export interface LedgerRow {
   call_id?: string;
   dist_id?: string;
   wire_reference?: string;
+  notes?: string;
 }
 
 export interface LedgerSnapshot {

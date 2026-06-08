@@ -5,6 +5,7 @@
  * Dover Street XI. (SDG and per-fund ledger data are added via the addXFund.ts
  * scripts / PDF uploads.)
  */
+/// <reference types="node" />
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
@@ -116,6 +117,69 @@ async function main() {
   })
   console.log('  ✔ Fund created: NB Real Estate Secondary Opportunities Offshore Fund II LP (Neuberger Berman)')
 
+  // ── Fund — Siguler Guff (sourced from PDF keyword "Complex Name") ──────────
+  // commitmentUsd derived via formula: C = NetCallUsd / CallPct = $49,000 / 0.049
+  await prisma.fund.create({
+    data: {
+      fundName:            'Siguler Guff Small Buyout Opportunities Fund VI (F), LP',
+      fundNameJp:          'シグラー・ガフ スモール・バイアウト・オポチュニティーズ ファンドVI(F)',
+      manager:             'Siguler Guff & Company, LP',
+      administrator:       'Siguler Guff & Company, LP',
+      strategy:            'Small Buyout',
+      vintageYear:         2025,
+      currency:            'USD',
+      // LP commitment = netCallUsd / callPct = $49,000 / 0.049
+      commitmentUsd:       1_000_000,
+      entryFxRate:         154.20,   // Jan 2026 MUFG TTM rate
+      contractDate:        new Date('2025-12-01'),
+      wireBank:            'JPMORGAN CHASE BANK, N.A.',
+      wireSwift:           'CHASUS33XXX',
+      wireAba:             '021000021',
+      wireAccountName:     'SIGULER GUFF SMALL BUYOUT OPPORTUNITIES VI F',
+      wireAccountNumber:   '515067018',
+      wireReference:       '11873-Thirdwave Financial Inc.',
+      notes:               'ExtInvestorID: 11873 · FundComplex: 442065 · ClientID: 1541',
+      isActive:            true,
+    },
+  })
+  console.log('  ✔ Fund created: Siguler Guff Small Buyout Opportunities Fund VI (F), LP')
+
+  // ── Fund — Goldman Sachs Vintage X ───────────────────────────────────────────
+  await prisma.fund.create({
+    data: {
+      fundName:      'Vintage X (Flagship) Offshore SCSp',
+      manager:       'Goldman Sachs Asset Management',
+      administrator: 'Goldman Sachs Asset Management',
+      strategy:      'Secondaries',
+      vintageYear:   2024,
+      currency:      'USD',
+      commitmentUsd: 20_000_000,
+      entryFxRate:   154.20,
+      wireBank:      'State Street Bank & Trust co. Boston',
+      wireAba:       '011000028',
+      wireAccountName:   'Vintage X (Flagship) Offshore SCSp',
+      wireAccountNumber: '11841533',
+      wireReference:     'MG149345 Thirdwave Financial Inc.,',
+      isActive:      true,
+    },
+  })
+  console.log('  ✔ Fund created: Vintage X (Flagship) Offshore SCSp (Goldman Sachs)')
+
+  // ── Fund — Capula Global Relative Value Trust ─────────────────────────────────
+  await prisma.fund.create({
+    data: {
+      fundName:      'Capula Global Relative Value Trust',
+      manager:       'Capula Investment Management LLP',
+      administrator: 'Capula Investment Management LLP',
+      strategy:      'Global Relative Value',
+      vintageYear:   2025,
+      currency:      'USD',
+      commitmentUsd: 5_000_000,
+      isActive:      true,
+    },
+  })
+  console.log('  ✔ Fund created: Capula Global Relative Value Trust')
+
   // ── Fund — Hamilton Lane Secondary Fund VI-B LP ─────────────────────────────
   // Notices are EITHER a capital call OR a distribution (separate documents).
   await prisma.fund.create({
@@ -167,7 +231,8 @@ async function main() {
   console.log('  ✔ Fund created: Dover Street XI Feeder Fund L.P. (HarbourVest)')
 
   console.log('\n✅  Database seeded successfully!')
-  console.log('\n   Funds: NB Real Estate, Hamilton Lane Secondary, Hamilton Lane Strategic, Dover Street XI')
+  console.log('\n   Funds: NB Real Estate, Siguler Guff, Goldman Vintage X, Capula, Hamilton Lane Secondary, Hamilton Lane Strategic, Dover Street XI')
+  console.log('   (ledger empty — upload PDFs via UI to populate)')
   console.log('\n   Credentials:')
   console.log('   Admin:   admin@thirdwave.co.jp  /  Admin123!')
   console.log('   Finance: finance@thirdwave.co.jp /  Staff123!')

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, BarChart, Bar,
@@ -42,13 +43,6 @@ function isDark() {
 type RatesMap = Record<string, number>;
 type CalcTab  = 'irr' | 'fx' | 'multiples' | 'netcall' | 'fee';
 
-const TABS: { id: CalcTab; icon: string; label: string }[] = [
-  { id: 'irr',       icon: '📈', label: 'IRR / NPV' },
-  { id: 'fx',        icon: '💱', label: 'FX Converter' },
-  { id: 'multiples', icon: '✖️',  label: 'DPI / TVPI' },
-  { id: 'netcall',   icon: '📋', label: 'Net Call' },
-  { id: 'fee',       icon: '💰', label: 'Fee & Carry' },
-];
 
 const ALL_CURRENCIES = ['USD', 'JPY', 'EUR', 'GBP', 'AUD', 'CAD', 'CHF', 'CNY', 'KRW', 'SGD', 'HKD'];
 const CURRENCY_FLAGS: Record<string, string> = {
@@ -779,28 +773,35 @@ function FeeCalc() {
 /* ══════════════════════════ MAIN PAGE ══════════════════════════════════ */
 
 export default function Calculator() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<CalcTab>('irr');
+
+  const TRANSLATED_TABS: { id: CalcTab; icon: string; label: string }[] = [
+    { id: 'irr',       icon: '📈', label: t('calculator.irrTab') },
+    { id: 'fx',        icon: '💱', label: t('calculator.fxTab') },
+    { id: 'multiples', icon: '✖️',  label: t('calculator.multiplesTab') },
+    { id: 'netcall',   icon: '📋', label: t('calculator.netCallTab') },
+    { id: 'fee',       icon: '💰', label: t('calculator.feeTab') },
+  ];
 
   return (
     <div className="p-6 space-y-5 animate-fade-in">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold theme-text">Advanced Financial Calculators</h1>
-          <p className="theme-text-muted text-sm mt-0.5">
-            IRR · DPI/TVPI · Live FX Converter · Net Call · Fee & Carry modelling
-          </p>
+          <h1 className="text-xl font-bold theme-text">{t('calculator.title')}</h1>
+          <p className="theme-text-muted text-sm mt-0.5">{t('calculator.subtitle')}</p>
         </div>
         <span className="text-xs px-3 py-1.5 rounded-lg font-medium"
           style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
-          🔓 Available to all users
+          🔓 {t('calculator.availableAll')}
         </span>
       </div>
 
       {/* Tab bar */}
       <div className="flex gap-1 flex-wrap p-1 rounded-xl border theme-border"
         style={{ background: 'rgba(0,0,0,0.15)' }}>
-        {TABS.map(t => (
+        {TRANSLATED_TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               tab === t.id ? 'bg-indigo-600 text-white shadow-sm' : 'theme-text-sub hover:theme-text'
