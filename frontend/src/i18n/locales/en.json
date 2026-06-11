@@ -367,6 +367,11 @@
     "rateLabel": "USD/JPY Rate",
     "equalsLabel": "1 USD =",
     "sourceLabel": "Source",
-    "viewOnly": "View only — contact Admin to add FX rates"
+    "viewOnly": "View only — contact Admin to add FX rates",
+    "murcWarningTitle": "Today's MUFG TTM rate is not yet available",
+    "murcWarningBody": "MURC publishes the official rate daily after 11:00 AM JST. Showing most recent saved rate",
+    "fetchToday": "Fetch Today",
+    "latestRate": "Latest saved rate",
+    "autoLoaded": "Auto-loaded from DB"
   }
 }

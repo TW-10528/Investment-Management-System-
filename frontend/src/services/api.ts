@@ -166,6 +166,7 @@ export const noticesAPI = {
     }),
   updateExtracted: (id: string, data: Record<string, unknown>) =>
     api.put(`/notices/${id}/extracted`, data),
+  deleteNote:      (id: string) => api.delete(`/notices/${id}/notes`),
   recentInvestments: (limit?: number) =>
     api.get('/notices/investments/recent', { params: limit ? { limit } : {} }),
   allInvestments: (params?: { fund_id?: string; sector?: string; geography?: string }) =>

@@ -33,6 +33,7 @@ export interface Transaction {
   callId?:         string
   distId?:         string
   wireReference?:  string | null
+  notes?:          string | null
   // Finance-detail columns (carried through to the ledger row).
   returnOfCapital?: Decimal | null
   gain?:            Decimal | null

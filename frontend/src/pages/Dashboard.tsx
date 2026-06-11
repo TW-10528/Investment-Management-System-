@@ -17,7 +17,7 @@ const C = {
   violet:    '#8b5cf6',
 };
 
-function usd(n: number) { return fmt.usd(n, true); }
+function usd(n: number) { return fmt.usd(n); }
 function pct(n: number) { return n.toFixed(2) + '%'; }
 
 /* ── KPI card ─────────────────────────────────────────────────────────────── */
@@ -96,10 +96,10 @@ function SigfPanel({ sigfData }: { sigfData: any }) {
       {/* 4 column totals */}
       <div className="grid grid-cols-2 sm:grid-cols-4 divide-x theme-divider border-b theme-divider">
         {[
-          { col:'E', label:'Cumulative Drawn',    val: '$'+t.cumulative_drawn?.toLocaleString(),    color: C.indigo },
-          { col:'F', label:'Investment Capacity', val: '$'+t.investment_capacity?.toLocaleString(), color: C.emerald },
-          { col:'G', label:'Net Cash Flow',       val: '−$'+Math.abs(t.net_cash_flow??0).toLocaleString(), color: C.red },
-          { col:'L', label:'Non-Recallable Dist', val: '$'+(t.non_recallable_dist??0).toLocaleString(),     color: C.slate },
+          { col:'E', label:'Cumulative Drawn',    val: fmt.usd(t.cumulative_drawn??0),              color: C.indigo },
+          { col:'F', label:'Investment Capacity', val: fmt.usd(t.investment_capacity??0),           color: C.emerald },
+          { col:'G', label:'Net Cash Flow',       val: '−'+fmt.usd(Math.abs(t.net_cash_flow??0)),  color: C.red },
+          { col:'L', label:'Non-Recallable Dist', val: fmt.usd(t.non_recallable_dist??0),           color: C.slate },
         ].map(m => (
           <div key={m.col} className="px-4 py-3">
             <div className="flex items-center gap-1.5 mb-1">
@@ -117,7 +117,7 @@ function SigfPanel({ sigfData }: { sigfData: any }) {
       {/* deployment bar */}
       <div className="px-5 py-3 border-b theme-divider">
         <div className="flex items-center justify-between text-[10px] theme-text-muted mb-1">
-          <span>Commitment utilization · (E / ${commitment.toLocaleString()}) × 100</span>
+          <span>Commitment utilization · (E / {fmt.usd(commitment)}) × 100</span>
           <span className="font-bold" style={{ color: C.indigo }}>{utilPct}%</span>
         </div>
         <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--color-card-border)' }}>
@@ -142,11 +142,11 @@ function SigfPanel({ sigfData }: { sigfData: any }) {
                 <td className="px-4 py-2.5 font-bold theme-text">#{cc.call_number}</td>
                 <td className="px-4 py-2.5 text-right theme-text-muted">{cc.due_date}</td>
                 <td className="px-4 py-2.5 text-right theme-text">{cc.call_pct?.toFixed(2)}%</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.red }}>${cc.paid?.toLocaleString()}</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.indigo }}>${cc.cumulative_drawn?.toLocaleString()}</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.emerald }}>${cc.investment_capacity?.toLocaleString()}</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.red }}>−${Math.abs(cc.net_cash_flow??0).toLocaleString()}</td>
-                <td className="px-4 py-2.5 text-right theme-text-muted">${(cc.non_recallable_dist??0).toLocaleString()}</td>
+                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.red }}>{fmt.usd(cc.paid??0)}</td>
+                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.indigo }}>{fmt.usd(cc.cumulative_drawn??0)}</td>
+                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.emerald }}>{fmt.usd(cc.investment_capacity??0)}</td>
+                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.red }}>−{fmt.usd(Math.abs(cc.net_cash_flow??0))}</td>
+                <td className="px-4 py-2.5 text-right theme-text-muted">{fmt.usd(cc.non_recallable_dist??0)}</td>
                 <td className="px-4 py-2.5 text-right theme-text-muted">{cc.cumulative_pct?.toFixed(2)}%</td>
               </tr>
             ))}
@@ -158,25 +158,41 @@ function SigfPanel({ sigfData }: { sigfData: any }) {
 }
 
 /* ── FX widget ────────────────────────────────────────────────────────────── */
-function FxWidget({ live, loading, onFetch }:
-  { live: number|null; loading: boolean; onFetch: ()=>void }) {
-  const today = new Date().toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+function FxWidget({ latestSaved, latestDate }:
+  { latestSaved: number|null; latestDate: string|null }) {
+  const { t } = useTranslation();
+  const todayJst   = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+  const jstHour    = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })).getHours();
+  const todayRateMissing = !latestDate || latestDate !== todayJst;
+  // Warning only when today's rate is not yet in DB AND before 11:00 JST
+  const showWarning = todayRateMissing && jstHour < 11;
+
   return (
-    <div className="theme-card border rounded-xl px-5 py-4 flex items-center gap-6">
-      <div className="flex-1">
+    <div className="space-y-2">
+      {showWarning && latestSaved && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+          <span className="text-lg mt-0.5">🕐</span>
+          <div>
+            <p className="font-semibold text-sm">{t('fxRates.murcWarningTitle')}</p>
+            <p className="text-xs mt-0.5 text-amber-400/80">
+              {t('fxRates.murcWarningBody')} ({latestDate} — ¥{latestSaved.toFixed(2)}).
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Rate card */}
+      <div className="theme-card border rounded-xl px-5 py-4">
         <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">USD / JPY · MUFG TTM Rate</p>
-        <p className="text-3xl font-bold tabular-nums mt-1" style={{ color: live ? C.emerald : C.slate }}>
-          {live ? `¥${live.toFixed(2)}` : '—'}
+        <p className="text-3xl font-bold tabular-nums mt-1" style={{ color: latestSaved ? C.emerald : C.slate }}>
+          {latestSaved ? `¥${latestSaved.toFixed(2)}` : '—'}
         </p>
         <p className="text-[10px] theme-text-muted mt-1">
-          {live ? `MUFG TTM · ${today}` : 'Click "Fetch Today" to load today\'s MUFG TTM rate'}
+          {latestDate
+            ? `MUFG TTM · ${new Date(latestDate + 'T00:00:00').toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}`
+            : t('fxRates.fetchToday')}
         </p>
       </div>
-      <button onClick={onFetch} disabled={loading}
-        className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border theme-divider theme-text-muted hover:border-indigo-400 hover:text-indigo-400 transition-colors disabled:opacity-40">
-        {loading ? <span className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"/> : '🔄'}
-        Fetch Today
-      </button>
     </div>
   );
 }
@@ -211,8 +227,8 @@ export default function Dashboard() {
   const { t } = useTranslation();
   const [data,        setData]        = useState<DashboardData | null>(null);
   const [sigfList,    setSigfList]    = useState<any[]>([]);
-  const [liveRate,    setLiveRate]    = useState<number | null>(null);
-  const [liveLoading, setLiveLoading] = useState(false);
+  const [latestSaved, setLatestSaved] = useState<number | null>(null);
+  const [latestDate,  setLatestDate]  = useState<string | null>(null);
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -220,9 +236,36 @@ export default function Dashboard() {
   const loadDashboard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
     try {
-      const r = await dashboardAPI.summary();
+      const [r, fxR] = await Promise.all([
+        dashboardAPI.summary(),
+        fxRatesAPI.latest(),
+      ]);
       setData(r.data);
       setLastUpdated(new Date());
+
+      const todayJst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+      const jstHour  = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })).getHours();
+      const savedDate = fxR.data?.date ?? null;
+
+      if (savedDate === todayJst) {
+        // Today's rate already in DB — use it directly
+        setLatestSaved(fxR.data.usd_jpy);
+        setLatestDate(savedDate);
+      } else if (jstHour >= 11) {
+        // After 11:00 JST and today's rate missing — auto-fetch and save
+        try {
+          const live = await fxRatesAPI.historical(todayJst, 'USD', 'JPY');
+          if (live.data?.usd_jpy) {
+            await fxRatesAPI.create({ rate_date: todayJst, usd_jpy: live.data.usd_jpy, source: 'murc_ttm' });
+            setLatestSaved(live.data.usd_jpy);
+            setLatestDate(todayJst);
+          }
+        } catch { /* non-fatal — keep showing last saved rate */ }
+      } else if (fxR.data?.usd_jpy) {
+        // Before 11:00 JST — show last saved rate with warning
+        setLatestSaved(fxR.data.usd_jpy);
+        setLatestDate(savedDate);
+      }
     } catch {
       if (!silent) toast.error('Failed to load dashboard');
     } finally {
@@ -250,16 +293,6 @@ export default function Dashboard() {
     return () => clearInterval(id);
   }, [loadDashboard, loadSigf]);
 
-  async function fetchLive() {
-    setLiveLoading(true);
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      const r = await fxRatesAPI.historical(today, 'USD', 'JPY');
-      setLiveRate(r.data.usd_jpy);
-      toast.success('MUFG TTM rate loaded');
-    } catch { toast.error('Could not fetch MUFG TTM rate for today'); }
-    finally { setLiveLoading(false); }
-  }
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -331,7 +364,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── FX Rate ── */}
-      <FxWidget live={liveRate} loading={liveLoading} onFetch={fetchLive} />
+      <FxWidget latestSaved={latestSaved} latestDate={latestDate} />
 
       {/* ── Per-fund table ── */}
       {activeFunds.length > 0 && (
@@ -399,18 +432,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Pending calls notice ── */}
-      {data.pending_calls_count > 0 && (
-        <div className="rounded-xl border px-4 py-3 flex items-center justify-between gap-3"
-             style={{ background: C.amberBg, borderColor: C.amberBdr }}>
-          <p className="text-sm font-semibold" style={{ color: C.amber }}>
-            📋 {data.pending_calls_count} pending capital call{data.pending_calls_count>1?'s':''} — manage in Funds
-          </p>
-          <Link to="/funds" className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white" style={{ background: C.amber }}>
-            Go to Funds →
-          </Link>
-        </div>
-      )}
 
     </div>
   );

@@ -367,6 +367,11 @@
     "rateLabel": "USD/JPYレート",
     "equalsLabel": "1USD =",
     "sourceLabel": "ソース",
-    "viewOnly": "閲覧モード — レートの追加は管理者にお問い合わせください"
+    "viewOnly": "閲覧モード — レートの追加は管理者にお問い合わせください",
+    "murcWarningTitle": "本日のMUFG TTMレートはまだ公表されていません",
+    "murcWarningBody": "MURCは毎日午前11時（JST）以降に公式レートを公表します。直近の保存済みレートを表示中",
+    "fetchToday": "本日のレートを取得",
+    "latestRate": "最新の保存済みレート",
+    "autoLoaded": "DBから自動読み込み"
   }
 }

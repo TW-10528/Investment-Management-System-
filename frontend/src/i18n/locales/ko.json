@@ -320,6 +320,11 @@
     "rateLabel": "USD/JPY 환율",
     "equalsLabel": "1 USD =",
     "sourceLabel": "출처",
-    "viewOnly": "보기 전용 — 환율 추가는 관리자에게 문의하세요"
+    "viewOnly": "보기 전용 — 환율 추가는 관리자에게 문의하세요",
+    "murcWarningTitle": "오늘의 MUFG TTM 환율은 아직 공표되지 않았습니다",
+    "murcWarningBody": "MURC는 매일 오전 11시(JST) 이후 공식 환율을 공표합니다. 최근 저장된 환율을 표시 중",
+    "fetchToday": "오늘 환율 가져오기",
+    "latestRate": "최신 저장 환율",
+    "autoLoaded": "DB에서 자동 로드됨"
   }
 }

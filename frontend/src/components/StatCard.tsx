@@ -25,9 +25,12 @@ export default function StatCard({
     switch (format) {
       case 'currency':
         if (currency === 'JPY') {
-          displayValue = `¥${(value / 1000000).toFixed(2)}M`;
+          displayValue = `¥${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(value)}`;
         } else {
-          displayValue = `$${(value / 1000000).toFixed(2)}M`;
+          displayValue = new Intl.NumberFormat('en-US', {
+            style: 'currency', currency: 'USD',
+            minimumFractionDigits: 2, maximumFractionDigits: 2,
+          }).format(value);
         }
         break;
       case 'percent':

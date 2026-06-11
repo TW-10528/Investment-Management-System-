@@ -74,6 +74,7 @@ router.get('/:id/ledger', async (c) => {
       manualCashFlow:  cc.manualCashFlowUsd != null ? new Decimal(cc.manualCashFlowUsd.toString()) : null,
       callId:          cc.id,
       wireReference:   cc.wireReference,
+      notes:           cc.notes ?? null,
       returnOfCapital: cc.returnOfCapitalUsd != null ? new Decimal(cc.returnOfCapitalUsd.toString()) : null,
       gain:            cc.gainUsd != null ? new Decimal(cc.gainUsd.toString()) : null,
       interest:        cc.interestUsd != null ? new Decimal(cc.interestUsd.toString()) : null,
@@ -87,6 +88,7 @@ router.get('/:id/ledger', async (c) => {
       capitalReceived: new Decimal(d.amountUsd.toString()),
       reinvestable:    new Decimal(d.reinvestableUsd.toString()),
       distId:          d.id,
+      notes:           d.notes ?? null,
       returnOfCapital: d.returnOfCapitalUsd != null ? new Decimal(d.returnOfCapitalUsd.toString()) : null,
       gain:            d.gainUsd != null ? new Decimal(d.gainUsd.toString()) : null,
       interest:        d.interestUsd != null ? new Decimal(d.interestUsd.toString()) : null,
@@ -124,6 +126,7 @@ router.get('/:id/ledger', async (c) => {
       call_id:             r.callId,
       dist_id:             r.distId,
       wire_reference:      r.wireReference,
+      notes:               r.notes ?? null,
     })),
     snapshot: {
       commitment_usd:      f(snapshot.commitmentUsd),

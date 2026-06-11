@@ -1,15 +1,11 @@
 /** Formatting helpers */
 
 export const fmt = {
-  usd: (v: number, compact = false) => {
-    if (compact && Math.abs(v) >= 1_000_000)
-      return `$${(v / 1_000_000).toFixed(1)}M`;
-    if (compact && Math.abs(v) >= 1_000)
-      return `$${(v / 1_000).toFixed(0)}K`;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency', currency: 'USD', maximumFractionDigits: 0,
-    }).format(v);
-  },
+  usd: (v: number, _compact = false) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD',
+      minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(v),
 
   jpy: (v: number) =>
     `¥${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(v)}`,

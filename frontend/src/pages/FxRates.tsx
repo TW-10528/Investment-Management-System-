@@ -186,6 +186,11 @@ export default function FxRates() {
     return rates[i].usd_jpy - rates[i + 1].usd_jpy;
   }
 
+  const latestRate = rates[0] ?? null;
+  // Today's date in JST as YYYY-MM-DD
+  const todayJst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+  const todayRateMissing = !latestRate || latestRate.date !== todayJst;
+
   return (
     <div className="p-6 space-y-5 animate-fade-in">
 
@@ -215,6 +220,19 @@ export default function FxRates() {
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
           <span className="text-lg">🔒</span>
           <span>{t('fxRates.viewOnly')}</span>
+        </div>
+      )}
+
+      {/* MURC not-yet-published warning — only when today's rate is not in the DB */}
+      {todayRateMissing && latestRate && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+          <span className="text-xl mt-0.5">🕐</span>
+          <div>
+            <p className="font-semibold">{t('fxRates.murcWarningTitle')}</p>
+            <p className="text-xs mt-0.5 text-amber-400/80">
+              {t('fxRates.murcWarningBody')} ({latestRate.date} — ¥{latestRate.usd_jpy.toFixed(2)}).
+            </p>
+          </div>
         </div>
       )}
 

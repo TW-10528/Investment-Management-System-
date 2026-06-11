@@ -276,6 +276,161 @@ function EditableRow({
   );
 }
 
+/* ── AI Validation Panel ─────────────────────────────────────────────────── */
+type FlagSeverity = 'error' | 'warning' | 'info';
+interface ValidationFlag {
+  field:     string;
+  severity:  FlagSeverity;
+  message:   string;
+  expected?: string;
+  actual?:   string;
+}
+interface ValidationResult {
+  ran:          boolean;
+  overallRisk:  'low' | 'medium' | 'high';
+  flags:        ValidationFlag[];
+  historicalContext: {
+    callCount:           number;
+    avgGrossCallUsd:     number;
+    avgManagementFeeUsd: number;
+    avgCallPct:          number;
+    avgDaysBetweenCalls: number;
+    lastCallNumber:      number;
+    commitmentUsdInDb:   number;
+  } | null;
+  summary:      string;
+  validatedAt:  string;
+}
+
+const SEV_STYLE: Record<FlagSeverity, { bg: string; txt: string; border: string; icon: string }> = {
+  error:   { bg: 'rgba(239,68,68,0.08)',   txt: '#ef4444', border: 'rgba(239,68,68,0.25)',   icon: '✕' },
+  warning: { bg: 'rgba(217,119,6,0.08)',   txt: '#d97706', border: 'rgba(217,119,6,0.25)',   icon: '⚠' },
+  info:    { bg: 'rgba(100,116,139,0.06)', txt: '#64748b', border: 'rgba(100,116,139,0.2)',  icon: 'ℹ' },
+};
+const RISK_STYLE: Record<'low'|'medium'|'high', { bg: string; txt: string; border: string; label: string }> = {
+  low:    { bg: 'rgba(16,185,129,0.08)',  txt: '#10b981', border: 'rgba(16,185,129,0.25)',  label: 'Low Risk'    },
+  medium: { bg: 'rgba(217,119,6,0.08)',   txt: '#d97706', border: 'rgba(217,119,6,0.25)',   label: 'Medium Risk' },
+  high:   { bg: 'rgba(239,68,68,0.08)',   txt: '#ef4444', border: 'rgba(239,68,68,0.25)',   label: 'High Risk'   },
+};
+
+function ValidationPanel({ data }: { data: Record<string, any> }) {
+  const v: ValidationResult | undefined = data?._validation;
+  if (!v) return null;
+
+  const risk = RISK_STYLE[v.overallRisk] ?? RISK_STYLE.low;
+
+  return (
+    <div className="rounded-xl border overflow-hidden" style={{ borderColor: risk.border }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3"
+           style={{ background: risk.bg, borderBottom: `1px solid ${risk.border}` }}>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-black uppercase tracking-widest" style={{ color: risk.txt }}>
+            AI Validation
+          </span>
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                style={{ background: risk.border, color: risk.txt }}>
+            {risk.label}
+          </span>
+          {v.flags.length > 0 && (
+            <span className="text-xs theme-text-muted">
+              {v.flags.length} flag{v.flags.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        {v.historicalContext && (
+          <span className="text-[10px] theme-text-muted tabular-nums">
+            {v.historicalContext.callCount} historical calls
+          </span>
+        )}
+      </div>
+
+      {/* Summary */}
+      <div className="px-4 py-3 border-b theme-divider">
+        <p className="text-xs theme-text leading-relaxed">{v.summary}</p>
+      </div>
+
+      {/* Flags */}
+      {v.flags.length > 0 && (
+        <div className="divide-y theme-divider">
+          {v.flags.map((flag, i) => {
+            const s = SEV_STYLE[flag.severity];
+            return (
+              <div key={i} className="px-4 py-3 flex gap-3 items-start">
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5"
+                      style={{ background: s.bg, color: s.txt, border: `1px solid ${s.border}` }}>
+                  {s.icon}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold" style={{ color: s.txt }}>
+                    {flag.field.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase())}
+                  </p>
+                  <p className="text-xs theme-text mt-0.5">{flag.message}</p>
+                  {(flag.expected || flag.actual) && (
+                    <div className="flex gap-4 mt-1.5">
+                      {flag.expected && (
+                        <span className="text-[10px] theme-text-muted">
+                          Expected: <span className="font-mono theme-text">{flag.expected}</span>
+                        </span>
+                      )}
+                      {flag.actual && (
+                        <span className="text-[10px]" style={{ color: s.txt }}>
+                          Actual: <span className="font-mono font-semibold">{flag.actual}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Historical baseline strip */}
+      {v.historicalContext && v.historicalContext.callCount > 0 && (
+        <div className="px-4 py-2.5 flex gap-6 flex-wrap border-t theme-divider"
+             style={{ background: 'rgba(100,116,139,0.03)' }}>
+          {v.historicalContext.avgGrossCallUsd > 0 && (
+            <span className="text-[10px] theme-text-muted">
+              Avg call: <span className="font-mono theme-text">
+                ${v.historicalContext.avgGrossCallUsd.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              </span>
+            </span>
+          )}
+          {v.historicalContext.avgCallPct > 0 && (
+            <span className="text-[10px] theme-text-muted">
+              Avg call %: <span className="font-mono theme-text">
+                {(v.historicalContext.avgCallPct * 100).toFixed(2)}%
+              </span>
+            </span>
+          )}
+          {v.historicalContext.avgDaysBetweenCalls > 0 && (
+            <span className="text-[10px] theme-text-muted">
+              Avg interval: <span className="font-mono theme-text">
+                {Math.round(v.historicalContext.avgDaysBetweenCalls)} days
+              </span>
+            </span>
+          )}
+          {v.historicalContext.lastCallNumber > 0 && (
+            <span className="text-[10px] theme-text-muted">
+              Last call: <span className="font-mono theme-text">
+                #{v.historicalContext.lastCallNumber}
+              </span>
+            </span>
+          )}
+        </div>
+      )}
+
+      {!v.ran && (
+        <div className="px-4 py-2.5 text-xs theme-text-muted border-t theme-divider">
+          {v.summary}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Notice Detail / Review Modal ────────────────────────────────────────── */
 function NoticeDetailModal({
   notice, funds, onClose, onRefresh,
@@ -1236,6 +1391,7 @@ export default function Notices() {
                 <th className="text-left px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide">Fund</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide">Status</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide">Confidence</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide">Review Note</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide">Uploaded</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -1265,6 +1421,33 @@ export default function Notices() {
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={n.status} /></td>
                     <td className="px-4 py-3"><ConfBadge n={n} /></td>
+                    <td className="px-4 py-3 max-w-[180px]">
+                      {n.admin_notes ? (
+                        <div className="flex items-start gap-1.5 group">
+                          <p className="text-xs theme-text truncate flex-1" title={n.admin_notes}>
+                            📝 {n.admin_notes}
+                          </p>
+                          {(canEdit() || isAdmin()) && (
+                            <button
+                              title="Delete note"
+                              onClick={async e => {
+                                e.stopPropagation();
+                                try {
+                                  await noticesAPI.deleteNote(n.id);
+                                  toast.success('Note deleted');
+                                  load(true);
+                                } catch { toast.error('Failed to delete note'); }
+                              }}
+                              className="text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-xs leading-none"
+                            >
+                              🗑
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs theme-text-muted">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 theme-text-muted text-xs">
                       {n.created_at ? fmt.date(n.created_at.slice(0, 10)) : '—'}
                     </td>

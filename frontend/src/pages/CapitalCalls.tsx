@@ -131,8 +131,8 @@ function CreateCallModal({
             </select>
             {selectedFund && (
               <p className="text-xs theme-text-muted mt-1">
-                Commitment: ${selectedFund.commitment_usd.toLocaleString()} ·
-                Unfunded: ${selectedFund.unfunded_usd.toLocaleString()}
+                Commitment: {fmt.usd(selectedFund.commitment_usd)} ·
+                Unfunded: {fmt.usd(selectedFund.unfunded_usd)}
               </p>
             )}
           </div>
@@ -217,8 +217,8 @@ function CreateCallModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs theme-text-muted">{t('capitalCalls.netUsd')}</p>
-                  <p className="text-lg font-bold text-indigo-300 tabular-nums">${netUSD.toLocaleString()}</p>
-                  <p className="text-[10px] theme-text-muted">= ${gross.toLocaleString()} − ${dist.toLocaleString()} + ${reinv.toLocaleString()}</p>
+                  <p className="text-lg font-bold text-indigo-300 tabular-nums">{fmt.usd(netUSD)}</p>
+                  <p className="text-[10px] theme-text-muted">= {fmt.usd(gross)} − {fmt.usd(dist)} + {fmt.usd(reinv)}</p>
                 </div>
                 {netJPY > 0 && (
                   <div>

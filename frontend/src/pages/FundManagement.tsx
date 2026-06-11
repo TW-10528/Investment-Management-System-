@@ -129,7 +129,7 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
       if (!rate) return '¥—';
       return '¥' + Math.round(usd * rate).toLocaleString('ja-JP');
     }
-    return '$' + usd.toLocaleString();
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(usd);
   }
 
   const load = useCallback(() =>
@@ -266,7 +266,7 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                   Cash Flow G {hasManualCf ? '(manual)' : '= −B + C'}
                 </p>
                 <p className="text-sm font-bold tabular-nums mt-0.5" style={{ color: cashFlowPreview < 0 ? C.red : C.emerald }}>
-                  {cashFlowPreview < 0 ? '−$' : '$'}{Math.abs(cashFlowPreview).toLocaleString()}
+                  {cashFlowPreview < 0 ? '−' : ''}{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(cashFlowPreview))}
                 </p>
               </div>
             </div>
@@ -308,7 +308,7 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                     {Number(cc.distribution_usd??0)>0 ? fmtCallAmt(Number(cc.distribution_usd), cc.fx_rate) : '—'}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold" style={{color: cf<0?C.red:C.emerald}}>
-                    {cf<0?'−$':'$'}{Math.abs(cf).toLocaleString()}
+                    {cf<0?'−':''}{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(Math.abs(cf))}
                     {cc.manual_cash_flow_usd!=null && <span className="ml-1 text-[9px] font-bold px-1 rounded" style={{color:C.amber,background:'rgba(217,119,6,0.12)'}} title="Manual cash-flow entry">M</span>}
                   </td>
                   <td className="px-4 py-3 text-right theme-text-muted">{cc.fx_rate ? Number(cc.fx_rate).toFixed(2) : '—'}</td>
@@ -379,7 +379,7 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
       if (!rate) return '¥—';
       return '¥' + Math.round(Number(d.amount_usd) * rate).toLocaleString('ja-JP');
     }
-    return '$' + Number(d.amount_usd).toLocaleString();
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(d.amount_usd));
   }
 
   const load = useCallback(() =>
@@ -411,7 +411,7 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
         <p className="text-sm font-semibold theme-text">
           Distributions
           <span className="ml-2 text-xs font-normal theme-text-muted">{dists.length} records</span>
-          {total > 0 && <span className="ml-3 font-semibold" style={{color:C.emerald}}>${total.toLocaleString()}</span>}
+          {total > 0 && <span className="ml-3 font-semibold" style={{color:C.emerald}}>{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(total)}</span>}
         </p>
         <div className="flex items-center gap-2 flex-wrap">
           {/* MURC rate editor */}
@@ -505,7 +505,7 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                   <td className="px-4 py-3 text-right theme-text-muted">{d.distribution_date}</td>
                   <td className="px-4 py-3 text-right theme-text">{d.dist_type}</td>
                   <td className="px-4 py-3 text-right font-semibold" style={{color:C.emerald}}>{fmtDistAmt(d)}</td>
-                  <td className="px-4 py-3 text-right theme-text-muted">${Number(d.reinvestable_usd).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right theme-text-muted">{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(d.reinvestable_usd))}</td>
                   <td className="px-4 py-3 text-right theme-text-muted">{d.fx_rate ? Number(d.fx_rate).toFixed(2):'—'}</td>
                   <td className="px-4 py-3">
                     {canEdit && (
@@ -977,14 +977,23 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
                           </div>
                         ) : (
                           <div className="flex items-start gap-2 group">
-                            <span className={`text-base flex-1 ${row.notes ? 'theme-text' : 'theme-text-muted opacity-40 italic'}`}>
+                            <span className={`text-sm flex-1 ${row.notes ? 'theme-text' : 'theme-text-muted opacity-40 italic'}`}>
                               {row.notes || '—'}
                             </span>
                             {canEdit && hasId && editIdx === null && editDateIdx === null && (
-                              <button onClick={() => openNote(row, i)}
-                                className="opacity-0 group-hover:opacity-100 flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium theme-text-muted hover:text-indigo-400 hover:bg-indigo-500/10 border theme-border transition-all">
-                                Edit
-                              </button>
+                              <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all">
+                                <button onClick={() => openNote(row, i)}
+                                  className="flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium theme-text-muted hover:text-indigo-400 hover:bg-indigo-500/10 border theme-border transition-colors">
+                                  Edit
+                                </button>
+                                {row.notes && (
+                                  <button onClick={() => saveNote(row, '')}
+                                    className="flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium text-red-400 hover:bg-red-500/10 border border-red-500/30 transition-colors"
+                                    title="Delete note">
+                                    🗑
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </div>
                         )}

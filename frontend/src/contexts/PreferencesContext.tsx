@@ -86,9 +86,35 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     }
   }, [prefs.theme]);
 
-  // Apply language to i18n
+  // Apply language — i18n for keyed strings + Google Translate for everything else
   useEffect(() => {
     i18n.changeLanguage(prefs.language);
+
+    const langMap: Record<string, string> = {
+      en: 'en', ja: 'ja', zh: 'zh-CN', ko: 'ko', tl: 'tl',
+    };
+    const target = langMap[prefs.language] ?? 'en';
+
+    if (target === 'en') {
+      // Restore original — remove googtrans cookie and reload
+      document.cookie = 'googtrans=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'googtrans=; path=/; domain=' + window.location.hostname + '; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      if (document.documentElement.lang !== 'en') window.location.reload();
+    } else {
+      // Set googtrans cookie so Google Translate activates on next render
+      const val = `/en/${target}`;
+      document.cookie = `googtrans=${val}; path=/`;
+      document.cookie = `googtrans=${val}; path=/; domain=${window.location.hostname}`;
+      // Trigger translation via the hidden widget element
+      const sel = document.querySelector<HTMLSelectElement>('.goog-te-combo');
+      if (sel) {
+        sel.value = target;
+        sel.dispatchEvent(new Event('change'));
+      } else {
+        // Widget not ready yet — reload so it picks up the cookie
+        window.location.reload();
+      }
+    }
   }, [prefs.language]);
 
   function update(patch: Partial<Prefs>) {

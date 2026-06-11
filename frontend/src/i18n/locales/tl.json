@@ -367,6 +367,11 @@
     "rateLabel": "USD/JPY Rate",
     "equalsLabel": "1 USD =",
     "sourceLabel": "Pinagmulan",
-    "viewOnly": "Tingnan lamang — makipag-ugnayan sa Admin para magdagdag ng mga rate"
+    "viewOnly": "Tingnan lamang — makipag-ugnayan sa Admin para magdagdag ng mga rate",
+    "murcWarningTitle": "Ang MUFG TTM rate ngayon ay hindi pa available",
+    "murcWarningBody": "Inilalathala ng MURC ang opisyal na rate pagkatapos ng 11:00 AM JST araw-araw. Ipinapakita ang pinakabagong nai-save na rate",
+    "fetchToday": "Kunin ang Rate Ngayon",
+    "latestRate": "Pinakabagong nai-save na rate",
+    "autoLoaded": "Awtomatikong na-load mula sa DB"
   }
 }

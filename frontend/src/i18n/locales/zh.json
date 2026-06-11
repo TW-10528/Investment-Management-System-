@@ -357,6 +357,11 @@
     "rateLabel": "USD/JPY汇率",
     "equalsLabel": "1 USD =",
     "sourceLabel": "来源",
-    "viewOnly": "仅查看 — 如需添加汇率请联系管理员"
+    "viewOnly": "仅查看 — 如需添加汇率请联系管理员",
+    "murcWarningTitle": "今日の MUFG TTMレートはまだ公表されていません",
+    "murcWarningBody": "MURCは毎日午前11時（JST）以降に公式レートを公表します。直近の保存済みレートを表示中",
+    "fetchToday": "今日のレートを取得",
+    "latestRate": "最新保存汇率",
+    "autoLoaded": "从数据库自动加载"
   }
 }
