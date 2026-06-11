@@ -4,6 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { usersAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
+/* Maximum active user accounts the system allows (mirrors backend config.maxActiveUsers). */
+const MAX_SEATS = 6;
+
 /* ── Types ───────────────────────────────────────────────────────────────── */
 interface User {
   id          : string;
@@ -409,7 +412,7 @@ export default function Users() {
             )}
           </h1>
           <p className="theme-text-muted text-sm mt-0.5">
-            {active.length} active · {inactive.length} deactivated · max 10 seats
+            {active.length} active · {inactive.length} deactivated · max {MAX_SEATS} seats
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -419,7 +422,9 @@ export default function Users() {
           </button>
           <button
             onClick={() => { setEditTarget(null); setModal('add'); }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
+            disabled={active.length >= MAX_SEATS}
+            title={active.length >= MAX_SEATS ? `Max ${MAX_SEATS} active users reached` : ''}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
           >
             {t('users.addUser')}
           </button>
@@ -532,8 +537,8 @@ export default function Users() {
                         <div className="flex flex-col gap-2 flex-shrink-0">
                           <button
                             onClick={() => doApprove(u)}
-                            disabled={busy || active.length >= 10}
-                            title={active.length >= 10 ? 'Max 10 active users reached' : ''}
+                            disabled={busy || active.length >= MAX_SEATS}
+                            title={active.length >= MAX_SEATS ? `Max ${MAX_SEATS} active users reached` : ''}
                             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold rounded-xl transition-colors shadow-md shadow-emerald-500/20"
                           >
                             {busy
@@ -563,11 +568,11 @@ export default function Users() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold theme-text">Active Users</h2>
-                <span className="text-xs theme-text-muted">{active.length} / 10 seats used</span>
+                <span className="text-xs theme-text-muted">{active.length} / {MAX_SEATS} seats used</span>
               </div>
               {/* Capacity bar */}
               <div className="progress-track">
-                <div className="progress-fill-indigo" style={{ width: `${(active.length / 10) * 100}%` }} />
+                <div className="progress-fill-indigo" style={{ width: `${Math.min(100, (active.length / MAX_SEATS) * 100)}%` }} />
               </div>
 
               {/* Table header (shared) */}

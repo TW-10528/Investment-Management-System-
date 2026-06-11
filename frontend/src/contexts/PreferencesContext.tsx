@@ -1,10 +1,15 @@
 /**
  * User Preferences Context
- * Stores: theme, language, currency, compact numbers, date format.
- * All values persist in localStorage.
+ * Stores: theme, language, currency, compact numbers, date format, per-section accents.
+ * Values persist in localStorage AND (for logged-in users) on the user's account so
+ * they follow the user across devices.
  */
-import { createContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import i18n from '../i18n';
+import {
+  DEFAULT_SECTION_ACCENTS, type SectionAccents, type AccentName,
+} from '../lib/accents';
+import { authAPI } from '../services/api';
 
 export type Theme      = 'light' | 'dark';
 export type Currency   = 'USD' | 'JPY';
@@ -17,6 +22,7 @@ interface Prefs {
   currency:       Currency;
   compactNumbers: boolean;
   dateFormat:     DateFmt;
+  sectionAccents: SectionAccents;
 }
 
 interface PrefsCtx extends Prefs {
@@ -25,6 +31,8 @@ interface PrefsCtx extends Prefs {
   setCurrency:       (c: Currency)   => void;
   setCompactNumbers: (v: boolean)    => void;
   setDateFormat:     (f: DateFmt)    => void;
+  setSectionAccent:  (section: string, accent: AccentName) => void;
+  hydrateFromServer: ()              => void;
   resetAll:          ()              => void;
 }
 
@@ -34,6 +42,7 @@ const DEFAULTS: Prefs = {
   currency:       'USD',
   compactNumbers: true,
   dateFormat:     'US',
+  sectionAccents: DEFAULT_SECTION_ACCENTS,
 };
 
 const VALID_LANGS: LangCode[] = ['en', 'ja', 'zh', 'tl'];
@@ -58,7 +67,12 @@ function load(): Prefs {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (!VALID_LANGS.includes(parsed.language)) parsed.language = detectBrowserLang();
-      return { ...DEFAULTS, ...parsed };
+      return {
+        ...DEFAULTS,
+        ...parsed,
+        // Merge accents so a newly-added section always has a default
+        sectionAccents: { ...DEFAULT_SECTION_ACCENTS, ...(parsed.sectionAccents ?? {}) },
+      };
     }
   } catch { /* ignore */ }
   // No saved prefs → auto-detect from browser
@@ -75,15 +89,13 @@ export const PrefsCtx = createContext<PrefsCtx>({} as PrefsCtx);
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<Prefs>(load);
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Apply theme class to <html>
   useEffect(() => {
     const html = document.documentElement;
-    if (prefs.theme === 'dark') {
-      html.classList.add('dark');
-    } else {
-      html.classList.remove('dark');
-    }
+    if (prefs.theme === 'dark') html.classList.add('dark');
+    else                        html.classList.remove('dark');
   }, [prefs.theme]);
 
   // Apply language — i18n for keyed strings + Google Translate for everything else
@@ -117,12 +129,40 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     }
   }, [prefs.language]);
 
-  function update(patch: Partial<Prefs>) {
+  /** Debounced push of the whole prefs blob to the user's account. */
+  function syncToServer(next: Prefs) {
+    if (!localStorage.getItem('authToken')) return;
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      authAPI.updatePreferences(next).catch(() => { /* offline / non-fatal */ });
+    }, 600);
+  }
+
+  function update(patch: Partial<Prefs>, opts: { sync?: boolean } = {}) {
+    const sync = opts.sync ?? true;
     setPrefs(prev => {
       const next = { ...prev, ...patch };
       save(next);
+      if (sync) syncToServer(next);
       return next;
     });
+  }
+
+  /** Pull this account's saved preferences (called after login / on a protected mount). */
+  function hydrateFromServer() {
+    if (!localStorage.getItem('authToken')) return;
+    authAPI.me()
+      .then(res => {
+        const server = res.data?.preferences;
+        if (server && typeof server === 'object') {
+          // Server wins for cross-device consistency; merge so missing keys keep defaults.
+          update({
+            ...server,
+            sectionAccents: { ...DEFAULT_SECTION_ACCENTS, ...(server.sectionAccents ?? {}) },
+          }, { sync: false });
+        }
+      })
+      .catch(() => { /* non-fatal */ });
   }
 
   return (
@@ -133,7 +173,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       setCurrency:       c => update({ currency: c }),
       setCompactNumbers: v => update({ compactNumbers: v }),
       setDateFormat:     f => update({ dateFormat: f }),
-      resetAll:          () => { save(DEFAULTS); setPrefs({ ...DEFAULTS }); },
+      setSectionAccent:  (section, accent) =>
+        update({ sectionAccents: { ...prefs.sectionAccents, [section]: accent } }),
+      hydrateFromServer,
+      resetAll:          () => { save(DEFAULTS); setPrefs({ ...DEFAULTS }); syncToServer(DEFAULTS); },
     }}>
       {children}
     </PrefsCtx.Provider>

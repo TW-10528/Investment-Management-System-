@@ -48,5 +48,5 @@ export const config = {
 
   // Misc
   revealEmailNotFound: getBool('REVEAL_EMAIL_NOT_FOUND', true),
-  maxActiveUsers:      10,
+  maxActiveUsers:      6,
 }

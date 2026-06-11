@@ -41,6 +41,8 @@ export const authAPI = {
   signup: (data: { full_name: string; email: string; password: string; role?: string }) =>
     api.post('/auth/signup', data),
   me:     () => api.get('/auth/me'),
+  updatePreferences: (preferences: unknown) =>
+    api.patch('/auth/me/preferences', { preferences }),
 };
 
 // ── Dashboard ────────────────────────────────────────────────────────────────

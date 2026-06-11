@@ -46,6 +46,7 @@ model User {
   status         UserStatus @default(pending)
   isActive       Boolean    @default(true) @map("is_active")
   lastLogin      DateTime?  @map("last_login")
+  preferences    Json?      @map("preferences")
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
