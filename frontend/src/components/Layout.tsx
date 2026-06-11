@@ -6,7 +6,6 @@ import { usePreferences } from '../contexts/usePreferences';
 import { LANGUAGES } from '../i18n';
 import SettingsModal from './SettingsModal';
 import NotificationBell from './NotificationBell';
-import AccentController from './AccentController';
 
 /* ── Nav items ─────────────────────────────────────────────────────────────── */
 const NAV_ITEMS = [
@@ -56,7 +55,9 @@ export default function Layout() {
       } catch { /* ignore */ }
     }
     load();
-    const id = setInterval(load, 30_000);
+    const id = setInterval(() => {
+      if (!cancelled && document.visibilityState === 'visible') load();
+    }, 30_000);
     return () => { cancelled = true; clearInterval(id); };
   }, [isAdmin]);
 
@@ -73,7 +74,6 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--color-bg)' }}>
-      <AccentController />
 
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
       <aside className="w-[220px] flex-shrink-0 flex flex-col select-none" style={{
@@ -127,8 +127,8 @@ export default function Layout() {
                   }`
                 }
                 style={({ isActive }) => isActive ? {
-                  background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.35) 0%, rgba(var(--accent-rgb),0.20) 100%)',
-                  border: '1px solid var(--accent-border)',
+                  background: 'linear-gradient(135deg, rgba(99,102,241,0.35) 0%, rgba(99,102,241,0.2) 100%)',
+                  border: '1px solid rgba(99,102,241,0.4)',
                 } : {
                   color: 'rgba(255,255,255,0.45)',
                   border: '1px solid transparent',

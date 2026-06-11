@@ -669,7 +669,7 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
   const [editDateVal, setEditDateVal] = useState('');
   const [dateSaving,  setDateSaving]  = useState(false);
 
-  async function fetchMurcRates(loaded: LedgerRow[]) {
+  const fetchMurcRates = useCallback(async (loaded: LedgerRow[]) => {
     if (!loaded.length) return;
     const uniqueDates = [...new Set(loaded.map(r => r.date))];
     setRateLoading(true);
@@ -683,9 +683,9 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
     results.forEach(r => { if (r.status === 'fulfilled' && r.value.rate) map[r.value.date] = r.value.rate; });
     setMurcRates(map);
     setRateLoading(false);
-  }
+  }, []);
 
-  function loadLedger() {
+  const loadLedger = useCallback(() => {
     setLoading(true);
     fundsAPI.ledger(fundId)
       .then(r => {
@@ -696,14 +696,14 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
         fetchMurcRates(loaded);
       })
       .finally(() => setLoading(false));
-  }
+  }, [fundId, fetchMurcRates]);
+
   useEffect(() => {
-    // Reset any open editors when the fund changes
     setEditIdx(null);
     setEditDateIdx(null);
     setEditDateVal('');
     loadLedger();
-  }, [fundId]);
+  }, [loadLedger]);
 
   function jpyStr(usd: number, rate: number | null | undefined): string {
     if (!usd || !rate) return '—';

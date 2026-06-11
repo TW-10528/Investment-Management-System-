@@ -24,23 +24,26 @@ export function createApp() {
   const app = new Hono()
 
   // ── Global middleware ──────────────────────────────────────────────────────
-  app.use('*', logger())
-
-  // Normalise trailing slashes
+  // Normalise trailing slashes (before logger so re-fetched requests don't double-log)
   app.use('*', async (c, next) => {
+    if (c.req.header('x-normalized')) return next()
     const path = new URL(c.req.url).pathname
     if (path.length > 1 && path.endsWith('/')) {
       const url = new URL(c.req.url)
       url.pathname = path.slice(0, -1)
+      const headers = new Headers(c.req.raw.headers)
+      headers.set('x-normalized', '1')
       const rewritten = new Request(url.toString(), {
         method:  c.req.method,
-        headers: c.req.raw.headers,
+        headers,
         body:    ['GET', 'HEAD'].includes(c.req.method) ? undefined : c.req.raw.body,
       })
       return app.fetch(rewritten)
     }
     return next()
   })
+
+  app.use('*', logger())
 
   app.use('*', cors({
     origin:       config.allowedOrigins,

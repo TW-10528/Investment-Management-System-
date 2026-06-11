@@ -6,8 +6,6 @@ import { auth } from '../../middleware/auth'
 import { rateLimit } from '../../middleware/rateLimit'
 import { SignupSchema, ForgotPasswordSchema, VerifyOtpSchema, ResetPasswordSchema } from './auth.schema'
 import * as AuthService from './auth.service'
-import * as UsersService from '../users/users.service'
-import { prisma } from '../../lib/prisma'
 
 const router = new Hono<HonoEnv>()
 
@@ -64,29 +62,9 @@ router.post('/login', rateLimit(10, 60), async (c) => {
 })
 
 // GET /me
-router.get('/me', auth, async (c) => {
-  const u    = c.get('user')
-  const full = await prisma.user.findUnique({ where: { id: u.id } })
-  return c.json({
-    email:       u.email,
-    role:        u.role,
-    name:        u.fullName,
-    full_name:   u.fullName,
-    preferences: full?.preferences ?? null,
-  })
-})
-
-// PATCH /me/preferences  — any authenticated user updates their own UI preferences
-router.patch('/me/preferences', auth, async (c) => {
-  const u    = c.get('user')
-  const body = await c.req.json().catch(() => ({}))
-  const prefs = body?.preferences ?? body
-  try {
-    const updated = await UsersService.updatePreferences(u.id, prefs)
-    return c.json({ preferences: updated.preferences })
-  } catch (err: any) {
-    return c.json({ detail: err.message }, err.status ?? 400)
-  }
+router.get('/me', auth, (c) => {
+  const u = c.get('user')
+  return c.json({ email: u.email, role: u.role, name: u.fullName, full_name: u.fullName })
 })
 
 // POST /forgot-password

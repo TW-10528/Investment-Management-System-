@@ -35,7 +35,7 @@
     "@types/nodemailer": "^6.4.17",
     "@types/pdf-parse": "^1.1.4",
     "prisma": "^5.22.0",
-    "tsx": "^4.19.2",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.2"
   }
 }

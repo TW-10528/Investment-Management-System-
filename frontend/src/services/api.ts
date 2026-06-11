@@ -41,8 +41,6 @@ export const authAPI = {
   signup: (data: { full_name: string; email: string; password: string; role?: string }) =>
     api.post('/auth/signup', data),
   me:     () => api.get('/auth/me'),
-  updatePreferences: (preferences: unknown) =>
-    api.patch('/auth/me/preferences', { preferences }),
 };
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -52,10 +50,10 @@ export const dashboardAPI = {
 
 // ── Funds ────────────────────────────────────────────────────────────────────
 export const fundsAPI = {
-  list:       ()                         => api.get('/funds/'),
+  list:       ()                         => api.get('/funds'),
   get:        (id: string)               => api.get(`/funds/${id}`),
   ledger:     (id: string)               => api.get(`/funds/${id}/ledger`),
-  create:     (data: any)                => api.post('/funds/', data),
+  create:     (data: any)                => api.post('/funds', data),
   update:     (id: string, data: any)    => api.put(`/funds/${id}`, data),
   deactivate:  (id: string)              => api.delete(`/funds/${id}`),
   reactivate:  (id: string)              => api.patch(`/funds/${id}/reactivate`),
@@ -88,10 +86,10 @@ export const capitalCallsAPI = {
     const p = new URLSearchParams();
     if (fundId) p.append('fund_id', fundId);
     if (status) p.append('status', status);
-    return api.get(`/capital-calls/?${p}`);
+    return api.get(`/capital-calls?${p}`);
   },
   get:      (id: string)  => api.get(`/capital-calls/${id}`),
-  create:   (data: any)   => api.post('/capital-calls/', data),
+  create:   (data: any)   => api.post('/capital-calls', data),
   approve:  (id: string)  => api.patch(`/capital-calls/${id}/approve`),
   markPaid: (id: string, data?: any) => api.patch(`/capital-calls/${id}/mark-paid`, data),
 };
@@ -100,19 +98,19 @@ export const capitalCallsAPI = {
 export const distributionsAPI = {
   list:   (fundId?: string) => {
     const p = fundId ? `?fund_id=${fundId}` : '';
-    return api.get(`/distributions/${p}`);
+    return api.get(`/distributions${p}`);
   },
-  create: (data: any)   => api.post('/distributions/', data),
+  create: (data: any)   => api.post('/distributions', data),
   delete: (id: string)  => api.delete(`/distributions/${id}`),
 };
 
 // ── FX Rates ─────────────────────────────────────────────────────────────────
 export const fxRatesAPI = {
-  list:       ()                                    => api.get('/fx-rates/'),
+  list:       ()                                    => api.get('/fx-rates'),
   latest:     ()                                    => api.get('/fx-rates/latest'),
   live:       ()                                    => api.get('/fx-rates/live'),
   history:    (days?: number)                       => api.get(`/fx-rates/history${days ? `?days=${days}` : ''}`),
-  create:     (data: any)                           => api.post('/fx-rates/', data),
+  create:     (data: any)                           => api.post('/fx-rates', data),
   cross:      (from: string, to: string)            => api.get(`/fx-rates/cross?from=${from}&to=${to}`),
   historical: (date: string, from: string, to: string) => api.get(`/fx-rates/historical?date=${date}&from=${from}&to=${to}`),
   monthly:    (year?: number)                          => api.get(`/fx-rates/monthly${year ? `?year=${year}` : ''}`),
@@ -120,9 +118,9 @@ export const fxRatesAPI = {
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const usersAPI = {
-  list:         ()                      => api.get('/users/'),
+  list:         ()                      => api.get('/users'),
   pendingCount: ()                      => api.get('/users/pending-count'),
-  create:       (data: any)             => api.post('/users/', data),
+  create:       (data: any)             => api.post('/users', data),
   approve:      (id: string, role?: string) => api.post(`/users/${id}/approve`, null, {
     params: role ? { role } : {},
   }),
@@ -146,7 +144,7 @@ export const noticesAPI = {
     if (params?.notice_type) p.append('notice_type', params.notice_type);
     if (params?.status)      p.append('status',      params.status);
     if (params?.fund_id)     p.append('fund_id',     params.fund_id);
-    return api.get(`/notices/?${p}`);
+    return api.get(`/notices?${p}`);
   },
   pendingCount:    ()                        => api.get('/notices/pending-count'),
   get:             (id: string)              => api.get(`/notices/${id}`),
@@ -211,18 +209,17 @@ export const rulesAPI = {
 
 // ── Fund PDF — generic upload + per-fund analysis ────────────────────────────
 export const fundPdfAPI = {
-  registered:   ()                => api.get('/fund-pdf/registered'),
-  analysis:     (fundCode: string)=> api.get(`/fund-pdf/${fundCode}/analysis`),
+  registered:   ()                => api.get('/fund-reports'),
   upload:       (file: File)      => {
     const form = new FormData();
     form.append('file', file);
-    return api.post('/fund-pdf/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return api.post('/fund-reports/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
 };
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 export const notificationsAPI = {
-  list:    (unreadOnly?: boolean) => api.get(`/notifications/${unreadOnly ? '?unread=true' : ''}`),
+  list:    (unreadOnly?: boolean) => api.get(unreadOnly ? '/notifications?unread=true' : '/notifications'),
   markRead:(id: string)           => api.patch(`/notifications/${id}/read`),
   markAll: ()                     => api.patch('/notifications/read-all'),
 };

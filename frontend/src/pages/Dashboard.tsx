@@ -6,7 +6,12 @@ import type { DashboardData, FundSummary } from '../types/index';
 import { fmt } from '../lib/format';
 import toast from 'react-hot-toast';
 
-const REFRESH_MS = 30_000;
+const SUMMARY_REFRESH_MS = 60_000;   // dashboard summary + fx — 1 min
+const SIGF_REFRESH_MS    = 5 * 60_000; // fund PDFs — 5 min (changes only on upload)
+
+// Prevents concurrent FX auto-saves when StrictMode double-invokes mount effects.
+// Stays true after a successful save; next poll finds today's rate via /fx-rates/latest anyway.
+let _fxAutoSaveGuard = false;
 
 const C = {
   indigo:    '#4f46e5', indigoBg:  'rgba(79,70,229,0.08)',  indigoBdr: 'rgba(79,70,229,0.2)',
@@ -75,6 +80,7 @@ function FundRow({ fund }: { fund: FundSummary }) {
 
 /* ── sigf.ts analysis panel ──────────────────────────────────────────────── */
 function SigfPanel({ sigfData }: { sigfData: any }) {
+  if (!sigfData?.totals) return null;
   const t = sigfData.totals;
   const calls: any[] = sigfData.calls ?? [];
   const commitment: number = sigfData.commitment ?? 0;
@@ -253,14 +259,17 @@ export default function Dashboard() {
         setLatestDate(savedDate);
       } else if (jstHour >= 11) {
         // After 11:00 JST and today's rate missing — auto-fetch and save
-        try {
-          const live = await fxRatesAPI.historical(todayJst, 'USD', 'JPY');
-          if (live.data?.usd_jpy) {
-            await fxRatesAPI.create({ rate_date: todayJst, usd_jpy: live.data.usd_jpy, source: 'murc_ttm' });
-            setLatestSaved(live.data.usd_jpy);
-            setLatestDate(todayJst);
-          }
-        } catch { /* non-fatal — keep showing last saved rate */ }
+        if (!_fxAutoSaveGuard) {
+          _fxAutoSaveGuard = true;
+          try {
+            const live = await fxRatesAPI.historical(todayJst, 'USD', 'JPY');
+            if (live.data?.usd_jpy) {
+              await fxRatesAPI.create({ rate_date: todayJst, usd_jpy: live.data.usd_jpy, source: 'murc_ttm' });
+              setLatestSaved(live.data.usd_jpy);
+              setLatestDate(todayJst);
+            }
+          } catch { _fxAutoSaveGuard = false; /* reset so next poll retries */ }
+        }
       } else if (fxR.data?.usd_jpy) {
         // Before 11:00 JST — show last saved rate with warning
         setLatestSaved(fxR.data.usd_jpy);
@@ -277,21 +286,39 @@ export default function Dashboard() {
   const loadSigf = useCallback(async () => {
     try {
       const reg = await fundPdfAPI.registered();
-      const codes: string[] = reg.data.map((f: any) => f.fund_code);
-      const results = await Promise.allSettled(codes.map((c: string) => fundPdfAPI.analysis(c)));
-      const merged: any[] = [];
-      results.forEach((r, i) => {
-        if (r.status === 'fulfilled') merged.push({ ...r.value.data, fund_code: codes[i] });
-      });
-      setSigfList(merged);
+      // Only accept items that contain full analysis data (totals + calls).
+      // Plain report-notice objects from /fund-reports don't have this shape.
+      const items = (reg.data ?? []).filter((d: any) => d.totals && d.calls);
+      setSigfList(items);
     } catch { /* non-fatal */ }
   }, []);
 
   useEffect(() => { loadDashboard(); loadSigf(); }, [loadDashboard, loadSigf]);
+
+  // Poll dashboard summary + FX every 60s — skip when tab is not visible
   useEffect(() => {
-    const id = setInterval(() => { loadDashboard(true); loadSigf(); }, REFRESH_MS);
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') loadDashboard(true);
+    }, SUMMARY_REFRESH_MS);
     return () => clearInterval(id);
-  }, [loadDashboard, loadSigf]);
+  }, [loadDashboard]);
+
+  // Poll fund PDFs every 5 min — they only change on upload
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') loadSigf();
+    }, SIGF_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [loadSigf]);
+
+  // Refresh immediately when tab becomes visible again after being hidden
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') loadDashboard(true);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [loadDashboard]);
 
 
   if (loading) return (
@@ -335,7 +362,7 @@ export default function Dashboard() {
           </div>
           <p className="theme-text-muted text-sm mt-0.5">
             Thirdwave Financial Inc. · {new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })}
-            {' · '}auto-refreshes every 30s
+            {' · '}auto-refreshes every 60s
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -373,7 +400,7 @@ export default function Dashboard() {
                style={{ background: C.indigoBg }}>
             <div>
               <h2 className="text-sm font-bold theme-text">{t('dashboard.fundPortfolio')}</h2>
-              <p className="text-[10px] theme-text-muted mt-0.5">{activeFunds.length} active fund{activeFunds.length!==1?'s':''} · updates every 30s</p>
+              <p className="text-[10px] theme-text-muted mt-0.5">{activeFunds.length} active fund{activeFunds.length!==1?'s':''} · updates every 60s</p>
             </div>
             <Link to="/funds" className="text-xs font-medium" style={{ color: C.indigo }}>Edit funds →</Link>
           </div>

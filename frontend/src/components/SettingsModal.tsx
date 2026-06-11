@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { usePreferences } from '../contexts/usePreferences';
 import type { Theme, Currency, DateFmt, LangCode } from '../contexts/PreferencesContext';
 import { LANGUAGES } from '../i18n';
-import { ACCENTS, SECTIONS, ACCENT_MAP, type AccentName } from '../lib/accents';
 import toast from 'react-hot-toast';
 
 interface Props { onClose: () => void }
@@ -32,28 +31,6 @@ function Chip({
     >
       {children}
     </button>
-  );
-}
-
-function Swatch({
-  accent, active, onClick,
-}: { accent: AccentName; active: boolean; onClick: () => void }) {
-  const a = ACCENT_MAP[accent];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={a.label}
-      aria-label={a.label}
-      className={`w-6 h-6 rounded-full transition-all border-2
-        ${active
-          ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-gray-800 scale-110 border-white dark:border-gray-800'
-          : 'border-transparent hover:scale-110 opacity-80 hover:opacity-100'}`}
-      style={{
-        background: `linear-gradient(135deg, ${a.base} 0%, ${a.strong} 100%)`,
-        ...(active ? { boxShadow: `0 0 0 2px ${a.base}` } : {}),
-      }}
-    />
   );
 }
 
@@ -137,41 +114,6 @@ export default function SettingsModal({ onClose }: Props) {
               </Chip>
             ))}
           </Row>
-
-          {/* ── Per-section accent colours ── */}
-          <div className="pt-4 mt-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                {t('settings.sectionColors', 'Section colours')}
-              </span>
-            </div>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-              {t('settings.sectionColorsHint', 'Pick an accent colour for each part of the app. It applies when you open that section.')}
-            </p>
-            <div className="space-y-1">
-              {SECTIONS.map(s => (
-                <div
-                  key={s.id}
-                  className="flex items-center justify-between gap-4 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0"
-                >
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2 flex-shrink-0">
-                    <span className="text-base">{s.icon}</span>
-                    {t(`section.${s.id}`, s.label)}
-                  </span>
-                  <div className="flex flex-wrap gap-1.5 justify-end">
-                    {ACCENTS.map(a => (
-                      <Swatch
-                        key={a.name}
-                        accent={a.name}
-                        active={prefs.sectionAccents[s.id] === a.name}
-                        onClick={() => prefs.setSectionAccent(s.id, a.name)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
         </div>
 

@@ -16,14 +16,7 @@ export function userDict(u: any) {
     is_active:    u.isActive,
     last_login:   u.lastLogin?.toISOString() ?? null,
     created_at:   u.createdAt?.toISOString() ?? null,
-    preferences:  u.preferences ?? null,
   }
-}
-
-/** Update only the JSON preferences blob for a user (self-service). */
-export async function updatePreferences(id: string, preferences: any) {
-  const updated = await prisma.user.update({ where: { id }, data: { preferences } })
-  return userDict(updated)
 }
 
 export async function listUsers() {
@@ -126,7 +119,6 @@ export async function updateUser(id: string, body: any) {
   if (body.full_name    !== undefined) data.fullName    = body.full_name
   if (body.full_name_jp !== undefined) data.fullNameJp  = body.full_name_jp
   if (body.role         !== undefined) data.role        = body.role
-  if (body.preferences  !== undefined) data.preferences = body.preferences
   if (body.is_active    !== undefined) {
     data.isActive = body.is_active
     data.status   = body.is_active ? 'active' : 'inactive'
