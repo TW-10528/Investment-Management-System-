@@ -1,164 +1,40 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { dashboardAPI, fxRatesAPI, fundPdfAPI } from '../services/api';
-import type { DashboardData, FundSummary } from '../types/index';
+import { dashboardAPI, fxRatesAPI } from '../services/api';
+import type { DashboardData } from '../types/index';
 import { fmt } from '../lib/format';
 import toast from 'react-hot-toast';
 
 const SUMMARY_REFRESH_MS = 60_000;   // dashboard summary + fx — 1 min
-const SIGF_REFRESH_MS    = 5 * 60_000; // fund PDFs — 5 min (changes only on upload)
 
 // Prevents concurrent FX auto-saves when StrictMode double-invokes mount effects.
 // Stays true after a successful save; next poll finds today's rate via /fx-rates/latest anyway.
 let _fxAutoSaveGuard = false;
 
+// Formal / corporate palette — deep navy primary, muted green, teal, slate
 const C = {
-  indigo:    '#4f46e5', indigoBg:  'rgba(79,70,229,0.08)',  indigoBdr: 'rgba(79,70,229,0.2)',
-  emerald:   '#10b981', emeraldBg: 'rgba(16,185,129,0.08)', emeraldBdr:'rgba(16,185,129,0.2)',
-  slate:     '#64748b', slateBg:   'rgba(100,116,139,0.06)',slateBdr:  'rgba(100,116,139,0.15)',
-  red:       '#ef4444', redBg:     'rgba(239,68,68,0.08)',  redBdr:    'rgba(239,68,68,0.2)',
-  amber:     '#d97706', amberBg:   'rgba(217,119,6,0.08)',  amberBdr:  'rgba(217,119,6,0.2)',
-  violet:    '#8b5cf6',
+  indigo:    '#1e40af', indigoBg:  'rgba(30,64,175,0.07)',  indigoBdr: 'rgba(30,64,175,0.20)',
+  emerald:   '#047857', emeraldBg: 'rgba(4,120,87,0.07)',   emeraldBdr:'rgba(4,120,87,0.20)',
+  slate:     '#475569', slateBg:   'rgba(71,85,105,0.06)',  slateBdr:  'rgba(71,85,105,0.16)',
+  red:       '#b91c1c', redBg:     'rgba(185,28,28,0.07)',  redBdr:    'rgba(185,28,28,0.20)',
+  amber:     '#b45309', amberBg:   'rgba(180,83,9,0.08)',   amberBdr:  'rgba(180,83,9,0.20)',
+  violet:    '#0f766e',
 };
 
 function usd(n: number) { return fmt.usd(n); }
 function pct(n: number) { return n.toFixed(2) + '%'; }
 
 /* ── KPI card ─────────────────────────────────────────────────────────────── */
-function KpiCard({ label, value, sub, color = C.indigo, bg = C.indigoBg, bdr = C.indigoBdr }:
-  { label:string; value:string; sub?:string; color?:string; bg?:string; bdr?:string }) {
+function KpiCard({ label, value, full, sub, color = C.indigo, bg = C.indigoBg, bdr = C.indigoBdr }:
+  { label:string; value:string; full?:string; sub?:string; color?:string; bg?:string; bdr?:string }) {
   return (
-    <div className="theme-card border rounded-xl p-4" style={{ borderColor: bdr, background: bg }}>
-      <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-1.5">{label}</p>
-      <p className="text-xl font-bold tabular-nums leading-none" style={{ color }}>{value}</p>
-      {sub && <p className="text-[10px] theme-text-muted mt-1">{sub}</p>}
-    </div>
-  );
-}
-
-/* ── Per-fund summary row ─────────────────────────────────────────────────── */
-function FundRow({ fund }: { fund: FundSummary }) {
-  const drawn = Math.min(fund.drawn_pct, 100);
-  return (
-    <tr className="theme-row-hover transition-colors">
-      <td className="px-5 py-3">
-        <Link to="/funds" className="font-semibold theme-text hover:text-indigo-400 text-sm transition-colors">
-          {fund.fund_name}
-        </Link>
-        {fund.fund_name_jp && <p className="text-[10px] theme-text-muted mt-0.5">{fund.fund_name_jp}</p>}
-      </td>
-      <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{usd(fund.commitment_usd)}</td>
-      <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>
-        {usd(fund.total_called_usd)}
-      </td>
-      <td className="px-4 py-3 text-right text-sm tabular-nums theme-text-muted">
-        {usd(fund.unfunded_usd ?? fund.commitment_usd - fund.total_called_usd)}
-      </td>
-      <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.emerald }}>
-        {usd(fund.total_received_usd)}
-      </td>
-      <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold"
-          style={{ color: (fund.net_cash_position ?? (fund.total_received_usd - fund.total_called_usd)) < 0 ? C.red : C.emerald }}>
-        {usd(fund.net_cash_position ?? (fund.total_received_usd - fund.total_called_usd))}
-      </td>
-      <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">
-        {(fund.dpi ?? 0).toFixed(3)}×
-      </td>
-      <td className="px-4 py-3 min-w-[130px]">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-card-border)' }}>
-            <div className="h-full rounded-full transition-all duration-700"
-                 style={{ width: `${drawn}%`, background: drawn >= 90 ? C.red : C.indigo }} />
-          </div>
-          <span className="text-xs tabular-nums theme-text-muted w-10 text-right">{fund.drawn_pct.toFixed(1)}%</span>
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-/* ── sigf.ts analysis panel ──────────────────────────────────────────────── */
-function SigfPanel({ sigfData }: { sigfData: any }) {
-  if (!sigfData?.totals) return null;
-  const t = sigfData.totals;
-  const calls: any[] = sigfData.calls ?? [];
-  const commitment: number = sigfData.commitment ?? 0;
-  const utilPct = commitment > 0 ? ((t.cumulative_drawn / commitment) * 100).toFixed(2) : '0.00';
-
-  return (
-    <div className="theme-card border rounded-2xl overflow-hidden">
-      {/* header */}
-      <div className="px-5 py-3 border-b theme-divider flex items-center gap-2 flex-wrap"
-           style={{ background: 'rgba(99,102,241,0.04)' }}>
-        <span className="text-[9px] font-black px-1.5 py-0.5 rounded font-mono"
-              style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
-          {sigfData.fund_code}
-        </span>
-        <p className="text-sm font-bold theme-text flex-1 truncate">{sigfData.fund_name}</p>
-        <span className="text-[9px] theme-text-muted">{calls.length} calls · sigf.ts</span>
-      </div>
-
-      {/* 4 column totals */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x theme-divider border-b theme-divider">
-        {[
-          { col:'E', label:'Cumulative Drawn',    val: fmt.usd(t.cumulative_drawn??0),              color: C.indigo },
-          { col:'F', label:'Investment Capacity', val: fmt.usd(t.investment_capacity??0),           color: C.emerald },
-          { col:'G', label:'Net Cash Flow',       val: '−'+fmt.usd(Math.abs(t.net_cash_flow??0)),  color: C.red },
-          { col:'L', label:'Non-Recallable Dist', val: fmt.usd(t.non_recallable_dist??0),           color: C.slate },
-        ].map(m => (
-          <div key={m.col} className="px-4 py-3">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-[8px] font-black px-1 py-0.5 rounded font-mono"
-                    style={{ background: 'rgba(255,255,255,0.07)', color: m.color }}>
-                col {m.col}
-              </span>
-              <p className="text-[9px] font-semibold theme-text-muted uppercase tracking-wide">{m.label}</p>
-            </div>
-            <p className="text-base font-bold tabular-nums" style={{ color: m.color }}>{m.val}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* deployment bar */}
-      <div className="px-5 py-3 border-b theme-divider">
-        <div className="flex items-center justify-between text-[10px] theme-text-muted mb-1">
-          <span>Commitment utilization · (E / {fmt.usd(commitment)}) × 100</span>
-          <span className="font-bold" style={{ color: C.indigo }}>{utilPct}%</span>
-        </div>
-        <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--color-card-border)' }}>
-          <div className="h-full rounded-full transition-all duration-700"
-               style={{ width: `${utilPct}%`, background: C.indigo }} />
-        </div>
-      </div>
-
-      {/* per-call table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead style={{ background: 'var(--color-header-bg)' }}>
-            <tr className="border-b theme-divider">
-              {['#','Due Date','Call %','Paid (B)','E — Cum. Drawn','F — Inv. Capacity','G — Net CF','L — NR Dist','Cumul %'].map(h => (
-                <th key={h} className={`px-4 py-2 text-[9px] font-semibold theme-text-muted uppercase tracking-wide ${h==='#'?'text-left':'text-right'}`}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y theme-divider">
-            {calls.map((cc: any) => (
-              <tr key={cc.call_number} className="theme-row-hover">
-                <td className="px-4 py-2.5 font-bold theme-text">#{cc.call_number}</td>
-                <td className="px-4 py-2.5 text-right theme-text-muted">{cc.due_date}</td>
-                <td className="px-4 py-2.5 text-right theme-text">{cc.call_pct?.toFixed(2)}%</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.red }}>{fmt.usd(cc.paid??0)}</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.indigo }}>{fmt.usd(cc.cumulative_drawn??0)}</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.emerald }}>{fmt.usd(cc.investment_capacity??0)}</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.red }}>−{fmt.usd(Math.abs(cc.net_cash_flow??0))}</td>
-                <td className="px-4 py-2.5 text-right theme-text-muted">{fmt.usd(cc.non_recallable_dist??0)}</td>
-                <td className="px-4 py-2.5 text-right theme-text-muted">{cc.cumulative_pct?.toFixed(2)}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="theme-card border rounded-xl p-5" style={{ borderColor: bdr, background: bg }}
+         title={full ? `${label}: ${full}` : undefined}>
+      <p className="text-[10px] font-bold uppercase tracking-widest theme-text-muted mb-2">{label}</p>
+      <p className="text-2xl font-bold tabular-nums leading-none" style={{ color }}>{value}</p>
+      {full && <p className="text-xs font-semibold tabular-nums theme-text mt-1.5">{full}</p>}
+      {sub && <p className="text-[11px] theme-text-muted mt-1">{sub}</p>}
     </div>
   );
 }
@@ -232,7 +108,6 @@ function OverdueAlert({ calls }: { calls: DashboardData['overdue_calls'] }) {
 export default function Dashboard() {
   const { t } = useTranslation();
   const [data,        setData]        = useState<DashboardData | null>(null);
-  const [sigfList,    setSigfList]    = useState<any[]>([]);
   const [latestSaved, setLatestSaved] = useState<number | null>(null);
   const [latestDate,  setLatestDate]  = useState<string | null>(null);
   const [loading,     setLoading]     = useState(true);
@@ -268,7 +143,7 @@ export default function Dashboard() {
               setLatestSaved(live.data.usd_jpy);
               setLatestDate(todayJst);
             }
-          } catch { _fxAutoSaveGuard = false; /* reset so next poll retries */ }
+          } catch { /* leave guard set — don't re-hit MURC every 60s poll when today's rate isn't published yet (or it's a non-trading/future date). Picked up on next page load. */ }
         }
       } else if (fxR.data?.usd_jpy) {
         // Before 11:00 JST — show last saved rate with warning
@@ -283,17 +158,7 @@ export default function Dashboard() {
     }
   }, []);
 
-  const loadSigf = useCallback(async () => {
-    try {
-      const reg = await fundPdfAPI.registered();
-      // Only accept items that contain full analysis data (totals + calls).
-      // Plain report-notice objects from /fund-reports don't have this shape.
-      const items = (reg.data ?? []).filter((d: any) => d.totals && d.calls);
-      setSigfList(items);
-    } catch { /* non-fatal */ }
-  }, []);
-
-  useEffect(() => { loadDashboard(); loadSigf(); }, [loadDashboard, loadSigf]);
+  useEffect(() => { loadDashboard(); }, [loadDashboard]);
 
   // Poll dashboard summary + FX every 60s — skip when tab is not visible
   useEffect(() => {
@@ -302,14 +167,6 @@ export default function Dashboard() {
     }, SUMMARY_REFRESH_MS);
     return () => clearInterval(id);
   }, [loadDashboard]);
-
-  // Poll fund PDFs every 5 min — they only change on upload
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (document.visibilityState === 'visible') loadSigf();
-    }, SIGF_REFRESH_MS);
-    return () => clearInterval(id);
-  }, [loadSigf]);
 
   // Refresh immediately when tab becomes visible again after being hidden
   useEffect(() => {
@@ -366,7 +223,7 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => { loadDashboard(true); loadSigf(); }} disabled={refreshing}
+          <button onClick={() => loadDashboard(true)} disabled={refreshing}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border theme-divider theme-text-muted hover:theme-text transition-colors disabled:opacity-40">
             🔄 Refresh
           </button>
@@ -381,84 +238,81 @@ export default function Dashboard() {
       {/* ── Overdue alert ── */}
       <OverdueAlert calls={data.overdue_calls ?? []} />
 
-      {/* ── Portfolio KPIs ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <KpiCard label={t('dashboard.activeFunds')}      value={String(data.total_funds)}            sub={t('dashboard.underManagement')} />
-        <KpiCard label={t('dashboard.totalCommitment')}  value={usd(data.total_commitment_usd)}      sub={t('dashboard.grossCommitment')} />
-        <KpiCard label={t('dashboard.paidIn')}           value={usd(data.total_called_usd)}          sub={pct(data.drawn_pct) + ' ' + t('dashboard.drawn')} />
-        <KpiCard label={t('dashboard.dryPowder')}        value={usd(data.dry_powder_usd)}            sub={pct(100 - data.drawn_pct) + ' ' + t('dashboard.available')} color={C.slate} bg={C.slateBg} bdr={C.slateBdr} />
-        <KpiCard label={t('dashboard.totalDistributed')} value={usd(data.total_received_usd)}        sub={`DPI ${data.dpi.toFixed(3)}×`} color={C.emerald} bg={C.emeraldBg} bdr={C.emeraldBdr} />
+      {/* ── Headline portfolio values (main overall only) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <KpiCard label="Total Value"        value={fmt.usdAbbr(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))}
+                 full={fmt.usdFull(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))}
+                 sub="Distributions + NAV" color={C.indigo} />
+        <KpiCard label="Total Commitments"  value={fmt.usdAbbr(data.total_commitment_usd)}
+                 full={fmt.usdFull(data.total_commitment_usd)}
+                 sub={`${data.total_funds} funds · ${pct(data.drawn_pct)} drawn`} />
+        <KpiCard label="Net IRR"            value={data.irr != null ? `${data.irr.toFixed(1)}%` : '—'}
+                 sub="since inception"
+                 color={(data.irr ?? 0) < 0 ? C.red : C.emerald}
+                 bg={(data.irr ?? 0) < 0 ? C.redBg : C.emeraldBg}
+                 bdr={(data.irr ?? 0) < 0 ? C.redBdr : C.emeraldBdr} />
       </div>
 
       {/* ── FX Rate ── */}
       <FxWidget latestSaved={latestSaved} latestDate={latestDate} />
 
-      {/* ── Per-fund table ── */}
+      {/* ── Funds — compact table, essential columns only ── */}
       {activeFunds.length > 0 && (
         <div className="theme-card border rounded-2xl overflow-hidden">
           <div className="px-5 py-3 border-b theme-divider flex items-center justify-between"
                style={{ background: C.indigoBg }}>
-            <div>
-              <h2 className="text-sm font-bold theme-text">{t('dashboard.fundPortfolio')}</h2>
-              <p className="text-[10px] theme-text-muted mt-0.5">{activeFunds.length} active fund{activeFunds.length!==1?'s':''} · updates every 60s</p>
-            </div>
-            <Link to="/funds" className="text-xs font-medium" style={{ color: C.indigo }}>Edit funds →</Link>
+            <h2 className="text-sm font-bold theme-text">Funds <span className="theme-text-muted font-medium">· {activeFunds.length}</span></h2>
+            <Link to="/funds" className="text-xs font-semibold" style={{ color: C.indigo }}>Manage Funds →</Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b theme-divider" style={{ background: 'var(--color-header-bg)' }}>
                 <tr>
                   {[
-                    { key: 'fund',        label: t('common.fund'),                   left: true,  wide: false },
-                    { key: 'commitment',  label: t('dashboard.commitment'),           left: false, wide: false },
-                    { key: 'paidIn',      label: t('dashboard.paidIn'),              left: false, wide: false },
-                    { key: 'dryPowder',   label: t('dashboard.dryPowder'),           left: false, wide: false },
-                    { key: 'distributed', label: t('dashboard.totalDistributed'),    left: false, wide: false },
-                    { key: 'netCash',     label: 'Net Cash',                         left: false, wide: false },
-                    { key: 'dpi',         label: 'DPI',                              left: false, wide: false },
-                    { key: 'drawn',       label: t('dashboard.drawn'),               left: false, wide: true  },
+                    { label: 'Fund',          left: true  },
+                    { label: 'Commitment',    left: false },
+                    { label: 'Contributions', left: false },
+                    { label: 'Distributions', left: false },
+                    { label: 'NAV',           left: false },
+                    { label: 'Total Value',   left: false },
                   ].map(h => (
-                    <th key={h.key} className={`px-${h.left?5:4} py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide ${h.left?'text-left':'text-right'} ${h.wide?'min-w-[140px]':''}`}>{h.label}</th>
+                    <th key={h.label} className={`px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h.left ? 'text-left pl-5' : 'text-right'}`}>{h.label}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y theme-divider">
-                {activeFunds.map(f => <FundRow key={f.fund_id} fund={f} />)}
+                {activeFunds.map(f => {
+                  const navUsd   = f.nav_usd ?? 0;
+                  const valueUsd = f.total_value_usd ?? (f.total_received_usd + navUsd);
+                  return (
+                    <tr key={f.fund_id} className="theme-row-hover transition-colors">
+                      <td className="px-5 py-3">
+                        <Link to="/funds" className="font-semibold theme-text hover:text-indigo-600 text-sm transition-colors">{f.fund_name}</Link>
+                        {f.fund_name_jp && <p className="text-[10px] theme-text-muted mt-0.5">{f.fund_name_jp}</p>}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums theme-text" title={fmt.usdFull(f.commitment_usd)}>{fmt.usdAbbr(f.commitment_usd)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.indigo }}  title={fmt.usdFull(f.total_called_usd)}>{fmt.usdAbbr(f.total_called_usd)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.emerald }} title={fmt.usdFull(f.total_received_usd)}>{fmt.usdAbbr(f.total_received_usd)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums" style={{ color: C.violet }} title={fmt.usdFull(navUsd)}>{fmt.usdAbbr(navUsd)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold theme-text" title={fmt.usdFull(valueUsd)}>{fmt.usdAbbr(valueUsd)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot className="border-t theme-divider" style={{ background: 'rgba(99,102,241,0.03)' }}>
                 <tr>
-                  <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">{t('dashboard.portfolioTotal')}</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{usd(data.total_commitment_usd)}</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{usd(data.total_called_usd)}</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold theme-text-muted">{usd(data.dry_powder_usd)}</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.emerald }}>{usd(data.total_received_usd)}</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold"
-                      style={{ color: (data.total_received_usd - data.total_called_usd) < 0 ? C.red : C.emerald }}>
-                    {usd(data.total_received_usd - data.total_called_usd)}
-                  </td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{data.dpi.toFixed(3)}×</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{pct(data.drawn_pct)}</td>
+                  <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">Total</td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold theme-text" title={fmt.usdFull(data.total_commitment_usd)}>{fmt.usdAbbr(data.total_commitment_usd)}</td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}  title={fmt.usdFull(data.total_called_usd)}>{fmt.usdAbbr(data.total_called_usd)}</td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.emerald }} title={fmt.usdFull(data.total_received_usd)}>{fmt.usdAbbr(data.total_received_usd)}</td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }} title={fmt.usdFull(data.total_nav_usd)}>{fmt.usdAbbr(data.total_nav_usd)}</td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold theme-text" title={fmt.usdFull(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))}>{fmt.usdAbbr(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
         </div>
       )}
-
-      {/* ── sigf.ts analysis — one panel per registered fund ── */}
-      {sigfList.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold theme-text">sigf.ts Fund Analysis</h2>
-            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8', border:'1px solid rgba(99,102,241,0.25)' }}>
-              PDF-sourced · auto-updates
-            </span>
-          </div>
-          {sigfList.map((sd: any) => <SigfPanel key={sd.fund_code} sigfData={sd} />)}
-        </div>
-      )}
-
 
     </div>
   );

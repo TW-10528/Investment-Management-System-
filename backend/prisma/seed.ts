@@ -34,39 +34,21 @@ async function main() {
   console.log('  ✔ Cleared existing data')
 
   // ── Users ─────────────────────────────────────────────────────────────────
+  // Only the admin is seeded. Up to 5 users total — the rest self-register.
   const adminPw = bcrypt.hashSync('Admin123!', 12)
-  const staffPw = bcrypt.hashSync('Staff123!', 12)
 
-  await prisma.user.createMany({
-    data: [
-      {
-        email:          'admin@thirdwave.co.jp',
-        fullName:       'Admin User',
-        fullNameJp:     '管理者',
-        hashedPassword: adminPw,
-        role:           'admin',
-        status:         'active',
-        isActive:       true,
-      },
-      {
-        email:          'finance@thirdwave.co.jp',
-        fullName:       'Leena Saravanan',
-        hashedPassword: staffPw,
-        role:           'finance_manager',
-        status:         'active',
-        isActive:       true,
-      },
-      {
-        email:          'board@thirdwave.co.jp',
-        fullName:       'Kenji Tanaka',
-        hashedPassword: staffPw,
-        role:           'board_member',
-        status:         'active',
-        isActive:       true,
-      },
-    ],
+  await prisma.user.create({
+    data: {
+      email:          'admin@thirdwave.co.jp',
+      fullName:       'Admin User',
+      fullNameJp:     '管理者',
+      hashedPassword: adminPw,
+      role:           'admin',
+      status:         'active',
+      isActive:       true,
+    },
   })
-  console.log('  ✔ Users created (3)')
+  console.log('  ✔ Admin user created')
 
   // ── FX Rates (historical + 2026 rates covering capital call dates) ─────────
   await prisma.fxRate.createMany({
@@ -235,8 +217,7 @@ async function main() {
   console.log('   (ledger empty — upload PDFs via UI to populate)')
   console.log('\n   Credentials:')
   console.log('   Admin:   admin@thirdwave.co.jp  /  Admin123!')
-  console.log('   Finance: finance@thirdwave.co.jp /  Staff123!')
-  console.log('   Board:   board@thirdwave.co.jp  /  Staff123!')
+  console.log('   (other users self-register — max 5 active)')
 }
 
 main()

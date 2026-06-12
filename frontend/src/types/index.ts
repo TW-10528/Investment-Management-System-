@@ -21,6 +21,11 @@ export interface FundSummary {
   net_cash_position: number;
   total_received_usd: number;
   total_received_jpy?: number;
+  nav_usd?: number;
+  total_value_usd?: number;
+  moic?: number;
+  tvpi?: number;
+  irr?: number | null;
   dpi: number;
   is_active?: boolean;
 }
@@ -129,7 +134,10 @@ export interface DashboardData {
   // Performance multiples
   dpi: number;
   tvpi: number;
+  moic?: number;
+  irr?: number | null;
   total_nav_usd: number;
+  total_value_usd?: number;
   pending_calls_count: number;
   overdue_calls_count: number;
   overdue_calls: { id: string; due_date: string; net_call_usd: number }[];

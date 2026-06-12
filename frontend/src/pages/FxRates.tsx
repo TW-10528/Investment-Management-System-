@@ -11,9 +11,7 @@ import toast from 'react-hot-toast';
 
 /* ── Role helper ── */
 function useCanEdit() {
-  const raw  = localStorage.getItem('user') || '{}';
-  const user = (() => { try { return JSON.parse(raw); } catch { return {}; } })();
-  return ['admin', 'finance_manager', 'finance_staff'].includes(user.role ?? '');
+  return true;   // every signed-in user can edit (no role differentiation)
 }
 
 function isDark() {

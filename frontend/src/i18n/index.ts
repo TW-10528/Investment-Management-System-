@@ -3,14 +3,10 @@ import { initReactI18next } from 'react-i18next';
 
 import en from './locales/en.json';
 import ja from './locales/ja.json';
-import zh from './locales/zh.json';
-import tl from './locales/tl.json';
 
 export const LANGUAGES = [
   { code: 'en', label: 'English',  flag: '🇺🇸' },
   { code: 'ja', label: '日本語',    flag: '🇯🇵' },
-  { code: 'zh', label: '中文',      flag: '🇨🇳' },
-  { code: 'tl', label: 'Filipino', flag: '🇵🇭' },
 ] as const;
 
 export type LangCode = typeof LANGUAGES[number]['code'];
@@ -28,10 +24,8 @@ function detectLang(): LangCode {
 
   for (const lang of browserLangs) {
     const l = lang.toLowerCase();
-    if (l.startsWith('ja'))                         return 'ja';
-    if (l.startsWith('zh'))                         return 'zh';
-    if (l.startsWith('tl') || l.startsWith('fil')) return 'tl';
-    if (l.startsWith('en'))                         return 'en';
+    if (l.startsWith('ja')) return 'ja';
+    if (l.startsWith('en')) return 'en';
   }
   return 'en';
 }
@@ -42,8 +36,6 @@ i18n
     resources: {
       en: { translation: en },
       ja: { translation: ja },
-      zh: { translation: zh },
-      tl: { translation: tl },
     },
     lng:          detectLang(),
     fallbackLng:  'en',

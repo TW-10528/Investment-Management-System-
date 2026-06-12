@@ -124,9 +124,33 @@ export class CalculationEngine {
     return { rows, snapshot }
   }
 
+  /**
+   * Annualised IRR (XIRR) from dated cash flows via bisection on NPV.
+   * Returns a fraction (0.18 = 18%) or null when it can't be solved (needs at
+   * least one inflow and one outflow with a sign change).
+   */
+  static xirr(flows: { date: Date; amount: number }[]): number | null {
+    const valid = flows.filter(x => x.amount !== 0 && !Number.isNaN(x.amount))
+    if (valid.length < 2) return null
+    if (!valid.some(x => x.amount < 0) || !valid.some(x => x.amount > 0)) return null
+    const t0 = Math.min(...valid.map(x => x.date.getTime()))
+    const yrs = (d: Date) => (d.getTime() - t0) / (365.25 * 24 * 3600 * 1000)
+    const npv = (r: number) => valid.reduce((s, x) => s + x.amount / Math.pow(1 + r, yrs(x.date)), 0)
+    let lo = -0.9999, hi = 100
+    let flo = npv(lo), fhi = npv(hi)
+    if (flo * fhi > 0) return null                  // no sign change in range
+    for (let i = 0; i < 256; i++) {
+      const mid = (lo + hi) / 2
+      const fm  = npv(mid)
+      if (Math.abs(fm) < 1e-7 || (hi - lo) < 1e-9) return mid
+      if (flo * fm < 0) { hi = mid; fhi = fm } else { lo = mid; flo = fm }
+    }
+    return (lo + hi) / 2
+  }
+
   /** Get current fund summary (used by list and dashboard endpoints). */
   static async fundSummary(fund: any): Promise<Record<string, unknown>> {
-    const [paidCalls, distributions] = await Promise.all([
+    const [paidCalls, distributions, navRec] = await Promise.all([
       prisma.capitalCall.findMany({
         where:   { fundId: fund.id, status: { in: ['approved', 'paid'] } },
         orderBy: { executionDate: 'asc' },
@@ -135,7 +159,10 @@ export class CalculationEngine {
         where:   { fundId: fund.id },
         orderBy: { distributionDate: 'asc' },
       }),
+      prisma.navRecord.findFirst({ where: { fundId: fund.id }, orderBy: { navDate: 'desc' } }),
     ])
+    const navUsd  = navRec ? parseFloat(navRec.navUsd?.toString() ?? '0') : 0
+    const navDate = navRec ? new Date(navRec.navDate) : null
 
     const commitment = new Decimal(fund.commitmentUsd.toString())
 
@@ -176,12 +203,19 @@ export class CalculationEngine {
         commitment_usd:     c,
         total_called_usd:   0,
         total_received_usd: 0,
+        total_called_jpy:   0,
+        total_received_jpy: 0,
         drawn_pct:          0,
         unfunded_usd:       c,
         investment_capacity: c,
         net_cash_position:  0,
+        nav_usd:            navUsd,
+        total_value_usd:    navUsd,
+        moic:               0,
+        irr:                null,
         is_active:          fund.isActive,
         dpi:                0,
+        tvpi:               0,
       }
     }
 
@@ -190,6 +224,17 @@ export class CalculationEngine {
     // JPY totals (sum of each row's B×fx / C×fx) for the dashboard's per-fund view.
     const totalCalledJpy   = rows.reduce((s, r) => s.plus(r.capitalPaidJpy),     new Decimal(0))
     const totalReceivedJpy = rows.reduce((s, r) => s.plus(r.capitalReceivedJpy), new Decimal(0))
+
+    const called       = f(snapshot.totalCalledUsd)
+    const received     = f(snapshot.totalReceivedUsd)
+    const totalValue   = received + navUsd                          // Distributions + NAV
+    const moic         = called > 0 ? Math.round(totalValue / called * 10000) / 10000 : 0
+    const tvpi         = moic                                       // same metric for these funds
+    // IRR from each row's net cash flow (G), plus the residual NAV as a terminal inflow.
+    const irrFlows = rows.map(r => ({ date: r.date, amount: f(r.cashFlow) }))
+    if (navUsd > 0 && navDate) irrFlows.push({ date: navDate, amount: navUsd })
+    const irrRaw = CalculationEngine.xirr(irrFlows)
+    const irr    = irrRaw != null ? Math.round(irrRaw * 1000) / 10 : null   // % to 1 dp
 
     return {
       fund_id:             fund.id,
@@ -200,14 +245,19 @@ export class CalculationEngine {
       vintage_year:        fund.vintageYear,
       currency:            fund.currency,
       commitment_usd:      f(commitment),
-      total_called_usd:    f(snapshot.totalCalledUsd),
-      total_received_usd:  f(snapshot.totalReceivedUsd),
+      total_called_usd:    called,
+      total_received_usd:  received,
       total_called_jpy:    f(totalCalledJpy),
       total_received_jpy:  f(totalReceivedJpy),
       drawn_pct:           f(snapshot.drawnPct),
       unfunded_usd:        f(snapshot.unfundedUsd),
       investment_capacity: f(snapshot.investmentCapacity),
       net_cash_position:   f(snapshot.netCashPosition),
+      nav_usd:             navUsd,
+      total_value_usd:     totalValue,
+      moic:                moic,
+      tvpi:                tvpi,
+      irr:                 irr,
       dpi:                 f(snapshot.dpi),
       is_active:           fund.isActive,
     }

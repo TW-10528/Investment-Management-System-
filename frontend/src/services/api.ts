@@ -112,7 +112,8 @@ export const fxRatesAPI = {
   history:    (days?: number)                       => api.get(`/fx-rates/history${days ? `?days=${days}` : ''}`),
   create:     (data: any)                           => api.post('/fx-rates', data),
   cross:      (from: string, to: string)            => api.get(`/fx-rates/cross?from=${from}&to=${to}`),
-  historical: (date: string, from: string, to: string) => api.get(`/fx-rates/historical?date=${date}&from=${from}&to=${to}`),
+  historical: (date: string, from: string, to: string, fallbackLatest = false) =>
+    api.get(`/fx-rates/historical?date=${date}&from=${from}&to=${to}${fallbackLatest ? '&fallback=latest' : ''}`),
   monthly:    (year?: number)                          => api.get(`/fx-rates/monthly${year ? `?year=${year}` : ''}`),
 };
 
@@ -177,6 +178,8 @@ export const noticesAPI = {
 // ── Fund Reports (per-fund PDF upload → auto-parse → auto-calculate) ─────────
 export const fundReportsAPI = {
   list:   (fundId: string)                  => api.get('/fund-reports', { params: { fund_id: fundId } }),
+  listAll: ()                               => api.get('/fund-reports'),
+  file:   (id: string)                      => api.get(`/fund-reports/${id}/file`, { responseType: 'blob' }),
   get:    (id: string)                      => api.get(`/fund-reports/${id}`),
   upload: (fundId: string, formData: FormData, noticeType?: string, commitmentId?: string) =>
     api.post('/fund-reports/upload', formData, {

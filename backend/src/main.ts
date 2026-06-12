@@ -6,6 +6,7 @@
  * Build:  pnpm build (tsc)
  */
 
+import './lib/httpProxy'   // side-effect: route outbound fetch via corporate proxy (must be first)
 import { serve } from '@hono/node-server'
 import { createApp } from './app'
 import { config } from './config/index'

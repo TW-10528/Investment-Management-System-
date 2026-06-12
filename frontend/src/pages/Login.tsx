@@ -99,7 +99,10 @@ export default function Login() {
         name:  data.name,
       }));
       toast.success(`Welcome back, ${data.name || data.email}! 👋`);
-      navigate('/', { replace: true });
+      // Respect the user's preferred landing page
+      let landing = '/';
+      try { if (JSON.parse(localStorage.getItem('ims_prefs') || '{}').landingPage === 'funds') landing = '/funds'; } catch { /* default */ }
+      navigate(landing, { replace: true });
     } catch (err: unknown) {
       const e      = err as { response?: { data?: { detail?: string }; status?: number }; code?: string };
       const status = e.response?.status;

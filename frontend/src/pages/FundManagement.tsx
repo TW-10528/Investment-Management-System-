@@ -4,30 +4,31 @@
  * Each section has tabs: Overview · Capital Calls · Distributions · NAV · Ledger · Details · Wire
  * Everything is inline-editable. Edit/delete available for admin and finance roles.
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { fundsAPI, fxRatesAPI } from '../services/api';
+import { fundsAPI, fxRatesAPI, fundReportsAPI } from '../services/api';
 import type { FundDetail, FundSummary, LedgerRow, LedgerSnapshot } from '../types/index';
 import { fmt, strategyBg, strategyColor } from '../lib/format';
+import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AddFundWizard from '../components/AddFundWizard';
 import FundDocuments from '../components/FundDocuments';
 import FundUploadBar from '../components/FundUploadBar';
+import PortfolioOverview from '../components/PortfolioOverview';
 import toast from 'react-hot-toast';
 
-// ── Role helpers ──────────────────────────────────────────────────────────────
-function getUser() {
-  try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
-}
+// ── Edit access — every signed-in user can edit (no role differentiation) ───────
 function useCanEdit() {
-  return ['admin', 'finance_manager', 'finance_staff'].includes(getUser().role ?? '');
+  return true;
 }
 
 // ── Colours ───────────────────────────────────────────────────────────────────
+// Formal / corporate palette — deep navy primary, muted green, teal, slate
 const C = {
-  indigo:  '#4f46e5', indigoBg:  'rgba(79,70,229,0.1)',  indigoBdr:  'rgba(79,70,229,0.25)',
-  emerald: '#10b981', emeraldBg: 'rgba(16,185,129,0.1)', emeraldBdr: 'rgba(16,185,129,0.25)',
-  red:     '#ef4444', redBg:     'rgba(239,68,68,0.08)', redBdr:     'rgba(239,68,68,0.2)',
-  violet:  '#8b5cf6', amber:     '#d97706', slate:       '#64748b',
+  indigo:  '#1e40af', indigoBg:  'rgba(30,64,175,0.09)', indigoBdr:  'rgba(30,64,175,0.22)',
+  emerald: '#047857', emeraldBg: 'rgba(4,120,87,0.09)',  emeraldBdr: 'rgba(4,120,87,0.22)',
+  red:     '#b91c1c', redBg:     'rgba(185,28,28,0.08)', redBdr:     'rgba(185,28,28,0.2)',
+  violet:  '#0f766e', amber:     '#b45309', slate:       '#475569',
 };
 
 const STRATEGIES = ['Small Buyout','Buyout','Growth','Venture','Secondaries',
@@ -651,6 +652,114 @@ function shiftDate(dateStr: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
+// CASH FLOW TAB — period cash flow (G) bars + cumulative net cash (H) line + table
+// ─────────────────────────────────────────────────────────────────────────────
+function CashFlowTab({ fundId, currency }: { fundId: string; currency?: string }) {
+  const [rows, setRows] = useState<LedgerRow[]>([]);
+  const [snap, setSnap] = useState<LedgerSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const money = (n: any) =>
+    n == null ? '—'
+    : currency === 'JPY' ? '¥' + Math.round(Number(n)).toLocaleString('en-US')
+    : fmt.usd(Number(n));
+
+  useEffect(() => {
+    setLoading(true);
+    fundsAPI.ledger(fundId)
+      .then(r => { setRows(r.data.rows ?? []); setSnap(r.data.snapshot ?? null); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [fundId]);
+
+  if (loading) return <p className="px-5 py-8 text-sm theme-text-muted">Loading cash flow…</p>;
+  if (rows.length === 0) return (
+    <div className="px-5 py-12 text-center">
+      <p className="text-3xl mb-3 opacity-20">💸</p>
+      <p className="text-sm theme-text-muted">No cash flow yet — add capital calls or distributions.</p>
+    </div>
+  );
+
+  const totalOut = rows.reduce((s, r) => s + (r.capital_paid_in || 0), 0);
+  const totalIn  = rows.reduce((s, r) => s + (r.capital_received || 0), 0);
+  const net      = totalIn - totalOut;
+
+  // One point per transaction date: contributions (−B), distributions (+C), cumulative net (H).
+  const chartData = rows.map(r => ({
+    date:        fmt.date(r.date),
+    contributions: -(r.capital_paid_in || 0),
+    distributions: r.capital_received || 0,
+    cumulative:  r.net_cash_position,
+  }));
+
+  return (
+    <div className="p-5 space-y-5">
+      {/* summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Contributions (out)', val: money(totalOut),       color: C.red },
+          { label: 'Total Distributions (in)',  val: money(totalIn),        color: C.emerald },
+          { label: 'Net Cash Flow',             val: money(net),            color: net < 0 ? C.red : C.emerald },
+          { label: 'Net Cash Position (H)',     val: money(snap?.net_cash_position ?? net), color: (snap?.net_cash_position ?? net) < 0 ? C.red : C.emerald },
+        ].map(m => (
+          <div key={m.label} className="theme-card border theme-border rounded-xl p-3">
+            <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{m.label}</p>
+            <p className="text-lg font-bold tabular-nums mt-1" style={{ color: m.color }}>{m.val}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* chart */}
+      <div className="theme-card border theme-border rounded-xl p-4">
+        <p className="text-xs font-bold theme-text mb-3">Cash Flow Overview — contributions vs distributions, with cumulative net</p>
+        <div style={{ width: '100%', height: 280 }}>
+          <ResponsiveContainer>
+            <ComposedChart data={chartData} margin={{ top: 8, right: 12, bottom: 4, left: 12 }}>
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                     tickFormatter={(v: number) => (currency === 'JPY' ? '¥' : '$') + (Math.abs(v) >= 1e6 ? (v/1e6).toFixed(0)+'M' : (v/1e3).toFixed(0)+'k')} />
+              <Tooltip formatter={(v: any) => money(v)} contentStyle={{ fontSize: 12 }} />
+              <ReferenceLine y={0} stroke="var(--color-card-border)" />
+              <Bar dataKey="contributions" name="Contributions" fill={C.red} radius={[2,2,0,0]} />
+              <Bar dataKey="distributions" name="Distributions" fill={C.emerald} radius={[2,2,0,0]} />
+              <Line dataKey="cumulative" name="Cumulative net" stroke={C.indigo} strokeWidth={2} dot={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* period table (G / H) */}
+      <div className="overflow-x-auto rounded-xl border theme-border">
+        <table className="w-full text-xs">
+          <thead style={{ background: 'var(--color-header-bg)' }}>
+            <tr className="border-b theme-border text-[10px] uppercase tracking-wide theme-text-muted">
+              {['Date','Type','Contribution (B)','Distribution (C)','Cash Flow (G)','Net Position (H)'].map((h, i) => (
+                <th key={h} className={`px-3 py-2 font-semibold whitespace-nowrap ${i<2?'text-left':'text-right'}`}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y theme-border">
+            {rows.map((r, i) => (
+              <tr key={i} className="theme-row-hover">
+                <td className="px-3 py-2 theme-text-muted whitespace-nowrap">{fmt.date(r.date)}</td>
+                <td className="px-3 py-2">
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${r.tx_type==='distribution'?'text-emerald-400 border-emerald-500/25 bg-emerald-500/10':'text-indigo-400 border-indigo-500/25 bg-indigo-500/10'}`}>
+                    {r.tx_type==='distribution'?'Distribution':'Capital Call'}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums" style={{ color: r.capital_paid_in?C.red:undefined }}>{r.capital_paid_in?money(r.capital_paid_in):'—'}</td>
+                <td className="px-3 py-2 text-right tabular-nums" style={{ color: r.capital_received?C.emerald:undefined }}>{r.capital_received?money(r.capital_received):'—'}</td>
+                <td className="px-3 py-2 text-right tabular-nums" style={{ color: r.cash_flow<0?C.red:C.emerald }}>{money(r.cash_flow)}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: r.net_cash_position<0?C.red:C.emerald }}>{money(r.net_cash_position)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // LEDGER TAB — B Called / B (¥) / C Received / C (¥) adjacent columns, notes edit
 // FX column shows the MURC TTM rate for each transaction date (auto-fetched)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1139,99 +1248,9 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WIRE TAB (editable)
-// ─────────────────────────────────────────────────────────────────────────────
-function WireTab({ detail, canEdit, fundId, onSaved }: { detail:FundDetail; canEdit:boolean; fundId:string; onSaved:()=>void }) {
-  const [editing, setEditing] = useState(false);
-  const [form, setForm]       = useState<any>({});
-  const [saving, setSaving]   = useState(false);
-  const sf = (k:string, v:any) => setForm((f:any)=>({...f,[k]:v}));
-
-  function startEdit() {
-    setForm({
-      wire_bank:           detail.wire_bank??'',
-      wire_account_name:   detail.wire_account_name??'',
-      wire_account_number: detail.wire_account_number??'',
-      wire_aba:            detail.wire_aba??'',
-      wire_swift:          detail.wire_swift??'',
-      wire_reference:      detail.wire_reference??'',
-    });
-    setEditing(true);
-  }
-
-  async function save() {
-    setSaving(true);
-    try {
-      await fundsAPI.update(fundId, form);
-      toast.success('Wire instructions saved');
-      setEditing(false);
-      onSaved();
-    } catch { toast.error('Failed to save'); } finally { setSaving(false); }
-  }
-
-  const wireFields: [string, string, string][] = [
-    ['Beneficiary Bank',  'wire_bank',           detail.wire_bank??''],
-    ['Account Name',      'wire_account_name',   detail.wire_account_name??''],
-    ['Account Number',    'wire_account_number', detail.wire_account_number??''],
-    ['ABA Routing No.',   'wire_aba',            detail.wire_aba??''],
-    ['SWIFT / BIC',       'wire_swift',          detail.wire_swift??''],
-    ['Wire Reference',    'wire_reference',      detail.wire_reference??''],
-  ];
-
-  if (!editing) return (
-    <div className="p-5">
-      {canEdit && (
-        <div className="flex justify-end mb-5">
-          <button onClick={startEdit}
-            className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
-            Edit Wire Instructions
-          </button>
-        </div>
-      )}
-      {detail.wire_bank ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {wireFields.filter(([,,v])=>v).map(([label,,value])=>(
-            <div key={label} className="rounded-xl px-4 py-3 border theme-border"
-                 style={{ background:'rgba(255,255,255,0.02)' }}>
-              <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{label}</p>
-              <p className="text-sm font-mono font-medium theme-text mt-1 break-all">{value}</p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <p className="text-3xl opacity-20 mb-3">🏦</p>
-          <p className="text-sm theme-text-muted">No wire instructions on file.</p>
-          {canEdit && <p className="text-xs theme-text-muted mt-1">Click "Edit Wire Instructions" to add them.</p>}
-        </div>
-      )}
-      {detail.wire_bank && (
-        <p className="text-xs theme-text-muted mt-4 px-1">Always confirm wire instructions directly with the fund manager before wiring funds.</p>
-      )}
-    </div>
-  );
-
-  return (
-    <div className="p-5 space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {wireFields.map(([label, key])=>(
-          <Field key={key} label={label}>
-            <input className={inp} value={form[key]??''} onChange={e=>sf(key,e.target.value)} />
-          </Field>
-        ))}
-      </div>
-      <div className="flex gap-3">
-        <SaveBtn loading={saving} onClick={save} />
-        <CancelBtn onClick={() => setEditing(false)} />
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // FULL FUND SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-type TabKey = 'documents' | 'calls' | 'distributions' | 'nav' | 'ledger' | 'details' | 'wire';
+type TabKey = 'overview' | 'cashflow' | 'documents' | 'calls' | 'distributions' | 'nav' | 'ledger' | 'details';
 
 function FundSection({
   fund, detail, canEdit, onChanged,
@@ -1239,7 +1258,7 @@ function FundSection({
   fund: FundSummary; detail: FundDetail;
   canEdit: boolean; onChanged: () => void;
 }) {
-  const [tab, setTab] = useState<TabKey>('documents');
+  const [tab, setTab] = useState<TabKey>('cashflow');
   const fundId   = fund.fund_id;
   const isActive = fund.is_active !== false;
   const dotColor = strategyColor[fund.strategy??''] ?? '#6b7280';
@@ -1260,13 +1279,13 @@ function FundSection({
   }
 
   const TABS: { key: TabKey; label: string }[] = [
-    { key:'documents',     label:'Documents'      },
+    { key:'cashflow',      label:'Cash Flow'      },
+    { key:'ledger',        label:'Ledger'         },
     { key:'calls',         label:'Capital Calls'  },
     { key:'distributions', label:'Distributions'  },
     { key:'nav',           label:'NAV Records'    },
-    { key:'ledger',        label:'Ledger'         },
+    { key:'documents',     label:'Documents / Reports' },
     { key:'details',       label:'Fund Details'   },
-    { key:'wire',          label:'Wire Instructions'},
   ];
 
   return (
@@ -1353,13 +1372,13 @@ function FundSection({
           ))}
         </div>
 
+        {tab==='cashflow'      && <CashFlowTab  fundId={fundId} currency={detail.currency} />}
         {tab==='documents'     && <FundDocuments fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='calls'         && <CallsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='distributions' && <DistsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='nav'           && <NavTab      fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='ledger'        && <LedgerTab   fundId={fundId} canEdit={canEdit} />}
         {tab==='details'       && <DetailsTab  detail={detail} canEdit={canEdit} fundId={fundId} onSaved={onChanged} />}
-        {tab==='wire'          && <WireTab     detail={detail} canEdit={canEdit} fundId={fundId} onSaved={onChanged} />}
       </div>
     </div>
   );
@@ -1416,6 +1435,237 @@ function FundCard({ fund, detail, onClick }: { fund: FundSummary; detail?: FundD
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// REPORTS SECTION — per-fund folders; open a folder to see its files; click a
+// file to view the PDF in-app. Files are grouped into Capital Calls & Distributions.
+// ─────────────────────────────────────────────────────────────────────────────
+function PdfViewerModal({ doc, onClose }: { doc: any; onClose: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let revoked = false;
+    let objUrl = '';
+    fundReportsAPI.file(doc.id)
+      .then(r => { objUrl = URL.createObjectURL(r.data); if (!revoked) setUrl(objUrl); })
+      .catch(() => setError(true));
+    return () => { revoked = true; if (objUrl) URL.revokeObjectURL(objUrl); };
+  }, [doc.id]);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="theme-card border theme-border rounded-2xl shadow-2xl w-full max-w-5xl h-[88vh] flex flex-col overflow-hidden"
+           onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-3 border-b theme-border flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold theme-text truncate" title={doc.file_name}>📄 {doc.file_name}</p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {url && (
+              <a href={url} target="_blank" rel="noreferrer"
+                 className="px-3 py-1.5 rounded-lg text-xs font-medium border theme-border theme-text-muted hover:theme-text transition-colors">
+                Open in new tab ↗
+              </a>
+            )}
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-lg flex items-center justify-center theme-text-muted hover:theme-text hover:bg-black/5 transition-colors text-lg">
+              ×
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 min-h-0" style={{ background: '#525659' }}>
+          {error ? (
+            <div className="h-full flex items-center justify-center text-sm text-white/70">Could not load this PDF.</div>
+          ) : url ? (
+            <iframe src={url} title={doc.file_name} className="w-full h-full" />
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-white/30 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportFilesTile({
+  title, kind, color, bg, rows, canEdit, onView, onDelete,
+}: {
+  title: string; kind: 'call' | 'dist'; color: string; bg: string;
+  rows: any[]; canEdit: boolean; onView: (doc: any) => void; onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="theme-card border theme-border rounded-2xl overflow-hidden">
+      <div className="px-5 py-3 border-b theme-border flex items-center justify-between" style={{ background: bg }}>
+        <h3 className="text-sm font-bold theme-text">{title}</h3>
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color, background: 'rgba(255,255,255,0.5)' }}>
+          {rows.length} file{rows.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      {rows.length === 0 ? (
+        <div className="px-5 py-8 text-center">
+          <p className="text-2xl mb-1 opacity-20">📄</p>
+          <p className="text-sm theme-text-muted">No {kind === 'call' ? 'capital call' : 'distribution'} files.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead style={{ background: 'var(--color-header-bg)' }}>
+              <tr className="border-b theme-border text-xs">
+                {['File', 'Notice Date', 'Due Date', 'Amount (USD)', ''].map(h => (
+                  <th key={h} className={`px-4 py-2.5 font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h === 'File' || h === '' ? 'text-left' : 'text-right'}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y theme-border">
+              {rows.map(doc => {
+                const amount = kind === 'call' ? doc.gross_call_usd : doc.distribution_usd;
+                return (
+                  <tr key={doc.id} className="theme-row-hover cursor-pointer" onClick={() => onView(doc)}>
+                    <td className="px-4 py-3 theme-text max-w-[20rem] truncate" title={doc.file_name}>📄 {doc.file_name}</td>
+                    <td className="px-4 py-3 text-right theme-text-muted whitespace-nowrap">{doc.notice_date ?? '—'}</td>
+                    <td className="px-4 py-3 text-right theme-text-muted whitespace-nowrap">{doc.due_date ?? '—'}</td>
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color }}>{amount ? fmt.usd(Number(amount)) : '—'}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => onView(doc)}
+                        className="px-2 py-1 rounded text-xs font-medium text-indigo-600 hover:bg-indigo-500/10 transition-colors">
+                        View
+                      </button>
+                      {canEdit && (
+                        <button onClick={() => onDelete(doc.id)}
+                          className="ml-1 px-2 py-1 rounded text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors">
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReportsSection({ funds, canEdit, onChanged }:
+  { funds: FundSummary[]; canEdit: boolean; onChanged: () => void }) {
+  const [reports, setReports] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openFundId, setOpenFundId] = useState<string | null>(null);
+  const [viewerDoc, setViewerDoc] = useState<any | null>(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fundReportsAPI.listAll()
+      .then(r => setReports(r.data ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function del(id: string) {
+    if (!confirm('Delete this document? The capital call / distribution it created will also be removed and the ledger recalculated.')) return;
+    try { await fundReportsAPI.delete(id); toast.success('Document deleted — ledger updated.'); load(); onChanged(); }
+    catch (e: any) { toast.error(e?.response?.data?.detail ?? 'Failed to delete'); }
+  }
+
+  // Reports grouped by fund
+  const byFund = useMemo(() => {
+    const m: Record<string, any[]> = {};
+    reports.forEach(r => { (m[r.fund_id] ??= []).push(r); });
+    return m;
+  }, [reports]);
+
+  if (funds.length === 0) {
+    return (
+      <div className="text-center py-20 theme-text-muted">
+        <p className="text-5xl mb-4">📁</p>
+        <p className="text-base font-medium">No funds yet — add a fund to upload reports.</p>
+      </div>
+    );
+  }
+
+  const openFund = openFundId ? funds.find(f => f.fund_id === openFundId) : null;
+  const fundReports = openFundId ? (byFund[openFundId] ?? []) : [];
+  const calls = fundReports.filter(r => r.notice_type === 'capital_call' || r.notice_type === 'capital_and_distribution');
+  const dists = fundReports.filter(r => r.notice_type === 'distribution'  || r.notice_type === 'capital_and_distribution');
+
+  return (
+    <div className="space-y-5">
+      {/* Upload — pick the document type + select the fund, then drop a PDF */}
+      {canEdit && (
+        <FundUploadBar
+          funds={funds.map(f => ({ fund_id: f.fund_id, fund_name: f.fund_name }))}
+          onUploaded={() => { onChanged(); load(); }}
+        />
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : openFund ? (
+        /* ── Inside a fund folder ── */
+        <div className="space-y-4">
+          <button onClick={() => setOpenFundId(null)}
+            className="text-sm theme-text-muted hover:theme-text transition-colors">← All funds</button>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📁</span>
+            <h2 className="text-lg font-bold theme-text">{openFund.fund_name}</h2>
+            <span className="text-xs theme-text-muted">· {fundReports.length} file{fundReports.length !== 1 ? 's' : ''}</span>
+          </div>
+          <ReportFilesTile title="Capital Calls" kind="call" color={C.indigo}  bg={C.indigoBg}
+            rows={calls} canEdit={canEdit} onView={setViewerDoc} onDelete={del} />
+          <ReportFilesTile title="Distributions" kind="dist" color={C.emerald} bg={C.emeraldBg}
+            rows={dists} canEdit={canEdit} onView={setViewerDoc} onDelete={del} />
+        </div>
+      ) : (
+        /* ── Fund folders grid ── */
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {funds.map(f => {
+            const list  = byFund[f.fund_id] ?? [];
+            const nCall = list.filter(r => r.notice_type === 'capital_call' || r.notice_type === 'capital_and_distribution').length;
+            const nDist = list.filter(r => r.notice_type === 'distribution'  || r.notice_type === 'capital_and_distribution').length;
+            return (
+              <button key={f.fund_id} onClick={() => setOpenFundId(f.fund_id)}
+                className="theme-card border theme-border rounded-2xl p-5 text-left transition-colors hover:border-indigo-500/50">
+                <div className="flex items-start gap-3">
+                  <span className="text-3xl">📁</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold theme-text text-sm leading-snug truncate" title={f.fund_name}>{f.fund_name}</p>
+                    <p className="text-xs theme-text-muted mt-0.5">{list.length} file{list.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  <span className="theme-text-muted text-lg flex-shrink-0">→</span>
+                </div>
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t theme-border">
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: C.indigo,  background: C.indigoBg }}>{nCall} calls</span>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: C.emerald, background: C.emeraldBg }}>{nDist} dists</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {viewerDoc && <PdfViewerModal doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CASHFLOW SECTION — placeholder (empty for now)
+// ─────────────────────────────────────────────────────────────────────────────
+function CashflowSection() {
+  return (
+    <div className="theme-card border theme-border rounded-2xl py-24 text-center">
+      <p className="text-5xl mb-4 opacity-20">💸</p>
+      <p className="text-base font-medium theme-text">Cashflow</p>
+      <p className="text-sm theme-text-muted mt-1">Coming soon — this section is empty for now.</p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 export default function FundManagement() {
@@ -1429,6 +1679,15 @@ export default function FundManagement() {
   const [showInactive,setShowInactive]= useState(true);
   const [search,      setSearch]      = useState('');
   const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
+
+  // Section is driven by the URL (?section=…) so the left sidebar controls it
+  const [searchParams] = useSearchParams();
+  const rawSection = searchParams.get('section');
+  const section: 'manage' | 'reports' | 'cashflow' =
+    rawSection === 'reports' || rawSection === 'cashflow' ? rawSection : 'manage';
+
+  // Leaving / switching section closes any open fund detail
+  useEffect(() => { setSelectedFundId(null); }, [section]);
 
   const loadFunds = useCallback(async () => {
     setLoading(true);
@@ -1469,39 +1728,47 @@ export default function FundManagement() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          {selectedFund && (
+          {section === 'manage' && selectedFund && (
             <button onClick={() => setSelectedFundId(null)}
               className="text-sm theme-text-muted hover:theme-text transition-colors mb-1">
               {t('funds.backToAll')}
             </button>
           )}
           <h1 className="text-xl font-bold theme-text">
-            {selectedFund ? selectedFund.fund_name : t('funds.title')}
+            {section === 'manage'
+              ? (selectedFund ? selectedFund.fund_name : t('funds.title'))
+              : section === 'reports' ? 'Reports'
+              : 'Cashflow'}
           </h1>
-          {!selectedFund && (
+          {section === 'manage' && !selectedFund && (
             <p className="text-sm theme-text-muted mt-0.5">
               {activeCount} {t('dashboard.activeFunds')}
               {inactiveCount > 0 && ` · ${t('funds.showInactive', { count: inactiveCount })}`}
               {' · '}{t('funds.selectToView')}
             </p>
           )}
+          {section === 'reports' && (
+            <p className="text-sm theme-text-muted mt-0.5">Upload, edit and delete fund reports.</p>
+          )}
         </div>
-        {!selectedFund && (
-          <div className="flex items-center gap-2">
-            {inactiveCount > 0 && (
-              <button onClick={() => setShowInactive(v=>!v)}
-                className="text-sm px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text transition-colors">
-                {showInactive ? t('funds.hideInactive') : t('funds.showInactive', { count: inactiveCount })}
-              </button>
-            )}
-            {canEdit && (
-              <button onClick={() => setShowWizard(true)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
-                {t('funds.addFund')}
-              </button>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {section === 'manage' && !selectedFund && (
+            <>
+              {inactiveCount > 0 && (
+                <button onClick={() => setShowInactive(v=>!v)}
+                  className="text-sm px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text transition-colors">
+                  {showInactive ? t('funds.hideInactive') : t('funds.showInactive', { count: inactiveCount })}
+                </button>
+              )}
+              {canEdit && (
+                <button onClick={() => setShowWizard(true)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                  {t('funds.addFund')}
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* View-only banner */}
@@ -1512,7 +1779,13 @@ export default function FundManagement() {
         </div>
       )}
 
-      {selectedFund ? (
+      {section === 'reports' ? (
+        /* ── REPORTS SECTION — upload / edit / delete documents ── */
+        <ReportsSection funds={funds} canEdit={canEdit} onChanged={loadFunds} />
+      ) : section === 'cashflow' ? (
+        /* ── CASHFLOW SECTION — empty for now ── */
+        <CashflowSection />
+      ) : selectedFund ? (
         /* ── DETAIL VIEW — one fund's full sections ── */
         selectedDetail ? (
           <FundSection
@@ -1528,14 +1801,12 @@ export default function FundManagement() {
           </div>
         )
       ) : (
-        /* ── LIST VIEW — upload bar + fund name cards ── */
+        /* ── MANAGE FUNDS — overall totals + in-detail calculations + fund cards ── */
         <>
-          {canEdit && funds.length > 0 && (
-            <FundUploadBar
-              funds={funds.map(f => ({ fund_id: f.fund_id, fund_name: f.fund_name }))}
-              onUploaded={() => loadFunds()}
-            />
-          )}
+          {/* Portfolio-wide overall totals, per-fund table & analysis */}
+          <PortfolioOverview onSelectFund={setSelectedFundId} />
+
+          {/* Document upload lives in the Reports section — not here */}
 
           {/* Search */}
           <div className="relative max-w-sm">

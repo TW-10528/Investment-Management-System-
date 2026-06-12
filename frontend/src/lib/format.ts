@@ -7,6 +7,23 @@ export const fmt = {
       minimumFractionDigits: 2, maximumFractionDigits: 2,
     }).format(v),
 
+  /** Exact dollars, no cents — e.g. $1,234,567,890 */
+  usdFull: (v: number) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD', maximumFractionDigits: 0,
+    }).format(v),
+
+  /** Abbreviated, professional — e.g. $1.23B, $45.6M, $980K */
+  usdAbbr: (v: number) => {
+    const sign = v < 0 ? '−' : '';
+    const a = Math.abs(v);
+    if (a >= 1e12) return `${sign}$${(a / 1e12).toFixed(2)}T`;
+    if (a >= 1e9)  return `${sign}$${(a / 1e9).toFixed(2)}B`;
+    if (a >= 1e6)  return `${sign}$${(a / 1e6).toFixed(2)}M`;
+    if (a >= 1e3)  return `${sign}$${(a / 1e3).toFixed(1)}K`;
+    return `${sign}$${a.toFixed(0)}`;
+  },
+
   jpy: (v: number) =>
     `¥${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(v)}`,
 

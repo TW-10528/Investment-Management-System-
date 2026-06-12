@@ -394,6 +394,21 @@ router.get('/:id', async (c) => {
   return c.json({ ...reportDict(n), fund_report: fundReport })
 })
 
+// ── GET /:id/file — stream the stored PDF so it can be viewed in-app ──────────────
+router.get('/:id/file', async (c) => {
+  const n = await prisma.notice.findUnique({ where: { id: c.req.param('id') } })
+  if (!n) return c.json({ detail: 'Report not found' }, 404)
+  const filepath = path.join(config.uploadDir, n.filename)
+  if (!fs.existsSync(filepath)) return c.json({ detail: 'File not found on disk' }, 404)
+  const buf = fs.readFileSync(filepath)
+  return new Response(new Uint8Array(buf), {
+    headers: {
+      'Content-Type':        'application/pdf',
+      'Content-Disposition': `inline; filename="${encodeURIComponent(n.originalName ?? n.filename)}"`,
+    },
+  })
+})
+
 // ── POST /:id/approve ──────────────────────────────────────────────────────────
 // Creates CapitalCall or Distribution, deduplicates by due date,
 // then recalculates the full ledger via CalculationEngine and returns the snapshot.

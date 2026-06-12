@@ -69,9 +69,13 @@ async function fetchMurcUsdJpy(date: string): Promise<{ tts: number; ttb: number
     })
     if (!res.ok) return null
 
-    const html = await res.text()
+    // MURC pages are Shift-JIS; decode the bytes explicitly (res.text() defaults to
+    // UTF-8 and corrupts the markup, so the USD-row regex would never match).
+    const buf  = await res.arrayBuffer()
+    const html = new TextDecoder('shift_jis').decode(new Uint8Array(buf))
 
-    // HTML: <td class="t_center">USD</td><td class="t_right">158.01 </td><td class="t_right">156.01 </td>
+    // Row: <td>US Dollar</td><td>米ドル</td><td class="t_center">USD</td>
+    //      <td class="t_right">158.01 </td><td class="t_right">156.01 </td>
     const m = html.match(/USD<\/td>\s*<td[^>]*>([\d.]+)\s*<\/td>\s*<td[^>]*>([\d.]+)\s*<\/td>/)
     if (!m) return null
 
@@ -109,12 +113,34 @@ router.get('/historical', async (c) => {
     return c.json({ date, from, to, mufg_rate: mufgRate, usd_jpy: usdJpy, source: 'db' })
   }
 
-  // ── 2. MURC scrape ────────────────────────────────────────────────────────
+  // ── 2. MURC scrape (auto-saved to DB so we only scrape once per date) ──────
   const murc = await fetchMurcUsdJpy(date)
-  if (!murc) return c.json({ detail: 'No MUFG TTM rate found for this date (not a trading day or not yet published)' }, 404)
+  if (murc) {
+    try {
+      await prisma.fxRate.create({
+        data: { rateDate: new Date(date + 'T00:00:00Z'), usdJpy: murc.ttm, source: 'murc' },
+      })
+    } catch { /* duplicate / non-fatal */ }
+    const mufgRate = from === 'USD' ? murc.ttm : Math.round((1 / murc.ttm) * 1e8) / 1e8
+    return c.json({ date, from, to, mufg_rate: mufgRate, usd_jpy: murc.ttm, tts: murc.tts, ttb: murc.ttb, source: 'murc' })
+  }
 
-  const mufgRate = from === 'USD' ? murc.ttm : Math.round((1 / murc.ttm) * 1e8) / 1e8
-  return c.json({ date, from, to, mufg_rate: mufgRate, usd_jpy: murc.ttm, tts: murc.tts, ttb: murc.ttb, source: 'murc' })
+  // ── 3. Fallback: today's rate may not be published yet (or it's a future date).
+  // With ?fallback=latest, return the most recent stored rate instead of 404 so
+  // the dashboard/funds don't error. The lookup page omits the flag → strict 404.
+  if (c.req.query('fallback') === 'latest') {
+    const latest = await prisma.fxRate.findFirst({ orderBy: { rateDate: 'desc' } })
+    if (latest) {
+      const usdJpy   = parseFloat(latest.usdJpy.toString())
+      const mufgRate = from === 'USD' ? usdJpy : Math.round((1 / usdJpy) * 1e8) / 1e8
+      return c.json({
+        date, from, to, mufg_rate: mufgRate, usd_jpy: usdJpy, source: 'fallback_latest',
+        fallback_date: latest.rateDate.toISOString().slice(0, 10),
+      })
+    }
+  }
+
+  return c.json({ detail: 'No MUFG TTM rate found for this date (not a trading day or not yet published)' }, 404)
 })
 
 // GET /monthly?year=YYYY

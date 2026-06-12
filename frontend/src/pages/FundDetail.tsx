@@ -6,9 +6,7 @@ import { fmt, strategyBg } from '../lib/format';
 import CapitalCallEntry from '../components/CapitalCallEntry';
 
 function canEditRole() {
-  const raw  = localStorage.getItem('user') || '{}';
-  const user = (() => { try { return JSON.parse(raw); } catch { return {}; } })();
-  return ['admin', 'finance_manager', 'finance_staff'].includes(user.role ?? '');
+  return true;   // every signed-in user can edit (no role differentiation)
 }
 
 function Snap({ label, value, sub }: { label: string; value: string; sub?: string }) {

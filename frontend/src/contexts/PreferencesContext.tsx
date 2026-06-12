@@ -6,10 +6,11 @@
 import { createContext, useEffect, useState, type ReactNode } from 'react';
 import i18n from '../i18n';
 
-export type Theme      = 'light' | 'dark';
-export type Currency   = 'USD' | 'JPY';
-export type DateFmt    = 'US' | 'ISO' | 'JP';
-export type LangCode   = 'en' | 'ja' | 'zh' | 'tl';
+export type Theme       = 'light';   // dark theme removed — app is light-only
+export type Currency    = 'USD' | 'JPY';
+export type DateFmt     = 'US' | 'ISO' | 'JP';
+export type LangCode    = 'en' | 'ja';
+export type LandingPage = 'dashboard' | 'funds';
 
 interface Prefs {
   theme:          Theme;
@@ -17,15 +18,19 @@ interface Prefs {
   currency:       Currency;
   compactNumbers: boolean;
   dateFormat:     DateFmt;
+  landingPage:    LandingPage;
+  showAnalysis:   boolean;
 }
 
 interface PrefsCtx extends Prefs {
-  setTheme:          (t: Theme)      => void;
-  setLanguage:       (l: LangCode)   => void;
-  setCurrency:       (c: Currency)   => void;
-  setCompactNumbers: (v: boolean)    => void;
-  setDateFormat:     (f: DateFmt)    => void;
-  resetAll:          ()              => void;
+  setTheme:          (t: Theme)        => void;
+  setLanguage:       (l: LangCode)     => void;
+  setCurrency:       (c: Currency)     => void;
+  setCompactNumbers: (v: boolean)      => void;
+  setDateFormat:     (f: DateFmt)      => void;
+  setLandingPage:    (p: LandingPage)  => void;
+  setShowAnalysis:   (v: boolean)      => void;
+  resetAll:          ()                => void;
 }
 
 const DEFAULTS: Prefs = {
@@ -34,9 +39,11 @@ const DEFAULTS: Prefs = {
   currency:       'USD',
   compactNumbers: true,
   dateFormat:     'US',
+  landingPage:    'dashboard',
+  showAnalysis:   true,
 };
 
-const VALID_LANGS: LangCode[] = ['en', 'ja', 'zh', 'tl'];
+const VALID_LANGS: LangCode[] = ['en', 'ja'];
 
 function detectBrowserLang(): LangCode {
   const langs: readonly string[] = navigator.languages?.length
@@ -44,10 +51,8 @@ function detectBrowserLang(): LangCode {
     : [navigator.language ?? 'en'];
   for (const lang of langs) {
     const l = lang.toLowerCase();
-    if (l.startsWith('ja'))                         return 'ja';
-    if (l.startsWith('zh'))                         return 'zh';
-    if (l.startsWith('tl') || l.startsWith('fil')) return 'tl';
-    if (l.startsWith('en'))                         return 'en';
+    if (l.startsWith('ja')) return 'ja';
+    if (l.startsWith('en')) return 'en';
   }
   return 'en';
 }
@@ -58,7 +63,7 @@ function load(): Prefs {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (!VALID_LANGS.includes(parsed.language)) parsed.language = detectBrowserLang();
-      return { ...DEFAULTS, ...parsed };
+      return { ...DEFAULTS, ...parsed, theme: 'light' };   // force light — dark removed
     }
   } catch { /* ignore */ }
   // No saved prefs → auto-detect from browser
@@ -76,22 +81,17 @@ export const PrefsCtx = createContext<PrefsCtx>({} as PrefsCtx);
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<Prefs>(load);
 
-  // Apply theme class to <html>
+  // Dark theme removed — always keep the app in light mode
   useEffect(() => {
-    const html = document.documentElement;
-    if (prefs.theme === 'dark') {
-      html.classList.add('dark');
-    } else {
-      html.classList.remove('dark');
-    }
-  }, [prefs.theme]);
+    document.documentElement.classList.remove('dark');
+  }, []);
 
   // Apply language — i18n for keyed strings + Google Translate for everything else
   useEffect(() => {
     i18n.changeLanguage(prefs.language);
 
     const langMap: Record<string, string> = {
-      en: 'en', ja: 'ja', zh: 'zh-CN', ko: 'ko', tl: 'tl',
+      en: 'en', ja: 'ja',
     };
     const target = langMap[prefs.language] ?? 'en';
 
@@ -133,6 +133,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       setCurrency:       c => update({ currency: c }),
       setCompactNumbers: v => update({ compactNumbers: v }),
       setDateFormat:     f => update({ dateFormat: f }),
+      setLandingPage:    p => update({ landingPage: p }),
+      setShowAnalysis:   v => update({ showAnalysis: v }),
       resetAll:          () => { save(DEFAULTS); setPrefs({ ...DEFAULTS }); },
     }}>
       {children}

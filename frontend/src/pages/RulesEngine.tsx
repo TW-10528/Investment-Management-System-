@@ -103,9 +103,7 @@ const blankExtractor = () => ({
 /* ══════════════════════════════ MAIN PAGE ══════════════════════════════════ */
 
 export default function RulesEngine() {
-  const raw    = localStorage.getItem('user') || '{}';
-  const user   = (() => { try { return JSON.parse(raw); } catch { return {}; } })();
-  const canEdit = ['admin', 'finance_manager', 'finance_staff'].includes(user.role);
+  const canEdit = true;   // every signed-in user can edit (no role differentiation)
 
   const [rules,      setRules]      = useState<Rule[]>([]);
   const [attributes, setAttributes] = useState<Attribute[]>([]);

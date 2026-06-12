@@ -74,8 +74,22 @@ router.get('/summary', async (c) => {
     include: { fund: { select: { fundName: true } } },
   })
 
-  const tvpiNum = totalReceived + totalNavUsd
-  const tvpi    = totalCalled > 0 ? tvpiNum / totalCalled : 0
+  const totalValue = totalReceived + totalNavUsd          // Distributions + NAV
+  const tvpi    = totalCalled > 0 ? totalValue / totalCalled : 0
+  const moic    = tvpi                                    // Total Value / Contributions
+
+  // Portfolio IRR (XIRR) — every fund's net cash flow (−B+C) + residual NAV inflow.
+  const irrCalls = await prisma.capitalCall.findMany({ where: { status: { in: ['approved', 'paid'] } } })
+  const irrFlows: { date: Date; amount: number }[] = [
+    ...irrCalls.map(cc => ({
+      date:   cc.executionDate ?? cc.dueDate,
+      amount: -parseFloat(cc.grossCallUsd.toString()) + parseFloat(cc.distributionUsd.toString()),
+    })),
+    ...dists.map(d => ({ date: d.distributionDate, amount: parseFloat(d.amountUsd.toString()) })),
+    ...Object.values(navRecords).map((n: any) => ({ date: new Date(n.navDate), amount: parseFloat(n.navUsd?.toString() ?? '0') })),
+  ]
+  const portIrrRaw = CalculationEngine.xirr(irrFlows.map(x => ({ date: new Date(x.date), amount: x.amount })))
+  const portfolioIrr = portIrrRaw != null ? Math.round(portIrrRaw * 1000) / 10 : null
 
   return c.json({
     total_funds:           funds.length,
@@ -89,7 +103,10 @@ router.get('/summary', async (c) => {
 
     dpi:  totalCalled > 0 ? Math.round(totalReceived / totalCalled * 10000) / 10000 : 0,
     tvpi: Math.round(tvpi * 10000) / 10000,
-    total_nav_usd: totalNavUsd,
+    moic: Math.round(moic * 10000) / 10000,
+    total_nav_usd:   totalNavUsd,
+    total_value_usd: totalValue,
+    irr: portfolioIrr,
 
     pending_calls_count: pendingCalls.length,
     overdue_calls_count: overdueCalls.length,
