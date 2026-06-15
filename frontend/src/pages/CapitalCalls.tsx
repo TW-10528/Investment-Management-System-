@@ -111,8 +111,8 @@ function CreateCallModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b theme-border flex-shrink-0">
           <div>
-            <h2 className="font-semibold theme-text">New Capital Call</h2>
-            <p className="text-xs theme-text-muted mt-0.5">Create a new capital call record</p>
+            <h2 className="font-semibold theme-text">{t('capitalCalls.newCall')}</h2>
+            <p className="text-xs theme-text-muted mt-0.5">{t('capitalCalls.createDesc')}</p>
           </div>
           <button onClick={onClose} className="theme-text-sub hover:theme-text text-xl leading-none">×</button>
         </div>
@@ -122,17 +122,17 @@ function CreateCallModal({
 
           {/* Fund */}
           <div>
-            <label className={lCls}>Fund <span className="text-red-400">*</span></label>
+            <label className={lCls}>{t('common.fund')} <span className="text-red-400">*</span></label>
             <select value={form.fund_id} onChange={e => set('fund_id', e.target.value)} className={iCls}>
-              <option value="">Select fund…</option>
+              <option value="">{t('capitalCalls.selectFund')}</option>
               {funds.map(f => (
                 <option key={f.fund_id} value={f.fund_id}>{f.fund_name}</option>
               ))}
             </select>
             {selectedFund && (
               <p className="text-xs theme-text-muted mt-1">
-                Commitment: ${selectedFund.commitment_usd.toLocaleString()} ·
-                Unfunded: ${selectedFund.unfunded_usd.toLocaleString()}
+                Commitment: {fmt.usd(selectedFund.commitment_usd)} ·
+                Unfunded: {fmt.usd(selectedFund.unfunded_usd)}
               </p>
             )}
           </div>
@@ -140,11 +140,11 @@ function CreateCallModal({
           {/* Dates */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={lCls}>Notice Date</label>
+              <label className={lCls}>{t('capitalCalls.noticeDate')}</label>
               <input type="date" value={form.notice_date} onChange={e => set('notice_date', e.target.value)} className={iCls} />
             </div>
             <div>
-              <label className={lCls}>Due Date <span className="text-red-400">*</span></label>
+              <label className={lCls}>{t('capitalCalls.dueDate')} <span className="text-red-400">*</span></label>
               <input type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)} className={iCls} />
             </div>
           </div>
@@ -152,37 +152,37 @@ function CreateCallModal({
           {/* Gross amount */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={lCls}>Gross Call Amount (USD) <span className="text-red-400">*</span></label>
+              <label className={lCls}>{t('capitalCalls.grossCallAmt')} <span className="text-red-400">*</span></label>
               <input type="number" value={form.gross_call_usd} onChange={e => set('gross_call_usd', e.target.value)}
                 className={iCls} step="any" placeholder="e.g. 5,000,000" />
             </div>
             <div>
-              <label className={lCls}>Or: Call % of Commitment</label>
+              <label className={lCls}>{t('capitalCalls.callPctLabel')}</label>
               <input type="number" value={form.call_pct} onChange={e => set('call_pct', e.target.value)}
                 className={iCls} step="0.1" placeholder="e.g. 25" min="0" max="100" />
-              <p className="text-xs theme-text-muted mt-1">Auto-fills gross amount</p>
+              <p className="text-xs theme-text-muted mt-1">{t('capitalCalls.autoFills')}</p>
             </div>
           </div>
 
           {/* Net adjustments */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={lCls}>Distribution Offset (USD)</label>
+              <label className={lCls}>{t('capitalCalls.distOffset')}</label>
               <input type="number" value={form.distribution_usd} onChange={e => set('distribution_usd', e.target.value)}
                 className={iCls} step="any" placeholder="0" />
-              <p className="text-xs theme-text-muted mt-1">Reduces net call</p>
+              <p className="text-xs theme-text-muted mt-1">{t('capitalCalls.reducesNet')}</p>
             </div>
             <div>
-              <label className={lCls}>Reinvestable Amount (USD)</label>
+              <label className={lCls}>{t('capitalCalls.reinvestableAmt')}</label>
               <input type="number" value={form.reinvestable_usd} onChange={e => set('reinvestable_usd', e.target.value)}
                 className={iCls} step="any" placeholder="0" />
-              <p className="text-xs theme-text-muted mt-1">Adds back to net</p>
+              <p className="text-xs theme-text-muted mt-1">{t('capitalCalls.addsBack')}</p>
             </div>
           </div>
 
           {/* FX rate */}
           <div>
-            <label className={lCls}>USD / JPY Rate</label>
+            <label className={lCls}>{t('capitalCalls.usdJpyRate')}</label>
             <div className="flex gap-2">
               <input type="number" value={form.fx_rate} onChange={e => set('fx_rate', e.target.value)}
                 className={iCls} step="0.0001" placeholder="e.g. 150.0000" />
@@ -196,17 +196,16 @@ function CreateCallModal({
           {/* Notes & status */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={lCls}>Notes</label>
+              <label className={lCls}>{t('common.notes')}</label>
               <textarea value={form.notes} onChange={e => set('notes', e.target.value)}
                 rows={2} className={`${iCls} resize-none`} placeholder="Optional notes…" />
             </div>
             <div>
-              <label className={lCls}>Initial Status</label>
+              <label className={lCls}>{t('capitalCalls.initialStatus')}</label>
               <select value={form.initial_status} onChange={e => set('initial_status', e.target.value)} className={iCls}>
-                <option value="pending">Pending (new entry)</option>
-                <option value="paid">Paid (historical entry)</option>
+                <option value="pending">{t('capitalCalls.pendingNew')}</option>
+                <option value="paid">{t('capitalCalls.paidHistorical')}</option>
               </select>
-              <p className="text-xs theme-text-muted mt-1">Use "Paid" for historical data</p>
             </div>
           </div>
 
@@ -214,16 +213,16 @@ function CreateCallModal({
           {gross > 0 && (
             <div className="rounded-xl p-4 space-y-2"
               style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
-              <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide">Calculated Net Call</p>
+              <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide">{t('capitalCalls.calcNetCall')}</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs theme-text-muted">Net (USD)</p>
-                  <p className="text-lg font-bold text-indigo-300 tabular-nums">${netUSD.toLocaleString()}</p>
-                  <p className="text-[10px] theme-text-muted">= ${gross.toLocaleString()} − ${dist.toLocaleString()} + ${reinv.toLocaleString()}</p>
+                  <p className="text-xs theme-text-muted">{t('capitalCalls.netUsd')}</p>
+                  <p className="text-lg font-bold text-indigo-300 tabular-nums">{fmt.usd(netUSD)}</p>
+                  <p className="text-[10px] theme-text-muted">= {fmt.usd(gross)} − {fmt.usd(dist)} + {fmt.usd(reinv)}</p>
                 </div>
                 {netJPY > 0 && (
                   <div>
-                    <p className="text-xs theme-text-muted">Net (JPY)</p>
+                    <p className="text-xs theme-text-muted">{t('capitalCalls.netJpy')}</p>
                     <p className="text-lg font-bold text-emerald-300 tabular-nums">¥{netJPY.toLocaleString('ja-JP', { maximumFractionDigits: 0 })}</p>
                     <p className="text-[10px] theme-text-muted">@ ¥{form.fx_rate}/USD</p>
                   </div>
@@ -235,7 +234,7 @@ function CreateCallModal({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t theme-border flex justify-between items-center flex-shrink-0">
-          <p className="text-xs theme-text-muted">All amounts in USD unless stated</p>
+          <p className="text-xs theme-text-muted">{t('capitalCalls.allAmountsUsd')}</p>
           <div className="flex gap-3">
             <button onClick={onClose}
               className="px-4 py-2 text-sm theme-text-sub hover:bg-white/5 rounded-lg transition-colors">
@@ -243,7 +242,7 @@ function CreateCallModal({
             </button>
             <button onClick={handleSave} disabled={saving || !form.fund_id || !form.due_date || !form.gross_call_usd}
               className="px-5 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg disabled:opacity-50 transition-colors">
-              {saving ? 'Creating…' : 'Create Capital Call'}
+              {saving ? t('capitalCalls.creating') : t('capitalCalls.createCall')}
             </button>
           </div>
         </div>
@@ -348,7 +347,7 @@ export default function CapitalCalls() {
           {canEdit && (
             <button onClick={() => setShowCreate(true)}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
-              + New Capital Call
+              {t('capitalCalls.newButton')}
             </button>
           )}
         </div>
@@ -380,15 +379,23 @@ export default function CapitalCalls() {
 
       {/* Status tabs */}
       <div className="flex gap-1 bg-black/20 border theme-border rounded-xl p-1 w-fit flex-wrap">
-        {STATUS_TABS.map(s => (
+        {STATUS_TABS.map(s => {
+          const STATUS_LABELS: Record<string, string> = {
+            all: t('capitalCalls.statusAll'),
+            pending: t('capitalCalls.statusPending'),
+            approved: t('capitalCalls.statusApproved'),
+            paid: t('capitalCalls.statusPaid'),
+            cancelled: t('capitalCalls.statusCancelled'),
+          };
+          return (
           <button
             key={s}
             onClick={() => setTab(s)}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors ${
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               tab === s ? 'bg-indigo-600 text-white shadow-sm' : 'theme-text-sub hover:theme-text'
             }`}
           >
-            {s}
+            {STATUS_LABELS[s] ?? s}
             {counts[s] != null && counts[s] > 0 && (
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none ${
                 tab === s ? 'bg-white/20 text-white' : 'bg-white/10 theme-text-sub'
@@ -397,7 +404,8 @@ export default function CapitalCalls() {
               </span>
             )}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {/* Table */}
@@ -413,7 +421,7 @@ export default function CapitalCalls() {
             {canEdit && tab === 'all' && (
               <button onClick={() => setShowCreate(true)}
                 className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition-colors">
-                + Create First Capital Call
+                {t('capitalCalls.createFirst')}
               </button>
             )}
           </div>

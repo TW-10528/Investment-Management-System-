@@ -1,5 +1,6 @@
 {
   "nav": {
+    "navigation": "Nabigasyon",
     "dashboard": "Dashboard",
     "funds": "Mga Pondo",
     "notices": "Mga Abiso",
@@ -8,6 +9,7 @@
     "fxRates": "Palitan ng Pera",
     "investments": "Mga Pamumuhunan",
     "calculator": "Mga Kalkuladora",
+    "rulesEngine": "Rules Engine",
     "users": "Mga Gumagamit",
     "signOut": "Mag-sign out",
     "viewOnly": "Tingnan lamang"
@@ -55,7 +57,11 @@
     "usdJpy": "USD / JPY Rate",
     "liveRate": "Live na rate ng merkado",
     "stored": "Nakaimbak",
-    "noStrategyData": "Walang data ng estratehiya"
+    "noStrategyData": "Walang data ng estratehiya",
+    "underManagement": "sa pamamahala",
+    "portfolioTotal": "Kabuuan ng Portfolio",
+    "available": "magagamit",
+    "grossCommitment": "kabuuang pangako ng LP"
   },
   "notices": {
     "title": "Pagpoproseso ng Abiso",
@@ -126,6 +132,16 @@
     "totalInvested": "Kabuuang Namuhunan",
     "targets": "mga target"
   },
+  "calculator": {
+    "title": "Mga Advanced na Kalkuladora sa Pananalapi",
+    "subtitle": "IRR · DPI/TVPI · Live FX Converter · Net Call · Fee & Carry",
+    "irrTab": "IRR / NPV",
+    "fxTab": "FX Converter",
+    "multiplesTab": "DPI / TVPI",
+    "netCallTab": "Net Call",
+    "feeTab": "Fee & Carry",
+    "availableAll": "Available sa lahat ng gumagamit"
+  },
   "auth": {
     "login": "Mag-sign In",
     "email": "Email address",
@@ -164,7 +180,8 @@
     "yes": "Oo",
     "no": "Hindi",
     "error": "May naganap na error",
-    "success": "Tagumpay"
+    "success": "Tagumpay",
+    "refresh": "I-refresh"
   },
   "settings": {
     "title": "Mga Setting at Kagustuhan",
@@ -200,7 +217,19 @@
     "joined": "Sumali",
     "lastLogin": "Huling Login",
     "awaitingApproval": "naghihintay ng pag-apruba",
-    "reviewNow": "Suriin ngayon →"
+    "reviewNow": "Suriin ngayon →",
+    "addNewUser": "+ Bagong Gumagamit",
+    "addUser": "+ Idagdag ang Gumagamit",
+    "activeStatus": "Aktibo",
+    "inactiveStatus": "Hindi Aktibo",
+    "reactivate": "↺ I-reactivate",
+    "you": "Ikaw",
+    "newRegistration": "Bagong Pagpaparehistro",
+    "approveAs": "Aprubahan bilang:",
+    "accessOverview": "Pangkalahatang-ideya ng Antas ng Pag-access",
+    "pendingWord": "naghihintay",
+    "loadingUsers": "Naglo-load ng mga gumagamit…",
+    "deactivateAction": "⊘ I-deactivate"
   },
   "funds": {
     "title": "Pamamahala ng Pondo",
@@ -235,7 +264,23 @@
     "deactivateConfirm": "I-deactivate ang \"{{name}}\"? Ito ay matatago mula sa aktibong listahan.",
     "createFund": "Likhain ang Pondo",
     "updateFund": "I-update ang Pondo",
-    "viewOnly": "Tingnan lamang — makipag-ugnayan sa Finance o Admin para gumawa ng mga pagbabago"
+    "viewOnly": "Tingnan lamang — makipag-ugnayan sa Finance o Admin para gumawa ng mga pagbabago",
+    "backToAll": "← Lahat ng Pondo",
+    "selectToView": "pumili ng pondo para makita ang detalye",
+    "hideInactive": "Itago ang Hindi Aktibo",
+    "showInactive": "Ipakita ang Hindi Aktibo ({{count}})",
+    "noFundsCreate": "I-click ang + Magdagdag ng Pondo para lumikha ng iyong unang pondo.",
+    "viewOnlyMode": "Nasa mode na tingnan lamang. Mag-log in bilang Admin o Finance Manager para mag-edit."
+  },
+  "fundUpload": {
+    "title": "Mag-upload ng dokumento ng pondo",
+    "subtitle": "Pumili ng pondo, i-drop ang PDF, awtomatikong ina-parse at inilalagay sa pondo.",
+    "docTypeLabel": "1 · Uri ng dokumento",
+    "whichFund": "2 · Anong pondo?",
+    "dropPdf": "I-drop ang PDF dito o i-click para pumili",
+    "processing": "Pinoproseso…",
+    "upload": "I-upload",
+    "capitalAndDist": "Capital & Distribusyon"
   },
   "capitalCalls": {
     "title": "Tawag sa Kapital",
@@ -253,7 +298,32 @@
     "approve": "Aprubahan",
     "markPaid": "Markahan Bilang Bayad",
     "noCalls": "Walang tawag sa kapital na natagpuan para sa",
-    "viewOnly": "Tingnan lamang — makipag-ugnayan sa Finance o Admin para aprubahan o markahan bilang bayad"
+    "viewOnly": "Tingnan lamang — makipag-ugnayan sa Finance o Admin para aprubahan o markahan bilang bayad",
+    "newCall": "Bagong Tawag sa Kapital",
+    "createDesc": "Lumikha ng bagong tawag sa kapital",
+    "selectFund": "Pumili ng pondo…",
+    "grossCallAmt": "Kabuuang Halaga ng Tawag (USD)",
+    "callPctLabel": "O: % ng Pangako",
+    "autoFills": "Awtomatikong pinupuno ang kabuuan",
+    "distOffset": "Offset ng Distribusyon (USD)",
+    "reinvestableAmt": "Halaga ng Muling Pamumuhunan (USD)",
+    "reducesNet": "Nagbabawas ng net na tawag",
+    "addsBack": "Idinaragdag sa net",
+    "usdJpyRate": "Palitan ng USD / JPY",
+    "initialStatus": "Paunang Katayuan",
+    "pendingNew": "Nakabinbin (bagong entry)",
+    "paidHistorical": "Binayaran (makasaysayang entry)",
+    "calcNetCall": "Kalkuladong Net na Tawag",
+    "allAmountsUsd": "Lahat ng halaga ay USD maliban kung nabanggit",
+    "creating": "Gumagawa…",
+    "createCall": "Lumikha ng Tawag sa Kapital",
+    "newButton": "+ Bagong Tawag sa Kapital",
+    "createFirst": "+ Lumikha ng Unang Tawag sa Kapital",
+    "statusAll": "Lahat",
+    "statusPending": "Nakabinbin",
+    "statusApproved": "Naaprubahan",
+    "statusPaid": "Binayaran",
+    "statusCancelled": "Nakansela"
   },
   "distributions": {
     "title": "Distribusyon",
@@ -282,6 +352,13 @@
     "addMufg": "Magdagdag ng MUFG TTM Rate",
     "rateHistory": "Kasaysayan ng Rate (90 araw)",
     "entries": "mga entry",
+    "livePairs": "Live na Mga Rate ng Pera",
+    "historicalLookup": "Paghahanap ng Nakaraang Rate",
+    "historicalSub": "Hanapin ang MUFG TTM rate na naitala para sa isang partikular na petsa",
+    "lookupFetch": "Kunin ang Rate",
+    "lookupFetching": "Kinukuha…",
+    "lookupNearestDay": "Pinakamalapit na araw ng kalakalan",
+    "lookupNoRate": "Walang MUFG TTM rate na naitala para sa petsang ito — gamitin ang + Magdagdag ng Rate",
     "noHistory": "Walang kasaysayan ng rate na natagpuan",
     "saveRate": "I-save ang Rate",
     "saving": "Nagse-save…",
@@ -290,6 +367,11 @@
     "rateLabel": "USD/JPY Rate",
     "equalsLabel": "1 USD =",
     "sourceLabel": "Pinagmulan",
-    "viewOnly": "Tingnan lamang — makipag-ugnayan sa Admin para magdagdag ng mga rate"
+    "viewOnly": "Tingnan lamang — makipag-ugnayan sa Admin para magdagdag ng mga rate",
+    "murcWarningTitle": "Ang MUFG TTM rate ngayon ay hindi pa available",
+    "murcWarningBody": "Inilalathala ng MURC ang opisyal na rate pagkatapos ng 11:00 AM JST araw-araw. Ipinapakita ang pinakabagong nai-save na rate",
+    "fetchToday": "Kunin ang Rate Ngayon",
+    "latestRate": "Pinakabagong nai-save na rate",
+    "autoLoaded": "Awtomatikong na-load mula sa DB"
   }
 }

@@ -1,7 +1,7 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json
- 
- 
+
+
 DB_CONFIG = {
     "host": "127.0.0.1",
     "database": "investment_db",
@@ -9,12 +9,12 @@ DB_CONFIG = {
     "password": "pavi2004",
     "port": 5433,
 }
- 
- 
+
+
 def get_connection():
     return psycopg2.connect(**DB_CONFIG)
- 
- 
+
+
 def get_or_create_fund(
     fund_key: str,
     fund_name: str,
@@ -30,10 +30,10 @@ def get_or_create_fund(
                 (fund_key,),
             )
             fund = cur.fetchone()
- 
+
             if fund:
                 return fund
- 
+
             cur.execute(
                 """
                 INSERT INTO funds (
@@ -44,14 +44,14 @@ def get_or_create_fund(
                 """,
                 (fund_key, fund_name, module_name, currency, commitment_amount),
             )
- 
+
             fund = cur.fetchone()
             conn.commit()
             return fund
     finally:
         conn.close()
- 
- 
+
+
 def get_latest_previous_state(fund_id: int):
     conn = get_connection()
     try:
@@ -69,29 +69,29 @@ def get_latest_previous_state(fund_id: int):
                 """,
                 (fund_id,),
             )
- 
+
             row = cur.fetchone()
- 
+
             if not row:
                 return None
- 
+
             return {
                 "cumulative_capital_contributions": float(row["cumulative_capital_contributions"])
                 if row["cumulative_capital_contributions"] is not None else None,
- 
+
                 "remaining_commitment": float(row["remaining_commitment"])
                 if row["remaining_commitment"] is not None else None,
- 
+
                 "cumulative_cash_flow": float(row["cumulative_cash_flow"])
                 if row["cumulative_cash_flow"] is not None else None,
             }
     finally:
         conn.close()
- 
- 
+
+
 def save_investment_transaction(fund_id: int, result: dict):
     final_fields = result.get("final_excel_fields", {})
- 
+
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -105,24 +105,28 @@ def save_investment_transaction(fund_id: int, result: dict):
                     fund_name,
                     currency,
                     transaction_date,
- 
+
                     subscription_agreement_effective_date,
                     commitment_amount,
                     capital_contribution_amount,
                     distribution_amount_received,
                     reinvestable_amount,
- 
+
                     cumulative_capital_contributions,
                     remaining_commitment_formula_value,
                     remaining_commitment,
- 
+
                     current_transaction_cash_flow,
                     cumulative_cash_flow,
                     cash_flow,
- 
+
+                    return_of_capital,
+                    gain,
+                    interest,
+
                     distribution_not_allocated_to_reinvestment,
                     remarks,
- 
+
                     final_excel_fields,
                     all_extracted_fields,
                     breakdown,
@@ -132,6 +136,7 @@ def save_investment_transaction(fund_id: int, result: dict):
                 VALUES (
                     %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s,
+                    %s, %s, %s,
                     %s, %s, %s,
                     %s, %s, %s,
                     %s, %s,
@@ -147,24 +152,28 @@ def save_investment_transaction(fund_id: int, result: dict):
                     result.get("fund_name"),
                     result.get("currency"),
                     final_fields.get("transaction_date"),
- 
+
                     final_fields.get("subscription_agreement_effective_date"),
                     final_fields.get("commitment_amount"),
                     final_fields.get("capital_contribution_amount"),
                     final_fields.get("distribution_amount_received"),
                     final_fields.get("reinvestable_amount"),
- 
+
                     final_fields.get("cumulative_capital_contributions"),
                     final_fields.get("remaining_commitment_formula_value"),
                     final_fields.get("remaining_commitment"),
- 
+
                     final_fields.get("current_transaction_cash_flow"),
                     final_fields.get("cumulative_cash_flow"),
                     final_fields.get("cash_flow"),
- 
+
+                    final_fields.get("return_of_capital"),
+                    final_fields.get("gain"),
+                    final_fields.get("interest"),
+
                     final_fields.get("distribution_not_allocated_to_reinvestment"),
                     final_fields.get("remarks"),
- 
+
                     Json(final_fields),
                     Json(result.get("all_extracted_fields", {})),
                     Json(result.get("breakdown", {})),
@@ -172,14 +181,14 @@ def save_investment_transaction(fund_id: int, result: dict):
                     Json(result.get("calculation_result", {})),
                 ),
             )
- 
+
             saved = cur.fetchone()
             conn.commit()
             return saved
     finally:
         conn.close()
- 
- 
+
+
 def list_transactions(fund_key: str):
     conn = get_connection()
     try:
@@ -194,9 +203,7 @@ def list_transactions(fund_key: str):
                 """,
                 (fund_key,),
             )
- 
+
             return cur.fetchall()
     finally:
         conn.close()
- 
- 

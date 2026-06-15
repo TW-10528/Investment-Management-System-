@@ -16,7 +16,11 @@ export default {
           950: '#0d1117',
         }
       },
-      fontFamily: { sans: ["Inter", "system-ui", "sans-serif"] },
+      fontFamily: {
+        sans: ["Arial", "Helvetica", "Segoe UI", "system-ui", "sans-serif"],
+        serif: ["Arial", "Helvetica", "Segoe UI", "system-ui", "sans-serif"],
+        mono: ["Arial", "Helvetica", "Segoe UI", "system-ui", "sans-serif"],
+      },
       transitionProperty: {
         'colors': 'color, background-color, border-color, fill, stroke',
       },

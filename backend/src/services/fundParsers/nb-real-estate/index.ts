@@ -61,6 +61,9 @@ export function parseNbRealEstate(rawText: string, previousState: NbPreviousStat
     reinvestableUsd,                    // D
     managementFeeUsd: a.net_management_fee || 0,
     taxExpenseUsd:    a.tax_expense || 0,
+    returnOfCapitalUsd: f.return_of_capital ?? 0,
+    gainUsd:            f.gain ?? 0,
+    interestUsd:        f.interest ?? 0,
     commitmentUsd,
     totalCalledUsd,
     unfundedUsd,
@@ -69,6 +72,6 @@ export function parseNbRealEstate(rawText: string, previousState: NbPreviousStat
     investmentTargets: [],
     confidence,
     confidenceGrade,
-    nbReport:         report,
+    fundReport:       report,
   }
 }

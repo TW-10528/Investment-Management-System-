@@ -24,9 +24,7 @@ const TYPE_DESC: Record<string, string> = {
 
 /* ── Role helper ── */
 function useCanEdit() {
-  const raw  = localStorage.getItem('user') || '{}';
-  const user = (() => { try { return JSON.parse(raw); } catch { return {}; } })();
-  return ['admin', 'finance_manager', 'finance_staff'].includes(user.role ?? '');
+  return true;   // every signed-in user can edit (no role differentiation)
 }
 
 /* ══════════════════ Create Distribution Modal ══════════════════════════ */
@@ -209,11 +207,11 @@ function CreateDistModal({
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
                   <p className="text-[10px] theme-text-muted">Amount (USD)</p>
-                  <p className="text-base font-bold text-emerald-300 tabular-nums">${amount.toLocaleString()}</p>
+                  <p className="text-base font-bold text-emerald-300 tabular-nums">{fmt.usd(amount)}</p>
                 </div>
                 <div>
                   <p className="text-[10px] theme-text-muted">Reinvestable</p>
-                  <p className="text-base font-bold text-blue-300 tabular-nums">${reinv.toLocaleString()}</p>
+                  <p className="text-base font-bold text-blue-300 tabular-nums">{fmt.usd(reinv)}</p>
                 </div>
                 {amtJPY > 0 && (
                   <div>
@@ -376,7 +374,7 @@ export default function Distributions() {
                 : badge.includes('yellow') ? '#f59e0b'
                 : '#8b5cf6';
               return (
-                <div key={type} className="h-full rounded-sm" title={`${type}: $${val.toLocaleString()}`}
+                <div key={type} className="h-full rounded-sm" title={`${type}: ${fmt.usd(val)}`}
                   style={{ width: `${(val / totals.usd) * 100}%`, background: color }} />
               );
             })}

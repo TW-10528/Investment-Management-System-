@@ -99,14 +99,17 @@ export default function Login() {
         name:  data.name,
       }));
       toast.success(`Welcome back, ${data.name || data.email}! 👋`);
-      navigate('/', { replace: true });
+      // Respect the user's preferred landing page
+      let landing = '/';
+      try { if (JSON.parse(localStorage.getItem('ims_prefs') || '{}').landingPage === 'funds') landing = '/funds'; } catch { /* default */ }
+      navigate(landing, { replace: true });
     } catch (err: unknown) {
       const e      = err as { response?: { data?: { detail?: string }; status?: number }; code?: string };
       const status = e.response?.status;
       const detail = e.response?.data?.detail;
 
       if (!e.response && (e.code === 'ERR_NETWORK' || e.code === 'ECONNREFUSED')) {
-        setErrMsg('Cannot connect to server. Please ensure the backend is running on port 8003.');
+        setErrMsg('Cannot connect to server. Please ensure the backend is running on port 8001.');
         setErrType('warning');
       } else if (status === 403 && detail?.includes('pending')) {
         setErrMsg('Your account is awaiting administrator approval. You will be notified once approved.');

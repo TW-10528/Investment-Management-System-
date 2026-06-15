@@ -8,7 +8,7 @@ import FundManagement from './pages/FundManagement';
 import FundDetail from './pages/FundDetail';
 import FxRates from './pages/FxRates';
 import Users from './pages/Users';
-import Calculator from './pages/Calculator';
+import Notifications from './pages/Notifications';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('authToken');
@@ -43,7 +43,7 @@ export default function App() {
           <Route path="funds"      element={<FundManagement />} />
           <Route path="funds/:id"  element={<FundDetail />} />
           <Route path="fx-rates"   element={<FxRates />} />
-          <Route path="calculator" element={<Calculator />} />
+          <Route path="notifications" element={<Notifications />} />
 
           {/* Admin-only */}
           <Route

@@ -276,6 +276,7 @@ function EditableRow({
   );
 }
 
+
 /* ── Notice Detail / Review Modal ────────────────────────────────────────── */
 function NoticeDetailModal({
   notice, funds, onClose, onRefresh,
@@ -1099,7 +1100,9 @@ export default function Notices() {
 
   // Auto-poll every 30 s so newly-uploaded notices appear
   useEffect(() => {
-    const id = setInterval(() => load(true), 30_000);
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') load(true);
+    }, 30_000);
     return () => clearInterval(id);
   }, [load]);
 
@@ -1108,10 +1111,10 @@ export default function Notices() {
   const rejected = notices.filter(n => n.status === 'rejected');
 
   const TABS = [
-    { key: 'all',      label: 'All',      count: notices.length },
-    { key: 'pending',  label: 'Pending',  count: pending.length  },
-    { key: 'approved', label: 'Approved', count: approved.length },
-    { key: 'rejected', label: 'Rejected', count: rejected.length },
+    { key: 'all',      label: t('notices.all'),      count: notices.length },
+    { key: 'pending',  label: t('notices.pending'),  count: pending.length  },
+    { key: 'approved', label: t('notices.approved'), count: approved.length },
+    { key: 'rejected', label: t('notices.rejected'), count: rejected.length },
   ] as const;
 
   return (
@@ -1236,6 +1239,7 @@ export default function Notices() {
                 <th className="text-left px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide">Fund</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide">Status</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide">Confidence</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide">Review Note</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide">Uploaded</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -1265,6 +1269,33 @@ export default function Notices() {
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={n.status} /></td>
                     <td className="px-4 py-3"><ConfBadge n={n} /></td>
+                    <td className="px-4 py-3 max-w-[180px]">
+                      {n.admin_notes ? (
+                        <div className="flex items-start gap-1.5 group">
+                          <p className="text-xs theme-text truncate flex-1" title={n.admin_notes}>
+                            📝 {n.admin_notes}
+                          </p>
+                          {(canEdit() || isAdmin()) && (
+                            <button
+                              title="Delete note"
+                              onClick={async e => {
+                                e.stopPropagation();
+                                try {
+                                  await noticesAPI.deleteNote(n.id);
+                                  toast.success('Note deleted');
+                                  load(true);
+                                } catch { toast.error('Failed to delete note'); }
+                              }}
+                              className="text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-xs leading-none"
+                            >
+                              🗑
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs theme-text-muted">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 theme-text-muted text-xs">
                       {n.created_at ? fmt.date(n.created_at.slice(0, 10)) : '—'}
                     </td>

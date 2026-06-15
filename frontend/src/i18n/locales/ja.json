@@ -1,5 +1,6 @@
 {
   "nav": {
+    "navigation": "ナビゲーション",
     "dashboard": "ダッシュボード",
     "funds": "ファンド",
     "notices": "通知処理",
@@ -8,6 +9,7 @@
     "fxRates": "為替レート",
     "investments": "投資先",
     "calculator": "計算ツール",
+    "rulesEngine": "ルールエンジン",
     "users": "ユーザー管理",
     "signOut": "サインアウト",
     "viewOnly": "閲覧のみ"
@@ -65,7 +67,11 @@
     "usdJpy": "USD / JPY レート",
     "liveRate": "市場レート",
     "stored": "保存済",
-    "noStrategyData": "戦略データなし"
+    "noStrategyData": "戦略データなし",
+    "underManagement": "運用中",
+    "portfolioTotal": "ポートフォリオ合計",
+    "available": "利用可能",
+    "grossCommitment": "総コミットメント額"
   },
   "notices": {
     "title": "通知処理",
@@ -174,7 +180,8 @@
     "yes": "はい",
     "no": "いいえ",
     "error": "エラーが発生しました",
-    "success": "成功"
+    "success": "成功",
+    "refresh": "更新"
   },
   "settings": {
     "title": "設定＆カスタマイズ",
@@ -210,7 +217,19 @@
     "joined": "登録日",
     "lastLogin": "最終ログイン",
     "awaitingApproval": "件承認待ち",
-    "reviewNow": "確認する →"
+    "reviewNow": "確認する →",
+    "addNewUser": "+ 新規ユーザー追加",
+    "addUser": "+ ユーザー追加",
+    "activeStatus": "アクティブ",
+    "inactiveStatus": "非アクティブ",
+    "reactivate": "↺ 再有効化",
+    "you": "自分",
+    "newRegistration": "新規登録",
+    "approveAs": "承認する役割：",
+    "accessOverview": "アクセスレベル概要",
+    "pendingWord": "承認待ち",
+    "loadingUsers": "ユーザーを読み込み中…",
+    "deactivateAction": "⊘ 無効化"
   },
   "funds": {
     "title": "ファンド管理",
@@ -245,7 +264,23 @@
     "deactivateConfirm": "「{{name}}」を無効化しますか？アクティブリストから非表示になります。",
     "createFund": "ファンド作成",
     "updateFund": "ファンド更新",
-    "viewOnly": "閲覧モード — 変更は財務部門または管理者にお問い合わせください"
+    "viewOnly": "閲覧モード — 変更は財務部門または管理者にお問い合わせください",
+    "backToAll": "← 全ファンド",
+    "selectToView": "ファンドを選択して詳細を表示",
+    "hideInactive": "非アクティブを非表示",
+    "showInactive": "非アクティブを表示（{{count}}件）",
+    "noFundsCreate": "「+ ファンド追加」をクリックして最初のファンドを作成してください。",
+    "viewOnlyMode": "閲覧のみモードです。編集するには管理者または財務担当者としてログインしてください。"
+  },
+  "fundUpload": {
+    "title": "ファンド書類をアップロード",
+    "subtitle": "ファンドを選択してPDFをドロップすると、自動的に解析されてファンドに登録されます。",
+    "docTypeLabel": "1 · 書類の種類",
+    "whichFund": "2 · どのファンド？",
+    "dropPdf": "PDFをここにドロップまたはクリックで選択",
+    "processing": "処理中…",
+    "upload": "アップロード",
+    "capitalAndDist": "出資要請＆分配"
   },
   "capitalCalls": {
     "title": "出資要請",
@@ -263,7 +298,32 @@
     "approve": "承認",
     "markPaid": "支払済にする",
     "noCalls": "対象の出資要請なし：",
-    "viewOnly": "閲覧モード — 承認・支払い処理は財務部門または管理者にお問い合わせください"
+    "viewOnly": "閲覧モード — 承認・支払い処理は財務部門または管理者にお問い合わせください",
+    "newCall": "新規出資要請",
+    "createDesc": "新規出資要請を作成",
+    "selectFund": "ファンドを選択…",
+    "grossCallAmt": "総出資要請額（USD）",
+    "callPctLabel": "またはコミットメントの%",
+    "autoFills": "総額を自動入力",
+    "distOffset": "分配相殺（USD）",
+    "reinvestableAmt": "再投資可能額（USD）",
+    "reducesNet": "純額を減少",
+    "addsBack": "純額に加算",
+    "usdJpyRate": "USD / JPY レート",
+    "initialStatus": "初期ステータス",
+    "pendingNew": "承認待ち（新規）",
+    "paidHistorical": "支払済（過去データ）",
+    "calcNetCall": "計算済みネット出資額",
+    "allAmountsUsd": "特記なき限りUSD表示",
+    "creating": "作成中…",
+    "createCall": "出資要請を作成",
+    "newButton": "+ 新規出資要請",
+    "createFirst": "+ 最初の出資要請を作成",
+    "statusAll": "すべて",
+    "statusPending": "承認待ち",
+    "statusApproved": "承認済",
+    "statusPaid": "支払済",
+    "statusCancelled": "キャンセル"
   },
   "distributions": {
     "title": "分配",
@@ -292,6 +352,13 @@
     "addMufg": "MUFGのTTMレートを追加",
     "rateHistory": "レート履歴（90日間）",
     "entries": "件",
+    "livePairs": "ライブ通貨レート",
+    "historicalLookup": "過去レート検索",
+    "historicalSub": "指定した日付に記録されたMUFG TTMレートを検索",
+    "lookupFetch": "レートを取得",
+    "lookupFetching": "取得中…",
+    "lookupNearestDay": "最近の取引日",
+    "lookupNoRate": "この日付のMUFG TTMレートは未登録です — 「+ レート追加」で登録してください",
     "noHistory": "レート履歴なし",
     "saveRate": "保存",
     "saving": "保存中…",
@@ -300,6 +367,11 @@
     "rateLabel": "USD/JPYレート",
     "equalsLabel": "1USD =",
     "sourceLabel": "ソース",
-    "viewOnly": "閲覧モード — レートの追加は管理者にお問い合わせください"
+    "viewOnly": "閲覧モード — レートの追加は管理者にお問い合わせください",
+    "murcWarningTitle": "本日のMUFG TTMレートはまだ公表されていません",
+    "murcWarningBody": "MURCは毎日午前11時（JST）以降に公式レートを公表します。直近の保存済みレートを表示中",
+    "fetchToday": "本日のレートを取得",
+    "latestRate": "最新の保存済みレート",
+    "autoLoaded": "DBから自動読み込み"
   }
 }

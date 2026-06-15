@@ -6,6 +6,7 @@
  * onUploaded() so every fund's KPIs/ledger refresh.
  */
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fundReportsAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -16,14 +17,15 @@ interface Props {
   onUploaded: () => void;
 }
 
-const DOC_TYPES: { value: string; label: string }[] = [
-  { value: 'capital_call',             label: 'Capital Call' },
-  { value: 'distribution',             label: 'Distribution' },
-  { value: 'capital_and_distribution', label: 'Capital & Distribution' },
-  { value: 'financial_statement',      label: 'Financial Statement' },
-];
-
 export default function FundUploadBar({ funds, onUploaded }: Props) {
+  const { t } = useTranslation();
+
+  const DOC_TYPES: { value: string; label: string }[] = [
+    { value: 'capital_call',             label: t('notices.capitalCallNotice') },
+    { value: 'distribution',             label: t('notices.distributionNotice') },
+    { value: 'capital_and_distribution', label: t('fundUpload.capitalAndDist') },
+    { value: 'financial_statement',      label: t('notices.financialStatement') },
+  ];
   const [docType, setDocType]     = useState('capital_call');
   const [fundId, setFundId]       = useState('');
   const [fileName, setFileName]   = useState('');
@@ -81,16 +83,14 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   return (
     <div className="theme-card border theme-border rounded-2xl overflow-hidden">
       <div className="px-5 py-3 border-b theme-border" style={{ background: 'rgba(99,102,241,0.04)' }}>
-        <p className="text-sm font-bold theme-text">Upload a fund document</p>
-        <p className="text-xs theme-text-muted mt-0.5">
-          Pick the fund, drop its capital-call / distribution PDF, and it's parsed and filed under that fund automatically.
-        </p>
+        <p className="text-sm font-bold theme-text">{t('fundUpload.title')}</p>
+        <p className="text-xs theme-text-muted mt-0.5">{t('fundUpload.subtitle')}</p>
       </div>
 
       <div className="p-5 flex flex-col lg:flex-row gap-4 lg:items-stretch">
         {/* Step 1 — document type */}
         <div className="lg:w-52 flex-shrink-0 space-y-1">
-          <label className="text-[10px] font-bold uppercase tracking-widest theme-text-muted">1 · Document type</label>
+          <label className="text-[10px] font-bold uppercase tracking-widest theme-text-muted">{t('fundUpload.docTypeLabel')}</label>
           <select
             value={docType}
             onChange={e => setDocType(e.target.value)}
@@ -104,13 +104,13 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
 
         {/* Step 2 — fund selector */}
         <div className="lg:w-60 flex-shrink-0 space-y-1">
-          <label className="text-[10px] font-bold uppercase tracking-widest theme-text-muted">2 · Which fund?</label>
+          <label className="text-[10px] font-bold uppercase tracking-widest theme-text-muted">{t('fundUpload.whichFund')}</label>
           <select
             value={fundId}
             onChange={e => setFundId(e.target.value)}
             className="theme-input rounded-lg px-3 py-2 text-sm w-full border theme-border"
           >
-            <option value="">Select fund…</option>
+            <option value="">{t('capitalCalls.selectFund')}</option>
             {funds.map(f => (
               <option key={f.fund_id} value={f.fund_id}>{f.fund_name}</option>
             ))}
@@ -135,8 +135,8 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
               <p className="text-sm font-semibold theme-text">📄 {fileName}</p>
             ) : (
               <>
-                <p className="text-sm font-semibold theme-text">📄 Drop a PDF here or click to browse</p>
-                <p className="text-[10px] theme-text-muted mt-1">Siguler Guff, Goldman Sachs or NB Real Estate notices</p>
+                <p className="text-sm font-semibold theme-text">📄 {t('fundUpload.dropPdf')}</p>
+                <p className="text-[10px] theme-text-muted mt-1">NB Real Estate, Hamilton Lane, Dover Street, SDG, Siguler Guff, Goldman Sachs or Capula notices</p>
               </>
             )}
           </div>
@@ -147,12 +147,12 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
         <div className="flex-shrink-0 flex items-end">
           <button
             onClick={submit}
-            disabled={uploading || !fundId || !fileName}
+            disabled={uploading}
             className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed w-full lg:w-auto"
           >
             {uploading
-              ? <span className="flex items-center gap-2"><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Processing…</span>
-              : 'Upload'}
+              ? <span className="flex items-center gap-2"><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />{t('fundUpload.processing')}</span>
+              : t('fundUpload.upload')}
           </button>
         </div>
       </div>

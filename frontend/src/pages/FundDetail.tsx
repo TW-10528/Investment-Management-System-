@@ -6,9 +6,7 @@ import { fmt, strategyBg } from '../lib/format';
 import CapitalCallEntry from '../components/CapitalCallEntry';
 
 function canEditRole() {
-  const raw  = localStorage.getItem('user') || '{}';
-  const user = (() => { try { return JSON.parse(raw); } catch { return {}; } })();
-  return ['admin', 'finance_manager', 'finance_staff'].includes(user.role ?? '');
+  return true;   // every signed-in user can edit (no role differentiation)
 }
 
 function Snap({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -197,8 +195,12 @@ export default function FundDetail() {
                     <th className="text-right px-3 py-3 font-medium text-gray-500 bg-red-50">
                       <span title="H = running net cash position">H — Net Cash</span>
                     </th>
-                    <th className="text-right px-3 py-3 font-medium text-gray-500">JPY Called</th>
-                    <th className="text-right px-3 py-3 font-medium text-gray-500">JPY Received</th>
+                    <th className="text-right px-3 py-3 font-medium text-gray-500">
+                      <span title="L = C − D (distribution not allocated to reinvestment)">L — Dist Not Reinvested</span>
+                    </th>
+                    <th className="text-right px-3 py-3 font-medium text-gray-500">Return of Capital</th>
+                    <th className="text-right px-3 py-3 font-medium text-gray-500">Gain</th>
+                    <th className="text-right px-3 py-3 font-medium text-gray-500">Interest</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -239,10 +241,16 @@ export default function FundDetail() {
                           {fmt.usd(row.net_cash_position)}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono text-gray-500">
-                          {row.capital_paid_jpy ? fmt.jpy(row.capital_paid_jpy) : '—'}
+                          {row.capital_received ? fmt.usd(row.capital_received - (row.reinvestable ?? 0)) : '—'}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono text-gray-500">
-                          {row.capital_received_jpy ? fmt.jpy(row.capital_received_jpy) : '—'}
+                          {row.return_of_capital ? fmt.usd(row.return_of_capital) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-500">
+                          {row.gain ? fmt.usd(row.gain) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-500">
+                          {row.interest ? fmt.usd(row.interest) : '—'}
                         </td>
                       </tr>
                     );

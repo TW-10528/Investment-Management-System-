@@ -74,6 +74,10 @@ router.get('/:id/ledger', async (c) => {
       manualCashFlow:  cc.manualCashFlowUsd != null ? new Decimal(cc.manualCashFlowUsd.toString()) : null,
       callId:          cc.id,
       wireReference:   cc.wireReference,
+      notes:           cc.notes ?? null,
+      returnOfCapital: cc.returnOfCapitalUsd != null ? new Decimal(cc.returnOfCapitalUsd.toString()) : null,
+      gain:            cc.gainUsd != null ? new Decimal(cc.gainUsd.toString()) : null,
+      interest:        cc.interestUsd != null ? new Decimal(cc.interestUsd.toString()) : null,
     })),
     ...distributions.map((d: any) => ({
       date:            d.distributionDate,
@@ -84,6 +88,10 @@ router.get('/:id/ledger', async (c) => {
       capitalReceived: new Decimal(d.amountUsd.toString()),
       reinvestable:    new Decimal(d.reinvestableUsd.toString()),
       distId:          d.id,
+      notes:           d.notes ?? null,
+      returnOfCapital: d.returnOfCapitalUsd != null ? new Decimal(d.returnOfCapitalUsd.toString()) : null,
+      gain:            d.gainUsd != null ? new Decimal(d.gainUsd.toString()) : null,
+      interest:        d.interestUsd != null ? new Decimal(d.interestUsd.toString()) : null,
     })),
   ]
 
@@ -98,7 +106,7 @@ router.get('/:id/ledger', async (c) => {
     fund_id:    fund.id,
     fund_name:  fund.fundName,
     commitment: f(commitment),
-    rows: rows.map((r, i) => ({
+    rows: rows.map((r) => ({
       date:                r.date.toISOString().slice(0, 10),
       tx_type:             r.txType,
       description:         r.description,
@@ -112,9 +120,13 @@ router.get('/:id/ledger', async (c) => {
       net_cash_position:   f(r.netCashPosition),
       capital_paid_jpy:    f(r.capitalPaidJpy),
       capital_received_jpy:f(r.capitalReceivedJpy),
-      call_id:             (txns[i] as any)?.callId,
-      dist_id:             (txns[i] as any)?.distId,
-      wire_reference:      (txns[i] as any)?.wireReference,
+      return_of_capital:   r.returnOfCapital != null ? f(r.returnOfCapital) : 0,
+      gain:                r.gain != null ? f(r.gain) : 0,
+      interest:            r.interest != null ? f(r.interest) : 0,
+      call_id:             r.callId,
+      dist_id:             r.distId,
+      wire_reference:      r.wireReference,
+      notes:               r.notes ?? null,
     })),
     snapshot: {
       commitment_usd:      f(snapshot.commitmentUsd),
@@ -127,6 +139,156 @@ router.get('/:id/ledger', async (c) => {
       dpi:                 f(snapshot.dpi),
     },
   })
+})
+
+// ── Commitments (optional per-fund sub-grouping; used by the SDG fund) ─────────
+// Each commitment is an independent mini-fund: its own commitment amount and its
+// own capital calls / distributions, with an independent ledger (called /
+// remaining / cash flow). Calls & distributions carry an optional commitmentId.
+
+const num = (d: any) => parseFloat(d.toString())
+
+// Build a ledger + snapshot for a given commitment amount from its calls/dists.
+function buildCommitmentLedger(commitmentAmount: Decimal, paidCalls: any[], distributions: any[]) {
+  const txns = [
+    ...paidCalls.map((cc: any) => ({
+      date:            cc.executionDate ?? cc.dueDate,
+      txType:          'capital_call' as const,
+      description:     `Capital Call #${cc.callNumber}`,
+      fxRate:          cc.fxRate ? new Decimal(cc.fxRate.toString()) : null,
+      capitalPaidIn:   new Decimal(cc.grossCallUsd.toString()),
+      capitalReceived: new Decimal(cc.distributionUsd.toString()),
+      reinvestable:    new Decimal(cc.reinvestableUsd.toString()),
+      manualCashFlow:  cc.manualCashFlowUsd != null ? new Decimal(cc.manualCashFlowUsd.toString()) : null,
+      callId:          cc.id,
+      wireReference:   cc.wireReference,
+    })),
+    ...distributions.map((d: any) => ({
+      date:            d.distributionDate,
+      txType:          'distribution' as const,
+      description:     d.distType,
+      fxRate:          d.fxRate ? new Decimal(d.fxRate.toString()) : null,
+      capitalPaidIn:   new Decimal(0),
+      capitalReceived: new Decimal(d.amountUsd.toString()),
+      reinvestable:    new Decimal(d.reinvestableUsd.toString()),
+      distId:          d.id,
+    })),
+  ]
+  if (txns.length === 0) {
+    return { rows: [] as any[], snapshot: null as any }
+  }
+  const { rows, snapshot } = CalculationEngine.buildLedger(commitmentAmount, txns)
+  return {
+    rows: rows.map((r, i) => ({
+      date:                r.date.toISOString().slice(0, 10),
+      tx_type:             r.txType,
+      description:         r.description,
+      capital_paid_in:     num(r.capitalPaidIn),
+      capital_received:    num(r.capitalReceived),
+      reinvestable:        num(r.reinvestable),
+      cumulative_called:   num(r.cumulativeCalled),
+      investment_capacity: num(r.investmentCapacity),
+      cash_flow:           num(r.cashFlow),
+      net_cash_position:   num(r.netCashPosition),
+      call_id:             (txns[i] as any)?.callId,
+      dist_id:             (txns[i] as any)?.distId,
+    })),
+    snapshot: {
+      commitment_usd:      num(snapshot.commitmentUsd),
+      total_called_usd:    num(snapshot.totalCalledUsd),
+      total_received_usd:  num(snapshot.totalReceivedUsd),
+      drawn_pct:           num(snapshot.drawnPct),
+      unfunded_usd:        num(snapshot.unfundedUsd),
+      investment_capacity: num(snapshot.investmentCapacity),
+      net_cash_position:   num(snapshot.netCashPosition),
+      dpi:                 num(snapshot.dpi),
+    },
+  }
+}
+
+// GET /:id/commitments — list with per-commitment snapshot + transaction counts
+router.get('/:id/commitments', async (c) => {
+  const fundId = c.req.param('id')
+  const commitments = await prisma.commitment.findMany({
+    where: { fundId }, orderBy: { commitmentDate: 'asc' },
+  })
+  const out = await Promise.all(commitments.map(async (cm: any) => {
+    const [calls, dists] = await Promise.all([
+      prisma.capitalCall.findMany({ where: { commitmentId: cm.id, status: { in: ['approved', 'paid'] } }, orderBy: { dueDate: 'asc' } }),
+      prisma.distribution.findMany({ where: { commitmentId: cm.id }, orderBy: { distributionDate: 'asc' } }),
+    ])
+    const { snapshot } = buildCommitmentLedger(new Decimal(cm.commitmentUsd.toString()), calls, dists)
+    return {
+      id:              cm.id,
+      fund_id:         cm.fundId,
+      name:            cm.name,
+      commitment_usd:  num(cm.commitmentUsd),
+      commitment_date: cm.commitmentDate?.toISOString().slice(0, 10) ?? null,
+      currency:        cm.currency,
+      notes:           cm.notes,
+      call_count:      calls.length,
+      dist_count:      dists.length,
+      snapshot,
+    }
+  }))
+  return c.json(out)
+})
+
+// POST /:id/commitments — create
+router.post('/:id/commitments', async (c) => {
+  const fundId = c.req.param('id')
+  const fund = await prisma.fund.findUnique({ where: { id: fundId } })
+  if (!fund) return c.json({ detail: 'Fund not found' }, 404)
+  const b = await c.req.json().catch(() => ({}))
+  if (!b.name) return c.json({ detail: 'Commitment name is required' }, 400)
+  const cm = await prisma.commitment.create({
+    data: {
+      fundId,
+      name:           String(b.name),
+      commitmentUsd:  b.commitment_usd != null ? parseFloat(b.commitment_usd) : 0,
+      commitmentDate: b.commitment_date ? new Date(b.commitment_date) : null,
+      currency:       b.currency ?? fund.currency ?? 'JPY',
+      notes:          b.notes ?? null,
+    },
+  })
+  return c.json({ id: cm.id }, 201)
+})
+
+// PATCH /:id/commitments/:cid — update
+router.patch('/:id/commitments/:cid', async (c) => {
+  const b: any = await c.req.json().catch(() => ({}))
+  const data: any = {}
+  if (b.name            !== undefined) data.name           = String(b.name)
+  if (b.commitment_usd  !== undefined) data.commitmentUsd  = parseFloat(b.commitment_usd) || 0
+  if (b.commitment_date !== undefined) data.commitmentDate = b.commitment_date ? new Date(b.commitment_date) : null
+  if (b.currency        !== undefined) data.currency       = b.currency
+  if (b.notes           !== undefined) data.notes          = b.notes
+  await prisma.commitment.update({ where: { id: c.req.param('cid') }, data })
+  return c.json({ ok: true })
+})
+
+// DELETE /:id/commitments/:cid — remove the commitment AND its calls/distributions
+router.delete('/:id/commitments/:cid', async (c) => {
+  const cid = c.req.param('cid')
+  await prisma.$transaction([
+    prisma.capitalCall.deleteMany({ where: { commitmentId: cid } }),
+    prisma.distribution.deleteMany({ where: { commitmentId: cid } }),
+    prisma.notice.deleteMany({ where: { commitmentId: cid } }),
+    prisma.commitment.delete({ where: { id: cid } }),
+  ])
+  return c.json({ ok: true })
+})
+
+// GET /:id/commitments/:cid/ledger — independent ledger for one commitment
+router.get('/:id/commitments/:cid/ledger', async (c) => {
+  const cm = await prisma.commitment.findUnique({ where: { id: c.req.param('cid') } })
+  if (!cm) return c.json({ detail: 'Commitment not found' }, 404)
+  const [calls, dists] = await Promise.all([
+    prisma.capitalCall.findMany({ where: { commitmentId: cm.id, status: { in: ['approved', 'paid'] } }, orderBy: { executionDate: 'asc' } }),
+    prisma.distribution.findMany({ where: { commitmentId: cm.id }, orderBy: { distributionDate: 'asc' } }),
+  ])
+  const { rows, snapshot } = buildCommitmentLedger(new Decimal(cm.commitmentUsd.toString()), calls, dists)
+  return c.json({ commitment_id: cm.id, name: cm.name, commitment_usd: num(cm.commitmentUsd), rows, snapshot })
 })
 
 // POST /

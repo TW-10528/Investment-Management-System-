@@ -14,7 +14,7 @@ function getBool(key: string, fallback: boolean): boolean {
 }
 
 export const config = {
-  port:        getInt('PORT', 8003),
+  port:        getInt('PORT', 8001),
   environment: get('ENVIRONMENT', 'local'),
 
   // JWT
@@ -48,5 +48,5 @@ export const config = {
 
   // Misc
   revealEmailNotFound: getBool('REVEAL_EMAIL_NOT_FOUND', true),
-  maxActiveUsers:      10,
+  maxActiveUsers:      5,
 }

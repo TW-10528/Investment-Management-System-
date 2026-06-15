@@ -505,6 +505,14 @@ def map_to_excel_fields(all_fields: Dict[str, Any], breakdown: Dict[str, Any]) -
         distribution_amount_received=distribution_amount_received,
     )
  
+    # Finance-detail columns requested by Finance team.
+    # NB: Current deemed distribution / LP share distributable proceeds is Return of Capital.
+    # Additional Payment is Interest only when it is received/offset (negative in report),
+    # represented by additional_payment_received. Positive additional payment payable is not interest income.
+    return_of_capital = float(all_fields.get("limited_partner_share_of_distributable_proceeds") or 0.0)
+    gain = 0.0
+    interest = float(all_fields.get("additional_payment_received") or 0.0)
+ 
     remarks_parts = ["NB Real Estate capital call/drawdown notice."]
     if distribution_amount_received:
         remarks_parts.append("Includes deemed distribution subject to reinvestment.")
@@ -539,6 +547,9 @@ def map_to_excel_fields(all_fields: Dict[str, Any], breakdown: Dict[str, Any]) -
         "net_management_fee": all_fields.get("net_management_fee", 0.0),
         "additional_payment_due_to_subsequent_closing": all_fields.get("additional_payment_due_to_subsequent_closing"),
         "additional_payment_received": all_fields.get("additional_payment_received", 0.0),
+        "return_of_capital": return_of_capital,
+        "gain": gain,
+        "interest": interest,
     }
  
  

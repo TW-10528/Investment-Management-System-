@@ -337,10 +337,10 @@ export default function AddFundWizard({ onClose }: { onClose: () => void }) {
             <div className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Fund Name *">
-                  <Input value={form.fund_name} onChange={v => set('fund_name', v)} placeholder="e.g. Goldman Sachs Vintage X" />
+                  <Input value={form.fund_name} onChange={v => set('fund_name', v)} placeholder="e.g. Hamilton Lane Secondary Fund VI-B" />
                 </Field>
                 <Field label="Japanese Name">
-                  <Input value={form.fund_name_jp} onChange={v => set('fund_name_jp', v)} placeholder="ゴールドマン・サックス" />
+                  <Input value={form.fund_name_jp} onChange={v => set('fund_name_jp', v)} placeholder="例: SDGs 投資事業有限責任組合" />
                 </Field>
                 <Field label="Strategy *">
                   <select
@@ -356,7 +356,7 @@ export default function AddFundWizard({ onClose }: { onClose: () => void }) {
                   <Input value={form.vintage_year} onChange={v => set('vintage_year', v)} type="number" placeholder="2024" />
                 </Field>
                 <Field label="Manager / GP">
-                  <Input value={form.manager} onChange={v => set('manager', v)} placeholder="e.g. Goldman Sachs" />
+                  <Input value={form.manager} onChange={v => set('manager', v)} placeholder="e.g. Hamilton Lane" />
                 </Field>
                 <Field label="Administrator">
                   <Input value={form.administrator} onChange={v => set('administrator', v)} placeholder="e.g. State Street" />

@@ -12,6 +12,7 @@ import { parseFundPdf } from '../../services/fundParsers/index'
 import { resolveFund } from '../../services/fundParsers/fund-resolver'
 import { notifyAllAdmins, notifyUser } from '../../services/notificationService'
 import { runRulesForNotice } from '../../services/rulesEngine'
+import { validateExtractedNotice } from '../../services/validationService'
 import { config } from '../../config/index'
 
 const router = new Hono<HonoEnv>()
@@ -170,7 +171,7 @@ router.post('/upload', async (c) => {
   let extractedData: any
   let resolvedFundId = fundId ?? null
 
-  const fundParsed = await parseFundPdf(buffer)
+  const fundParsed = await parseFundPdf(buffer, file.name)
   if (fundParsed.fundKey !== 'unknown') {
     // Known fund — use fund-specific extraction
     const { rawText: _, ...stored } = fundParsed
@@ -197,6 +198,17 @@ router.post('/upload', async (c) => {
     const fundExists = await prisma.fund.findUnique({ where: { id: resolvedFundId }, select: { id: true } })
     if (!fundExists) resolvedFundId = null
   }
+
+  // AI validation — compare extracted values against the fund's historical pattern
+  const validation = await validateExtractedNotice(
+    resolvedFundId,
+    extractedData,
+    finalNoticeType,
+  ).catch(err => {
+    console.error('[VALIDATION] Failed to run validation:', err)
+    return null
+  })
+  if (validation) extractedData._validation = validation
 
   const notice = await prisma.notice.create({
     data: {
@@ -359,6 +371,18 @@ router.post('/:id/reject', async (c) => {
   }
 
   return c.json({ message: 'Notice rejected.', ...noticeDict(updated) })
+})
+
+// ── DELETE /:id/notes — clears admin_notes from a notice ─────────────────────
+router.delete('/:id/notes', async (c) => {
+  const user = c.get('user')
+  if (!canEdit(user.role)) return c.json({ detail: 'Edit access required.' }, 403)
+
+  const notice = await prisma.notice.findUnique({ where: { id: c.req.param('id') } })
+  if (!notice) return c.json({ detail: 'Notice not found' }, 404)
+
+  const updated = await prisma.notice.update({ where: { id: notice.id }, data: { adminNotes: null } })
+  return c.json(noticeDict(updated))
 })
 
 // ── PUT /:id/extracted ────────────────────────────────────────────────────────

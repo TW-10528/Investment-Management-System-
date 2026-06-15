@@ -13,8 +13,9 @@ export function guard(...roles: string[]) {
   })
 }
 
-export function canEdit(role: string): boolean {
-  return ['admin', 'finance_manager', 'finance_staff'].includes(role)
+export function canEdit(_role: string): boolean {
+  // No role differentiation — every authenticated user can edit.
+  return true
 }
 
 export function isAdmin(role: string): boolean {

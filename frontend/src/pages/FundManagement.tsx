@@ -4,30 +4,31 @@
  * Each section has tabs: Overview · Capital Calls · Distributions · NAV · Ledger · Details · Wire
  * Everything is inline-editable. Edit/delete available for admin and finance roles.
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { fundsAPI } from '../services/api';
+import { fundsAPI, fxRatesAPI, fundReportsAPI } from '../services/api';
 import type { FundDetail, FundSummary, LedgerRow, LedgerSnapshot } from '../types/index';
 import { fmt, strategyBg, strategyColor } from '../lib/format';
+import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AddFundWizard from '../components/AddFundWizard';
 import FundDocuments from '../components/FundDocuments';
 import FundUploadBar from '../components/FundUploadBar';
+import PortfolioOverview from '../components/PortfolioOverview';
 import toast from 'react-hot-toast';
 
-// ── Role helpers ──────────────────────────────────────────────────────────────
-function getUser() {
-  try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
-}
+// ── Edit access — every signed-in user can edit (no role differentiation) ───────
 function useCanEdit() {
-  return ['admin', 'finance_manager', 'finance_staff'].includes(getUser().role ?? '');
+  return true;
 }
 
 // ── Colours ───────────────────────────────────────────────────────────────────
+// Formal / corporate palette — deep navy primary, muted green, teal, slate
 const C = {
-  indigo:  '#4f46e5', indigoBg:  'rgba(79,70,229,0.1)',  indigoBdr:  'rgba(79,70,229,0.25)',
-  emerald: '#10b981', emeraldBg: 'rgba(16,185,129,0.1)', emeraldBdr: 'rgba(16,185,129,0.25)',
-  red:     '#ef4444', redBg:     'rgba(239,68,68,0.08)', redBdr:     'rgba(239,68,68,0.2)',
-  violet:  '#8b5cf6', amber:     '#d97706', slate:       '#64748b',
+  indigo:  '#1e40af', indigoBg:  'rgba(30,64,175,0.09)', indigoBdr:  'rgba(30,64,175,0.22)',
+  emerald: '#047857', emeraldBg: 'rgba(4,120,87,0.09)',  emeraldBdr: 'rgba(4,120,87,0.22)',
+  red:     '#b91c1c', redBg:     'rgba(185,28,28,0.08)', redBdr:     'rgba(185,28,28,0.2)',
+  violet:  '#0f766e', amber:     '#b45309', slate:       '#475569',
 };
 
 const STRATEGIES = ['Small Buyout','Buyout','Growth','Venture','Secondaries',
@@ -90,6 +91,14 @@ function DelBtn({ onClick }: { onClick: () => void }) {
   );
 }
 
+function PenIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+    </svg>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CAPITAL CALLS TAB
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,6 +106,32 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
   const [calls, setCalls] = useState<any[]>([]);
   const [form,  setForm]  = useState<any|null>(null);
   const [saving, setSaving] = useState(false);
+  const [currency, setCurrency] = useState<'USD'|'JPY'>('USD');
+  const [murcRate, setMurcRate] = useState<number>(() => {
+    const s = localStorage.getItem('murc_fx_rate');
+    return s ? Number(s) : 0;
+  });
+  const [murcEditing, setMurcEditing] = useState(false);
+  const [murcInput, setMurcInput] = useState('');
+
+  function saveMurcRate() {
+    const val = Number(murcInput);
+    if (val > 0) {
+      setMurcRate(val);
+      localStorage.setItem('murc_fx_rate', String(val));
+      toast.success('MURC rate saved');
+    }
+    setMurcEditing(false);
+  }
+
+  function fmtCallAmt(usd: number, rowFx?: number | string | null) {
+    if (currency === 'JPY') {
+      const rate = rowFx ? Number(rowFx) : murcRate;
+      if (!rate) return '¥—';
+      return '¥' + Math.round(usd * rate).toLocaleString('ja-JP');
+    }
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(usd);
+  }
 
   const load = useCallback(() =>
     fundsAPI.getCalls(fundId).then(r => setCalls(r.data)).catch(() => {}), [fundId]);
@@ -132,18 +167,57 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
   return (
     <div>
       {/* toolbar */}
-      <div className="px-5 py-3 flex items-center justify-between border-b theme-border"
+      <div className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap border-b theme-border"
            style={{ background: C.indigoBg }}>
         <p className="text-sm font-semibold theme-text">
           Capital Calls
           <span className="ml-2 text-xs font-normal theme-text-muted">{calls.length} records</span>
         </p>
-        {canEdit && !form && (
-          <button onClick={() => setForm({ status: 'pending' })}
-            className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
-            + Add Capital Call
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* MURC rate editor */}
+          {murcEditing ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs theme-text-muted whitespace-nowrap">MURC Rate (¥/USD):</span>
+              <input
+                type="number"
+                className="theme-input rounded px-2 py-1 text-xs w-24 border theme-border"
+                placeholder="154.20"
+                step="0.01"
+                value={murcInput}
+                onChange={e => setMurcInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveMurcRate(); if (e.key === 'Escape') setMurcEditing(false); }}
+                autoFocus
+              />
+              <button onClick={saveMurcRate}
+                className="px-2 py-1 rounded text-xs bg-indigo-600 text-white font-semibold">Save</button>
+              <button onClick={() => setMurcEditing(false)}
+                className="text-xs theme-text-muted px-1 hover:text-red-400">✕</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setMurcInput(murcRate > 0 ? String(murcRate) : ''); setMurcEditing(true); }}
+              className="p-1.5 rounded hover:bg-white/10 transition-colors theme-text-muted hover:text-amber-400"
+              title={murcRate > 0 ? `MURC Rate: ¥${murcRate.toFixed(2)} / USD — click to edit` : 'Set MURC FX Rate'}>
+              <PenIcon />
+            </button>
+          )}
+          {/* Currency toggle */}
+          <button
+            onClick={() => setCurrency(c => c === 'USD' ? 'JPY' : 'USD')}
+            className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors ${
+              currency === 'JPY'
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25 hover:bg-indigo-500/20'
+            }`}>
+            {currency === 'USD' ? 'USD → JPY' : 'JPY → USD'}
           </button>
-        )}
+          {canEdit && !form && (
+            <button onClick={() => setForm({ status: 'pending' })}
+              className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+              + Add Capital Call
+            </button>
+          )}
+        </div>
       </div>
 
       {/* inline form */}
@@ -193,7 +267,7 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                   Cash Flow G {hasManualCf ? '(manual)' : '= −B + C'}
                 </p>
                 <p className="text-sm font-bold tabular-nums mt-0.5" style={{ color: cashFlowPreview < 0 ? C.red : C.emerald }}>
-                  {cashFlowPreview < 0 ? '−$' : '$'}{Math.abs(cashFlowPreview).toLocaleString()}
+                  {cashFlowPreview < 0 ? '−' : ''}{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(cashFlowPreview))}
                 </p>
               </div>
             </div>
@@ -211,7 +285,10 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
           <table className="w-full text-sm">
             <thead style={{ background:'var(--color-header-bg)' }}>
               <tr className="border-b theme-border text-xs">
-                {['#','Notice Date','Due Date','Call %','B · Capital','C · Dist','G · Cash Flow','FX Rate','Status',''].map(h=>(
+                {['#','Notice Date','Due Date','Call %',
+                  currency==='USD' ? 'B · Capital (USD)' : 'B · Capital (JPY)',
+                  currency==='USD' ? 'C · Dist (USD)'    : 'C · Dist (JPY)',
+                  'G · Cash Flow','FX Rate','Status',''].map(h=>(
                   <th key={h} className={`px-4 py-2.5 font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h===''||h==='#'?'text-left':'text-right'}`}>{h}</th>
                 ))}
               </tr>
@@ -225,10 +302,14 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                   <td className="px-4 py-3 text-right theme-text-muted">{cc.notice_date}</td>
                   <td className="px-4 py-3 text-right theme-text-muted">{cc.due_date}</td>
                   <td className="px-4 py-3 text-right theme-text">{cc.call_pct!=null ? `${Number(cc.call_pct).toFixed(2)}%` : '—'}</td>
-                  <td className="px-4 py-3 text-right font-semibold" style={{color:C.indigo}}>${Number(cc.gross_call_usd??cc.net_call_usd).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right" style={{color:C.emerald}}>{Number(cc.distribution_usd??0)>0 ? `$${Number(cc.distribution_usd).toLocaleString()}` : '—'}</td>
+                  <td className="px-4 py-3 text-right font-semibold" style={{color:C.indigo}}>
+                    {fmtCallAmt(Number(cc.gross_call_usd??cc.net_call_usd), cc.fx_rate)}
+                  </td>
+                  <td className="px-4 py-3 text-right" style={{color:C.emerald}}>
+                    {Number(cc.distribution_usd??0)>0 ? fmtCallAmt(Number(cc.distribution_usd), cc.fx_rate) : '—'}
+                  </td>
                   <td className="px-4 py-3 text-right font-semibold" style={{color: cf<0?C.red:C.emerald}}>
-                    {cf<0?'−$':'$'}{Math.abs(cf).toLocaleString()}
+                    {cf<0?'−':''}{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(Math.abs(cf))}
                     {cc.manual_cash_flow_usd!=null && <span className="ml-1 text-[9px] font-bold px-1 rounded" style={{color:C.amber,background:'rgba(217,119,6,0.12)'}} title="Manual cash-flow entry">M</span>}
                   </td>
                   <td className="px-4 py-3 text-right theme-text-muted">{cc.fx_rate ? Number(cc.fx_rate).toFixed(2) : '—'}</td>
@@ -244,6 +325,17 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                 </tr>
               );})}
             </tbody>
+            {murcRate > 0 && (
+              <tfoot>
+                <tr style={{ background:'rgba(217,119,6,0.06)' }}>
+                  <td colSpan={10} className="px-4 py-2 text-xs border-t theme-border">
+                    <span className="font-semibold" style={{color:C.amber}}>MURC FX Rate:</span>
+                    <span className="theme-text-muted ml-1.5">1 USD = ¥{murcRate.toFixed(2)}</span>
+                    {currency==='JPY' && <span className="ml-2 text-[10px] theme-text-muted">(applied to Capital &amp; Distribution columns)</span>}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       ) : (
@@ -263,6 +355,33 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
   const [dists, setDists] = useState<any[]>([]);
   const [form,  setForm]  = useState<any|null>(null);
   const [saving, setSaving] = useState(false);
+  const [currency, setCurrency] = useState<'USD'|'JPY'>('USD');
+  const [murcRate, setMurcRate] = useState<number>(() => {
+    const s = localStorage.getItem('murc_fx_rate');
+    return s ? Number(s) : 0;
+  });
+  const [murcEditing, setMurcEditing] = useState(false);
+  const [murcInput, setMurcInput] = useState('');
+
+  function saveMurcRate() {
+    const val = Number(murcInput);
+    if (val > 0) {
+      setMurcRate(val);
+      localStorage.setItem('murc_fx_rate', String(val));
+      toast.success('MURC rate saved');
+    }
+    setMurcEditing(false);
+  }
+
+  function fmtDistAmt(d: any) {
+    if (currency === 'JPY') {
+      if (d.amount_jpy) return '¥' + Number(d.amount_jpy).toLocaleString('ja-JP');
+      const rate = d.fx_rate ? Number(d.fx_rate) : murcRate;
+      if (!rate) return '¥—';
+      return '¥' + Math.round(Number(d.amount_usd) * rate).toLocaleString('ja-JP');
+    }
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(d.amount_usd));
+  }
 
   const load = useCallback(() =>
     fundsAPI.getDists(fundId).then(r => setDists(r.data)).catch(() => {}), [fundId]);
@@ -288,19 +407,58 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
 
   return (
     <div>
-      <div className="px-5 py-3 flex items-center justify-between border-b theme-border"
+      <div className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap border-b theme-border"
            style={{ background: C.emeraldBg }}>
         <p className="text-sm font-semibold theme-text">
           Distributions
           <span className="ml-2 text-xs font-normal theme-text-muted">{dists.length} records</span>
-          {total > 0 && <span className="ml-3 font-semibold" style={{color:C.emerald}}>${total.toLocaleString()}</span>}
+          {total > 0 && <span className="ml-3 font-semibold" style={{color:C.emerald}}>{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(total)}</span>}
         </p>
-        {canEdit && !form && (
-          <button onClick={() => setForm({dist_type:'Income'})}
-            className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
-            + Add Distribution
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* MURC rate editor */}
+          {murcEditing ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs theme-text-muted whitespace-nowrap">MURC Rate (¥/USD):</span>
+              <input
+                type="number"
+                className="theme-input rounded px-2 py-1 text-xs w-24 border theme-border"
+                placeholder="154.20"
+                step="0.01"
+                value={murcInput}
+                onChange={e => setMurcInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveMurcRate(); if (e.key === 'Escape') setMurcEditing(false); }}
+                autoFocus
+              />
+              <button onClick={saveMurcRate}
+                className="px-2 py-1 rounded text-xs bg-indigo-600 text-white font-semibold">Save</button>
+              <button onClick={() => setMurcEditing(false)}
+                className="text-xs theme-text-muted px-1 hover:text-red-400">✕</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setMurcInput(murcRate > 0 ? String(murcRate) : ''); setMurcEditing(true); }}
+              className="p-1.5 rounded hover:bg-white/10 transition-colors theme-text-muted hover:text-amber-400"
+              title={murcRate > 0 ? `MURC Rate: ¥${murcRate.toFixed(2)} / USD — click to edit` : 'Set MURC FX Rate'}>
+              <PenIcon />
+            </button>
+          )}
+          {/* Currency toggle */}
+          <button
+            onClick={() => setCurrency(c => c === 'USD' ? 'JPY' : 'USD')}
+            className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors ${
+              currency === 'JPY'
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/20'
+            }`}>
+            {currency === 'USD' ? 'USD → JPY' : 'JPY → USD'}
           </button>
-        )}
+          {canEdit && !form && (
+            <button onClick={() => setForm({dist_type:'Income'})}
+              className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+              + Add Distribution
+            </button>
+          )}
+        </div>
       </div>
 
       {form && (
@@ -335,7 +493,9 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
           <table className="w-full text-sm">
             <thead style={{ background:'var(--color-header-bg)' }}>
               <tr className="border-b theme-border text-xs">
-                {['Date','Type','Amount (USD)','Amount (JPY)','Reinvestable','FX Rate',''].map(h=>(
+                {['Date','Type',
+                  currency==='USD' ? 'Amount (USD)' : 'Amount (JPY)',
+                  'Reinvestable','FX Rate',''].map(h=>(
                   <th key={h} className={`px-4 py-2.5 font-semibold theme-text-muted uppercase tracking-wide ${h===''?'text-left':'text-right'}`}>{h}</th>
                 ))}
               </tr>
@@ -345,9 +505,8 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                 <tr key={d.id} className="theme-row-hover">
                   <td className="px-4 py-3 text-right theme-text-muted">{d.distribution_date}</td>
                   <td className="px-4 py-3 text-right theme-text">{d.dist_type}</td>
-                  <td className="px-4 py-3 text-right font-semibold" style={{color:C.emerald}}>${Number(d.amount_usd).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right theme-text-muted">¥{Number(d.amount_jpy).toLocaleString('ja-JP')}</td>
-                  <td className="px-4 py-3 text-right theme-text-muted">${Number(d.reinvestable_usd).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right font-semibold" style={{color:C.emerald}}>{fmtDistAmt(d)}</td>
+                  <td className="px-4 py-3 text-right theme-text-muted">{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(d.reinvestable_usd))}</td>
                   <td className="px-4 py-3 text-right theme-text-muted">{d.fx_rate ? Number(d.fx_rate).toFixed(2):'—'}</td>
                   <td className="px-4 py-3">
                     {canEdit && (
@@ -360,6 +519,17 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                 </tr>
               ))}
             </tbody>
+            {murcRate > 0 && (
+              <tfoot>
+                <tr style={{ background:'rgba(217,119,6,0.06)' }}>
+                  <td colSpan={6} className="px-4 py-2 text-xs border-t theme-border">
+                    <span className="font-semibold" style={{color:C.amber}}>MURC FX Rate:</span>
+                    <span className="theme-text-muted ml-1.5">1 USD = ¥{murcRate.toFixed(2)}</span>
+                    {currency==='JPY' && <span className="ml-2 text-[10px] theme-text-muted">(applied to Amount column)</span>}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       ) : (
@@ -476,25 +646,249 @@ function NavTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LEDGER TAB (read-only computed columns B C D E F G H)
+// Pure UTC date shift — module-level so it works for any fund/row count without re-creation
+function shiftDate(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+// CASH FLOW TAB — period cash flow (G) bars + cumulative net cash (H) line + table
 // ─────────────────────────────────────────────────────────────────────────────
-function LedgerTab({ fundId }: { fundId:string }) {
+function CashFlowTab({ fundId, currency }: { fundId: string; currency?: string }) {
   const [rows, setRows] = useState<LedgerRow[]>([]);
-  const [snap, setSnap] = useState<LedgerSnapshot|null>(null);
+  const [snap, setSnap] = useState<LedgerSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const money = (n: any) =>
+    n == null ? '—'
+    : currency === 'JPY' ? '¥' + Math.round(Number(n)).toLocaleString('en-US')
+    : fmt.usd(Number(n));
 
   useEffect(() => {
     setLoading(true);
     fundsAPI.ledger(fundId)
-      .then(r => { setRows(r.data.rows??[]); setSnap(r.data.snapshot??null); })
+      .then(r => { setRows(r.data.rows ?? []); setSnap(r.data.snapshot ?? null); })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [fundId]);
 
+  if (loading) return <p className="px-5 py-8 text-sm theme-text-muted">Loading cash flow…</p>;
+  if (rows.length === 0) return (
+    <div className="px-5 py-12 text-center">
+      <p className="text-3xl mb-3 opacity-20">💸</p>
+      <p className="text-sm theme-text-muted">No cash flow yet — add capital calls or distributions.</p>
+    </div>
+  );
+
+  const totalOut = rows.reduce((s, r) => s + (r.capital_paid_in || 0), 0);
+  const totalIn  = rows.reduce((s, r) => s + (r.capital_received || 0), 0);
+  const net      = totalIn - totalOut;
+
+  // One point per transaction date: contributions (−B), distributions (+C), cumulative net (H).
+  const chartData = rows.map(r => ({
+    date:        fmt.date(r.date),
+    contributions: -(r.capital_paid_in || 0),
+    distributions: r.capital_received || 0,
+    cumulative:  r.net_cash_position,
+  }));
+
+  return (
+    <div className="p-5 space-y-5">
+      {/* summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Contributions (out)', val: money(totalOut),       color: C.red },
+          { label: 'Total Distributions (in)',  val: money(totalIn),        color: C.emerald },
+          { label: 'Net Cash Flow',             val: money(net),            color: net < 0 ? C.red : C.emerald },
+          { label: 'Net Cash Position (H)',     val: money(snap?.net_cash_position ?? net), color: (snap?.net_cash_position ?? net) < 0 ? C.red : C.emerald },
+        ].map(m => (
+          <div key={m.label} className="theme-card border theme-border rounded-xl p-3">
+            <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{m.label}</p>
+            <p className="text-lg font-bold tabular-nums mt-1" style={{ color: m.color }}>{m.val}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* chart */}
+      <div className="theme-card border theme-border rounded-xl p-4">
+        <p className="text-xs font-bold theme-text mb-3">Cash Flow Overview — contributions vs distributions, with cumulative net</p>
+        <div style={{ width: '100%', height: 280 }}>
+          <ResponsiveContainer>
+            <ComposedChart data={chartData} margin={{ top: 8, right: 12, bottom: 4, left: 12 }}>
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                     tickFormatter={(v: number) => (currency === 'JPY' ? '¥' : '$') + (Math.abs(v) >= 1e6 ? (v/1e6).toFixed(0)+'M' : (v/1e3).toFixed(0)+'k')} />
+              <Tooltip formatter={(v: any) => money(v)} contentStyle={{ fontSize: 12 }} />
+              <ReferenceLine y={0} stroke="var(--color-card-border)" />
+              <Bar dataKey="contributions" name="Contributions" fill={C.red} radius={[2,2,0,0]} />
+              <Bar dataKey="distributions" name="Distributions" fill={C.emerald} radius={[2,2,0,0]} />
+              <Line dataKey="cumulative" name="Cumulative net" stroke={C.indigo} strokeWidth={2} dot={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* period table (G / H) */}
+      <div className="overflow-x-auto rounded-xl border theme-border">
+        <table className="w-full text-xs">
+          <thead style={{ background: 'var(--color-header-bg)' }}>
+            <tr className="border-b theme-border text-[10px] uppercase tracking-wide theme-text-muted">
+              {['Date','Type','Contribution (B)','Distribution (C)','Cash Flow (G)','Net Position (H)'].map((h, i) => (
+                <th key={h} className={`px-3 py-2 font-semibold whitespace-nowrap ${i<2?'text-left':'text-right'}`}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y theme-border">
+            {rows.map((r, i) => (
+              <tr key={i} className="theme-row-hover">
+                <td className="px-3 py-2 theme-text-muted whitespace-nowrap">{fmt.date(r.date)}</td>
+                <td className="px-3 py-2">
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${r.tx_type==='distribution'?'text-emerald-400 border-emerald-500/25 bg-emerald-500/10':'text-indigo-400 border-indigo-500/25 bg-indigo-500/10'}`}>
+                    {r.tx_type==='distribution'?'Distribution':'Capital Call'}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums" style={{ color: r.capital_paid_in?C.red:undefined }}>{r.capital_paid_in?money(r.capital_paid_in):'—'}</td>
+                <td className="px-3 py-2 text-right tabular-nums" style={{ color: r.capital_received?C.emerald:undefined }}>{r.capital_received?money(r.capital_received):'—'}</td>
+                <td className="px-3 py-2 text-right tabular-nums" style={{ color: r.cash_flow<0?C.red:C.emerald }}>{money(r.cash_flow)}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: r.net_cash_position<0?C.red:C.emerald }}>{money(r.net_cash_position)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// LEDGER TAB — B Called / B (¥) / C Received / C (¥) adjacent columns, notes edit
+// FX column shows the MURC TTM rate for each transaction date (auto-fetched)
+// ─────────────────────────────────────────────────────────────────────────────
+function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
+  const [rows, setRows]           = useState<LedgerRow[]>([]);
+  const [snap, setSnap]           = useState<LedgerSnapshot|null>(null);
+  const [fundName, setFundName]   = useState('');
+  const [loading, setLoading]     = useState(true);
+  const [editIdx, setEditIdx]     = useState<number|null>(null);
+  const [noteText, setNoteText]   = useState('');
+  const [saving, setSaving]       = useState(false);
+  // murcRates: MURC TTM USD/JPY rate keyed by YYYY-MM-DD, fetched per transaction date
+  const [murcRates, setMurcRates]     = useState<Record<string, number>>({});
+  const [rateLoading, setRateLoading] = useState(false);
+  const [editDateIdx, setEditDateIdx] = useState<number|null>(null);
+  const [editDateVal, setEditDateVal] = useState('');
+  const [dateSaving,  setDateSaving]  = useState(false);
+
+  const fetchMurcRates = useCallback(async (loaded: LedgerRow[]) => {
+    if (!loaded.length) return;
+    const uniqueDates = [...new Set(loaded.map(r => r.date))];
+    setRateLoading(true);
+    const results = await Promise.allSettled(
+      uniqueDates.map(date =>
+        fxRatesAPI.historical(date, 'USD', 'JPY')
+          .then((r: any) => ({ date, rate: r.data.usd_jpy as number }))
+      )
+    );
+    const map: Record<string, number> = {};
+    results.forEach(r => { if (r.status === 'fulfilled' && r.value.rate) map[r.value.date] = r.value.rate; });
+    setMurcRates(map);
+    setRateLoading(false);
+  }, []);
+
+  const loadLedger = useCallback(() => {
+    setLoading(true);
+    fundsAPI.ledger(fundId)
+      .then(r => {
+        const loaded = r.data.rows ?? [];
+        setRows(loaded);
+        setSnap(r.data.snapshot ?? null);
+        setFundName(r.data.fund_name ?? '');
+        fetchMurcRates(loaded);
+      })
+      .finally(() => setLoading(false));
+  }, [fundId, fetchMurcRates]);
+
+  useEffect(() => {
+    setEditIdx(null);
+    setEditDateIdx(null);
+    setEditDateVal('');
+    loadLedger();
+  }, [loadLedger]);
+
+  function jpyStr(usd: number, rate: number | null | undefined): string {
+    if (!usd || !rate) return '—';
+    return '¥' + Math.round(usd * rate).toLocaleString('ja-JP');
+  }
+
+  function openNote(row: LedgerRow, idx: number) {
+    setEditIdx(idx);
+    setNoteText(row.notes ?? '');
+  }
+
+  async function saveDate(row: LedgerRow, rowIdx: number, newDate: string) {
+    setDateSaving(true);
+    try {
+      if (row.tx_type === 'capital_call' && row.call_id) {
+        await fundsAPI.updateCall(fundId, row.call_id, { due_date: newDate });
+      } else if (row.tx_type === 'distribution' && row.dist_id) {
+        await fundsAPI.updateDist(fundId, row.dist_id, { distribution_date: newDate });
+      }
+      // Optimistic: update the row date in-place without a full reload
+      setRows(prev => prev.map((r, idx) => idx === rowIdx ? { ...r, date: newDate } : r));
+      // Fetch MURC rate for the new date if not already cached
+      if (!murcRates[newDate]) {
+        fxRatesAPI.historical(newDate, 'USD', 'JPY')
+          .then((r: any) => { if (r.data?.usd_jpy) setMurcRates(prev => ({ ...prev, [newDate]: r.data.usd_jpy })); })
+          .catch(() => {});
+      }
+      toast.success('Date updated');
+      setEditDateIdx(null);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? 'Failed to update date');
+    } finally { setDateSaving(false); }
+  }
+
+  async function saveNote(row: LedgerRow, text: string) {
+    setSaving(true);
+    try {
+      if (row.tx_type === 'capital_call' && row.call_id) {
+        await fundsAPI.updateCall(fundId, row.call_id, { notes: text });
+      } else if (row.tx_type === 'distribution' && row.dist_id) {
+        await fundsAPI.updateDist(fundId, row.dist_id, { notes: text });
+      }
+      toast.success(text ? 'Note saved' : 'Note deleted');
+      setEditIdx(null); loadLedger();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? 'Failed to save note');
+    } finally { setSaving(false); }
+  }
+
+  // Date range per row:
+  //   min = day after previous row's date (no lower bound for first row)
+  //   max = day before next row's date    (no upper bound for last row)
+  function getDateRange(rowIdx: number): { min: string; max: string } {
+    const min = rowIdx > 0 && rows[rowIdx - 1]?.date
+      ? shiftDate(rows[rowIdx - 1].date, 1)
+      : '';
+    const max = rowIdx < rows.length - 1 && rows[rowIdx + 1]?.date
+      ? shiftDate(rows[rowIdx + 1].date, -1)
+      : '';
+    return { min, max };
+  }
+
   if (loading) return <p className="px-5 py-8 text-sm theme-text-muted">Loading ledger…</p>;
+
+  // Distribution-detail columns (Return of Capital / Gain / Interest) are shown for
+  // the five core funds and hidden for Goldman Sachs / Siguler Guff / Capula.
+  const showDetail = !/vintage|goldman|siguler|capula/i.test(fundName);
 
   return (
     <div>
-      {/* Snapshot */}
+      {/* ── Toolbar ── */}
+      <div className="px-5 py-3 border-b theme-border" style={{ background:'rgba(79,70,229,0.04)' }}>
+        <p className="text-sm font-semibold theme-text">Ledger</p>
+      </div>
+
+      {/* ── Snapshot KPIs ── */}
       {snap && (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 divide-x theme-border border-b theme-border"
              style={{ background:'rgba(79,70,229,0.04)' }}>
@@ -507,7 +901,7 @@ function LedgerTab({ fundId }: { fundId:string }) {
             ['F Inv.Cap',   fmt.usd(snap.investment_capacity, true)],
             ['H Net Cash',  fmt.usd(snap.net_cash_position, true)],
             ['DPI',         snap.dpi.toFixed(3)+'×'],
-          ].map(([label, value])=>(
+          ].map(([label, value]) => (
             <div key={String(label)} className="px-3 py-2.5">
               <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{label}</p>
               <p className="text-sm font-bold tabular-nums theme-text mt-0.5">{value}</p>
@@ -520,42 +914,200 @@ function LedgerTab({ fundId }: { fundId:string }) {
         <div className="px-5 py-12 text-center">
           <p className="text-3xl mb-3 opacity-20">📋</p>
           <p className="text-sm theme-text-muted">No paid transactions yet.</p>
-          <p className="text-xs theme-text-muted mt-1">Add capital calls or distributions and mark them as paid.</p>
+          <p className="text-xs theme-text-muted mt-1">Upload a PDF or add capital calls / distributions and mark them as paid.</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-sm">
             <thead style={{ background:'var(--color-header-bg)' }}>
               <tr className="border-b theme-border">
-                {['Date','Description','FX','B Called','C Received','D Reinvest',
-                  'E Cum.Called','F Inv.Cap','G Cash Flow','H Net Cash','JPY Called','JPY Recv'].map(h=>(
-                  <th key={h} className="px-3 py-2.5 text-[9px] font-semibold theme-text-muted uppercase tracking-wide text-right first:text-left whitespace-nowrap">{h}</th>
+                {[
+                  { label: 'Date',         right: false },
+                  { label: 'Description',  right: false },
+                  { label: 'FX',           right: true  },
+                  { label: 'B Called',     right: true  },
+                  { label: 'B (¥)',        right: true  },
+                  { label: 'C Received',   right: true  },
+                  { label: 'C (¥)',        right: true  },
+                  { label: 'D Reinvest',   right: true  },
+                  { label: 'E Cum.Called', right: true  },
+                  { label: 'F Inv.Cap',    right: true  },
+                  { label: 'G Cash Flow',  right: true  },
+                  { label: 'H Net Cash',   right: true  },
+                  ...(showDetail ? [
+                    { label: 'Return of Capital', right: true },
+                    { label: 'Gain',              right: true },
+                    { label: 'Interest',          right: true },
+                  ] : []),
+                  { label: 'Review',       right: false },
+                ].map((h, hi) => (
+                  <th key={hi}
+                    className={`px-3 py-2.5 text-[10px] font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h.right ? 'text-right' : 'text-left'}`}>
+                    {h.label}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y theme-border">
-              {rows.map((row,i) => {
-                const isCall = row.tx_type === 'capital_call';
+              {rows.map((row, i) => {
+                const isCall    = row.tx_type === 'capital_call';
+                const isEditing = editIdx === i;
+                const hasId     = !!(row.call_id || row.dist_id);
+                const { min: rowDateMin, max: rowDateMax } = getDateRange(i);
+
                 return (
-                  <tr key={i} className="theme-row-hover">
-                    <td className="px-3 py-2.5 theme-text-muted whitespace-nowrap">{fmt.date(row.date)}</td>
-                    <td className="px-3 py-2.5">
-                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded mr-1.5 ${isCall?'bg-red-500/15 text-red-400':'bg-emerald-500/15 text-emerald-400'}`}>
-                        {isCall?'↓ Call':'↑ Dist'}
-                      </span>
-                      <span className="theme-text-muted">{row.description}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{fmt.rate(row.fx_rate)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:row.capital_paid_in?C.red:'inherit'}}>{row.capital_paid_in?fmt.usd(row.capital_paid_in):'—'}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:row.capital_received?C.emerald:'inherit'}}>{row.capital_received?fmt.usd(row.capital_received):'—'}</td>
-                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{row.reinvestable?fmt.usd(row.reinvestable):'—'}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:C.indigo}}>{fmt.usd(row.cumulative_called)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:C.violet}}>{fmt.usd(row.investment_capacity)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:row.cash_flow<0?C.red:C.emerald}}>{fmt.usd(row.cash_flow)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold" style={{color:row.net_cash_position<0?C.red:C.emerald}}>{fmt.usd(row.net_cash_position)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{row.capital_paid_jpy?fmt.jpy(row.capital_paid_jpy):'—'}</td>
-                    <td className="px-3 py-2.5 text-right font-mono theme-text-muted">{row.capital_received_jpy?fmt.jpy(row.capital_received_jpy):'—'}</td>
-                  </tr>
+                    <tr key={`row-${i}`} className="theme-row-hover transition-colors">
+
+                      {/* Date — click to edit; range locked to this row's sliding 3-row window */}
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        {canEdit && hasId && editDateIdx === i ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="date"
+                              autoFocus
+                              value={editDateVal}
+                              min={rowDateMin}
+                              max={rowDateMax}
+                              onChange={e => setEditDateVal(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter' && editDateVal) saveDate(row, i, editDateVal); if (e.key === 'Escape') setEditDateIdx(null); }}
+                              className="theme-input border theme-border rounded px-2 py-0.5 text-xs"
+                            />
+                            <button onClick={() => { if (editDateVal) saveDate(row, i, editDateVal); }} disabled={dateSaving || !editDateVal}
+                              className="text-xs px-1.5 py-0.5 bg-indigo-600 text-white rounded disabled:opacity-40">
+                              {dateSaving ? '…' : '✓'}
+                            </button>
+                            <button onClick={() => setEditDateIdx(null)} className="text-xs theme-text-muted hover:text-red-400">✕</button>
+                          </div>
+                        ) : (
+                          <span
+                            className={`theme-text-muted ${canEdit && hasId && editIdx === null && editDateIdx === null ? 'cursor-pointer hover:text-indigo-400 hover:underline' : ''}`}
+                            onClick={() => { if (canEdit && hasId && editIdx === null && editDateIdx === null) { setEditDateIdx(i); setEditDateVal(row.date); } }}
+                            title={canEdit && hasId && rowDateMin ? `Allowed: ${rowDateMin} → ${rowDateMax}` : undefined}
+                          >
+                            {fmt.date(row.date)}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Description */}
+                      <td className="px-3 py-3 min-w-[180px]">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded mr-1.5 ${isCall?'bg-red-500/15 text-red-400':'bg-emerald-500/15 text-emerald-400'}`}>
+                          {isCall?'↓ Call':'↑ Dist'}
+                        </span>
+                        <span className="theme-text text-base">{row.description}</span>
+                      </td>
+
+                      {/* FX — MURC TTM rate for this transaction date */}
+                      <td className="px-3 py-3 text-right font-mono theme-text-muted whitespace-nowrap">
+                        {rateLoading
+                          ? <span className="opacity-40 text-xs">…</span>
+                          : murcRates[row.date]
+                            ? <span title="MURC TTM rate for this date">{murcRates[row.date].toFixed(2)}</span>
+                            : <span title="No MURC rate found for this date">{fmt.rate(row.fx_rate)}</span>}
+                      </td>
+
+                      {/* B Called (USD) */}
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color: row.capital_paid_in ? C.red : 'inherit'}}>
+                        {row.capital_paid_in ? fmt.usd(row.capital_paid_in) : <span className="theme-text-muted">—</span>}
+                      </td>
+
+                      {/* B (¥) — JPY using MURC rate for this date */}
+                      <td className="px-3 py-3 text-right font-mono" style={{color: row.capital_paid_in ? 'rgba(239,68,68,0.65)' : 'inherit'}}>
+                        {row.capital_paid_in
+                          ? rateLoading
+                            ? <span className="opacity-40 text-xs">…</span>
+                            : jpyStr(row.capital_paid_in, murcRates[row.date] ?? row.fx_rate)
+                          : <span className="theme-text-muted">—</span>}
+                      </td>
+
+                      {/* C Received (USD) */}
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color: row.capital_received ? C.emerald : 'inherit'}}>
+                        {row.capital_received ? fmt.usd(row.capital_received) : <span className="theme-text-muted">—</span>}
+                      </td>
+
+                      {/* C (¥) — JPY using MURC rate for this date */}
+                      <td className="px-3 py-3 text-right font-mono" style={{color: row.capital_received ? 'rgba(16,185,129,0.65)' : 'inherit'}}>
+                        {row.capital_received
+                          ? rateLoading
+                            ? <span className="opacity-40 text-xs">…</span>
+                            : jpyStr(row.capital_received, murcRates[row.date] ?? row.fx_rate)
+                          : <span className="theme-text-muted">—</span>}
+                      </td>
+
+                      {/* D Reinvest */}
+                      <td className="px-3 py-3 text-right font-mono theme-text-muted">
+                        {row.reinvestable ? fmt.usd(row.reinvestable) : '—'}
+                      </td>
+
+                      {/* E–H computed */}
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.indigo}}>{fmt.usd(row.cumulative_called)}</td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.violet}}>{fmt.usd(row.investment_capacity)}</td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:row.cash_flow<0?C.red:C.emerald}}>{fmt.usd(row.cash_flow)}</td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:row.net_cash_position<0?C.red:C.emerald}}>{fmt.usd(row.net_cash_position)}</td>
+
+                      {/* Distribution detail — hidden for Goldman / Siguler / Capula */}
+                      {showDetail && (
+                        <>
+                          <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.return_of_capital ? fmt.usd(row.return_of_capital) : '—'}</td>
+                          <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.gain ? fmt.usd(row.gain) : '—'}</td>
+                          <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.interest ? fmt.usd(row.interest) : '—'}</td>
+                        </>
+                      )}
+
+                      {/* Review — inline edit */}
+                      <td className="px-3 py-3 min-w-[220px]">
+                        {isEditing ? (
+                          <div className="flex flex-col gap-1.5">
+                            <input
+                              type="text"
+                              autoFocus
+                              placeholder="Type your review…"
+                              className="theme-input rounded px-2 py-1.5 text-base border theme-border w-full"
+                              value={noteText}
+                              onChange={e => setNoteText(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') saveNote(row, noteText); if (e.key === 'Escape') setEditIdx(null); }}
+                            />
+                            <div className="flex items-center gap-1.5">
+                              <button onClick={() => saveNote(row, noteText)} disabled={saving}
+                                className="px-2.5 py-1 rounded text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 transition-colors">
+                                {saving ? '…' : 'Save'}
+                              </button>
+                              {row.notes && (
+                                <button onClick={() => saveNote(row, '')} disabled={saving}
+                                  className="px-2.5 py-1 rounded text-xs text-red-400 hover:bg-red-500/10 border border-red-500/30 transition-colors">
+                                  Delete
+                                </button>
+                              )}
+                              <button onClick={() => setEditIdx(null)}
+                                className="px-2 py-1 text-xs theme-text-muted hover:text-red-400 transition-colors">
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-start gap-2 group">
+                            <span className={`text-sm flex-1 ${row.notes ? 'theme-text' : 'theme-text-muted opacity-40 italic'}`}>
+                              {row.notes || '—'}
+                            </span>
+                            {canEdit && hasId && editIdx === null && editDateIdx === null && (
+                              <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all">
+                                <button onClick={() => openNote(row, i)}
+                                  className="flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium theme-text-muted hover:text-indigo-400 hover:bg-indigo-500/10 border theme-border transition-colors">
+                                  Edit
+                                </button>
+                                {row.notes && (
+                                  <button onClick={() => saveNote(row, '')}
+                                    className="flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium text-red-400 hover:bg-red-500/10 border border-red-500/30 transition-colors"
+                                    title="Delete note">
+                                    🗑
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
                 );
               })}
             </tbody>
@@ -696,99 +1248,9 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WIRE TAB (editable)
-// ─────────────────────────────────────────────────────────────────────────────
-function WireTab({ detail, canEdit, fundId, onSaved }: { detail:FundDetail; canEdit:boolean; fundId:string; onSaved:()=>void }) {
-  const [editing, setEditing] = useState(false);
-  const [form, setForm]       = useState<any>({});
-  const [saving, setSaving]   = useState(false);
-  const sf = (k:string, v:any) => setForm((f:any)=>({...f,[k]:v}));
-
-  function startEdit() {
-    setForm({
-      wire_bank:           detail.wire_bank??'',
-      wire_account_name:   detail.wire_account_name??'',
-      wire_account_number: detail.wire_account_number??'',
-      wire_aba:            detail.wire_aba??'',
-      wire_swift:          detail.wire_swift??'',
-      wire_reference:      detail.wire_reference??'',
-    });
-    setEditing(true);
-  }
-
-  async function save() {
-    setSaving(true);
-    try {
-      await fundsAPI.update(fundId, form);
-      toast.success('Wire instructions saved');
-      setEditing(false);
-      onSaved();
-    } catch { toast.error('Failed to save'); } finally { setSaving(false); }
-  }
-
-  const wireFields: [string, string, string][] = [
-    ['Beneficiary Bank',  'wire_bank',           detail.wire_bank??''],
-    ['Account Name',      'wire_account_name',   detail.wire_account_name??''],
-    ['Account Number',    'wire_account_number', detail.wire_account_number??''],
-    ['ABA Routing No.',   'wire_aba',            detail.wire_aba??''],
-    ['SWIFT / BIC',       'wire_swift',          detail.wire_swift??''],
-    ['Wire Reference',    'wire_reference',      detail.wire_reference??''],
-  ];
-
-  if (!editing) return (
-    <div className="p-5">
-      {canEdit && (
-        <div className="flex justify-end mb-5">
-          <button onClick={startEdit}
-            className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
-            Edit Wire Instructions
-          </button>
-        </div>
-      )}
-      {detail.wire_bank ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {wireFields.filter(([,,v])=>v).map(([label,,value])=>(
-            <div key={label} className="rounded-xl px-4 py-3 border theme-border"
-                 style={{ background:'rgba(255,255,255,0.02)' }}>
-              <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{label}</p>
-              <p className="text-sm font-mono font-medium theme-text mt-1 break-all">{value}</p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <p className="text-3xl opacity-20 mb-3">🏦</p>
-          <p className="text-sm theme-text-muted">No wire instructions on file.</p>
-          {canEdit && <p className="text-xs theme-text-muted mt-1">Click "Edit Wire Instructions" to add them.</p>}
-        </div>
-      )}
-      {detail.wire_bank && (
-        <p className="text-xs theme-text-muted mt-4 px-1">Always confirm wire instructions directly with the fund manager before wiring funds.</p>
-      )}
-    </div>
-  );
-
-  return (
-    <div className="p-5 space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {wireFields.map(([label, key])=>(
-          <Field key={key} label={label}>
-            <input className={inp} value={form[key]??''} onChange={e=>sf(key,e.target.value)} />
-          </Field>
-        ))}
-      </div>
-      <div className="flex gap-3">
-        <SaveBtn loading={saving} onClick={save} />
-        <CancelBtn onClick={() => setEditing(false)} />
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // FULL FUND SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-type TabKey = 'documents' | 'calls' | 'distributions' | 'nav' | 'ledger' | 'details' | 'wire';
+type TabKey = 'overview' | 'cashflow' | 'documents' | 'calls' | 'distributions' | 'nav' | 'ledger' | 'details';
 
 function FundSection({
   fund, detail, canEdit, onChanged,
@@ -796,7 +1258,7 @@ function FundSection({
   fund: FundSummary; detail: FundDetail;
   canEdit: boolean; onChanged: () => void;
 }) {
-  const [tab, setTab] = useState<TabKey>('documents');
+  const [tab, setTab] = useState<TabKey>('cashflow');
   const fundId   = fund.fund_id;
   const isActive = fund.is_active !== false;
   const dotColor = strategyColor[fund.strategy??''] ?? '#6b7280';
@@ -817,13 +1279,13 @@ function FundSection({
   }
 
   const TABS: { key: TabKey; label: string }[] = [
-    { key:'documents',     label:'Documents'      },
+    { key:'cashflow',      label:'Cash Flow'      },
+    { key:'ledger',        label:'Ledger'         },
     { key:'calls',         label:'Capital Calls'  },
     { key:'distributions', label:'Distributions'  },
     { key:'nav',           label:'NAV Records'    },
-    { key:'ledger',        label:'Ledger'         },
+    { key:'documents',     label:'Documents / Reports' },
     { key:'details',       label:'Fund Details'   },
-    { key:'wire',          label:'Wire Instructions'},
   ];
 
   return (
@@ -910,13 +1372,13 @@ function FundSection({
           ))}
         </div>
 
+        {tab==='cashflow'      && <CashFlowTab  fundId={fundId} currency={detail.currency} />}
         {tab==='documents'     && <FundDocuments fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='calls'         && <CallsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='distributions' && <DistsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='nav'           && <NavTab      fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
-        {tab==='ledger'        && <LedgerTab   fundId={fundId} />}
+        {tab==='ledger'        && <LedgerTab   fundId={fundId} canEdit={canEdit} />}
         {tab==='details'       && <DetailsTab  detail={detail} canEdit={canEdit} fundId={fundId} onSaved={onChanged} />}
-        {tab==='wire'          && <WireTab     detail={detail} canEdit={canEdit} fundId={fundId} onSaved={onChanged} />}
       </div>
     </div>
   );
@@ -973,6 +1435,237 @@ function FundCard({ fund, detail, onClick }: { fund: FundSummary; detail?: FundD
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// REPORTS SECTION — per-fund folders; open a folder to see its files; click a
+// file to view the PDF in-app. Files are grouped into Capital Calls & Distributions.
+// ─────────────────────────────────────────────────────────────────────────────
+function PdfViewerModal({ doc, onClose }: { doc: any; onClose: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let revoked = false;
+    let objUrl = '';
+    fundReportsAPI.file(doc.id)
+      .then(r => { objUrl = URL.createObjectURL(r.data); if (!revoked) setUrl(objUrl); })
+      .catch(() => setError(true));
+    return () => { revoked = true; if (objUrl) URL.revokeObjectURL(objUrl); };
+  }, [doc.id]);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="theme-card border theme-border rounded-2xl shadow-2xl w-full max-w-5xl h-[88vh] flex flex-col overflow-hidden"
+           onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-3 border-b theme-border flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold theme-text truncate" title={doc.file_name}>📄 {doc.file_name}</p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {url && (
+              <a href={url} target="_blank" rel="noreferrer"
+                 className="px-3 py-1.5 rounded-lg text-xs font-medium border theme-border theme-text-muted hover:theme-text transition-colors">
+                Open in new tab ↗
+              </a>
+            )}
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-lg flex items-center justify-center theme-text-muted hover:theme-text hover:bg-black/5 transition-colors text-lg">
+              ×
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 min-h-0" style={{ background: '#525659' }}>
+          {error ? (
+            <div className="h-full flex items-center justify-center text-sm text-white/70">Could not load this PDF.</div>
+          ) : url ? (
+            <iframe src={url} title={doc.file_name} className="w-full h-full" />
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-white/30 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportFilesTile({
+  title, kind, color, bg, rows, canEdit, onView, onDelete,
+}: {
+  title: string; kind: 'call' | 'dist'; color: string; bg: string;
+  rows: any[]; canEdit: boolean; onView: (doc: any) => void; onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="theme-card border theme-border rounded-2xl overflow-hidden">
+      <div className="px-5 py-3 border-b theme-border flex items-center justify-between" style={{ background: bg }}>
+        <h3 className="text-sm font-bold theme-text">{title}</h3>
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color, background: 'rgba(255,255,255,0.5)' }}>
+          {rows.length} file{rows.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      {rows.length === 0 ? (
+        <div className="px-5 py-8 text-center">
+          <p className="text-2xl mb-1 opacity-20">📄</p>
+          <p className="text-sm theme-text-muted">No {kind === 'call' ? 'capital call' : 'distribution'} files.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead style={{ background: 'var(--color-header-bg)' }}>
+              <tr className="border-b theme-border text-xs">
+                {['File', 'Notice Date', 'Due Date', 'Amount (USD)', ''].map(h => (
+                  <th key={h} className={`px-4 py-2.5 font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h === 'File' || h === '' ? 'text-left' : 'text-right'}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y theme-border">
+              {rows.map(doc => {
+                const amount = kind === 'call' ? doc.gross_call_usd : doc.distribution_usd;
+                return (
+                  <tr key={doc.id} className="theme-row-hover cursor-pointer" onClick={() => onView(doc)}>
+                    <td className="px-4 py-3 theme-text max-w-[20rem] truncate" title={doc.file_name}>📄 {doc.file_name}</td>
+                    <td className="px-4 py-3 text-right theme-text-muted whitespace-nowrap">{doc.notice_date ?? '—'}</td>
+                    <td className="px-4 py-3 text-right theme-text-muted whitespace-nowrap">{doc.due_date ?? '—'}</td>
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color }}>{amount ? fmt.usd(Number(amount)) : '—'}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => onView(doc)}
+                        className="px-2 py-1 rounded text-xs font-medium text-indigo-600 hover:bg-indigo-500/10 transition-colors">
+                        View
+                      </button>
+                      {canEdit && (
+                        <button onClick={() => onDelete(doc.id)}
+                          className="ml-1 px-2 py-1 rounded text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors">
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReportsSection({ funds, canEdit, onChanged }:
+  { funds: FundSummary[]; canEdit: boolean; onChanged: () => void }) {
+  const [reports, setReports] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openFundId, setOpenFundId] = useState<string | null>(null);
+  const [viewerDoc, setViewerDoc] = useState<any | null>(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fundReportsAPI.listAll()
+      .then(r => setReports(r.data ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function del(id: string) {
+    if (!confirm('Delete this document? The capital call / distribution it created will also be removed and the ledger recalculated.')) return;
+    try { await fundReportsAPI.delete(id); toast.success('Document deleted — ledger updated.'); load(); onChanged(); }
+    catch (e: any) { toast.error(e?.response?.data?.detail ?? 'Failed to delete'); }
+  }
+
+  // Reports grouped by fund
+  const byFund = useMemo(() => {
+    const m: Record<string, any[]> = {};
+    reports.forEach(r => { (m[r.fund_id] ??= []).push(r); });
+    return m;
+  }, [reports]);
+
+  if (funds.length === 0) {
+    return (
+      <div className="text-center py-20 theme-text-muted">
+        <p className="text-5xl mb-4">📁</p>
+        <p className="text-base font-medium">No funds yet — add a fund to upload reports.</p>
+      </div>
+    );
+  }
+
+  const openFund = openFundId ? funds.find(f => f.fund_id === openFundId) : null;
+  const fundReports = openFundId ? (byFund[openFundId] ?? []) : [];
+  const calls = fundReports.filter(r => r.notice_type === 'capital_call' || r.notice_type === 'capital_and_distribution');
+  const dists = fundReports.filter(r => r.notice_type === 'distribution'  || r.notice_type === 'capital_and_distribution');
+
+  return (
+    <div className="space-y-5">
+      {/* Upload — pick the document type + select the fund, then drop a PDF */}
+      {canEdit && (
+        <FundUploadBar
+          funds={funds.map(f => ({ fund_id: f.fund_id, fund_name: f.fund_name }))}
+          onUploaded={() => { onChanged(); load(); }}
+        />
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : openFund ? (
+        /* ── Inside a fund folder ── */
+        <div className="space-y-4">
+          <button onClick={() => setOpenFundId(null)}
+            className="text-sm theme-text-muted hover:theme-text transition-colors">← All funds</button>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📁</span>
+            <h2 className="text-lg font-bold theme-text">{openFund.fund_name}</h2>
+            <span className="text-xs theme-text-muted">· {fundReports.length} file{fundReports.length !== 1 ? 's' : ''}</span>
+          </div>
+          <ReportFilesTile title="Capital Calls" kind="call" color={C.indigo}  bg={C.indigoBg}
+            rows={calls} canEdit={canEdit} onView={setViewerDoc} onDelete={del} />
+          <ReportFilesTile title="Distributions" kind="dist" color={C.emerald} bg={C.emeraldBg}
+            rows={dists} canEdit={canEdit} onView={setViewerDoc} onDelete={del} />
+        </div>
+      ) : (
+        /* ── Fund folders grid ── */
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {funds.map(f => {
+            const list  = byFund[f.fund_id] ?? [];
+            const nCall = list.filter(r => r.notice_type === 'capital_call' || r.notice_type === 'capital_and_distribution').length;
+            const nDist = list.filter(r => r.notice_type === 'distribution'  || r.notice_type === 'capital_and_distribution').length;
+            return (
+              <button key={f.fund_id} onClick={() => setOpenFundId(f.fund_id)}
+                className="theme-card border theme-border rounded-2xl p-5 text-left transition-colors hover:border-indigo-500/50">
+                <div className="flex items-start gap-3">
+                  <span className="text-3xl">📁</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold theme-text text-sm leading-snug truncate" title={f.fund_name}>{f.fund_name}</p>
+                    <p className="text-xs theme-text-muted mt-0.5">{list.length} file{list.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  <span className="theme-text-muted text-lg flex-shrink-0">→</span>
+                </div>
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t theme-border">
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: C.indigo,  background: C.indigoBg }}>{nCall} calls</span>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: C.emerald, background: C.emeraldBg }}>{nDist} dists</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {viewerDoc && <PdfViewerModal doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CASHFLOW SECTION — placeholder (empty for now)
+// ─────────────────────────────────────────────────────────────────────────────
+function CashflowSection() {
+  return (
+    <div className="theme-card border theme-border rounded-2xl py-24 text-center">
+      <p className="text-5xl mb-4 opacity-20">💸</p>
+      <p className="text-base font-medium theme-text">Cashflow</p>
+      <p className="text-sm theme-text-muted mt-1">Coming soon — this section is empty for now.</p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 export default function FundManagement() {
@@ -986,6 +1679,15 @@ export default function FundManagement() {
   const [showInactive,setShowInactive]= useState(true);
   const [search,      setSearch]      = useState('');
   const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
+
+  // Section is driven by the URL (?section=…) so the left sidebar controls it
+  const [searchParams] = useSearchParams();
+  const rawSection = searchParams.get('section');
+  const section: 'manage' | 'reports' | 'cashflow' =
+    rawSection === 'reports' || rawSection === 'cashflow' ? rawSection : 'manage';
+
+  // Leaving / switching section closes any open fund detail
+  useEffect(() => { setSelectedFundId(null); }, [section]);
 
   const loadFunds = useCallback(async () => {
     setLoading(true);
@@ -1026,50 +1728,64 @@ export default function FundManagement() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          {selectedFund && (
+          {section === 'manage' && selectedFund && (
             <button onClick={() => setSelectedFundId(null)}
               className="text-sm theme-text-muted hover:theme-text transition-colors mb-1">
-              ← All funds
+              {t('funds.backToAll')}
             </button>
           )}
           <h1 className="text-xl font-bold theme-text">
-            {selectedFund ? selectedFund.fund_name : t('funds.title')}
+            {section === 'manage'
+              ? (selectedFund ? selectedFund.fund_name : t('funds.title'))
+              : section === 'reports' ? 'Reports'
+              : 'Cashflow'}
           </h1>
-          {!selectedFund && (
+          {section === 'manage' && !selectedFund && (
             <p className="text-sm theme-text-muted mt-0.5">
-              {activeCount} active fund{activeCount!==1?'s':''}
-              {inactiveCount>0 && ` · ${inactiveCount} inactive`}
-              {' · select a fund to view its details'}
+              {activeCount} {t('dashboard.activeFunds')}
+              {inactiveCount > 0 && ` · ${t('funds.showInactive', { count: inactiveCount })}`}
+              {' · '}{t('funds.selectToView')}
             </p>
           )}
+          {section === 'reports' && (
+            <p className="text-sm theme-text-muted mt-0.5">Upload, edit and delete fund reports.</p>
+          )}
         </div>
-        {!selectedFund && (
-          <div className="flex items-center gap-2">
-            {inactiveCount > 0 && (
-              <button onClick={() => setShowInactive(v=>!v)}
-                className="text-sm px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text transition-colors">
-                {showInactive ? 'Hide inactive' : `Show inactive (${inactiveCount})`}
-              </button>
-            )}
-            {canEdit && (
-              <button onClick={() => setShowWizard(true)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
-                + Add Fund
-              </button>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {section === 'manage' && !selectedFund && (
+            <>
+              {inactiveCount > 0 && (
+                <button onClick={() => setShowInactive(v=>!v)}
+                  className="text-sm px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text transition-colors">
+                  {showInactive ? t('funds.hideInactive') : t('funds.showInactive', { count: inactiveCount })}
+                </button>
+              )}
+              {canEdit && (
+                <button onClick={() => setShowWizard(true)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                  {t('funds.addFund')}
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* View-only banner */}
       {!canEdit && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
           <span>🔒</span>
-          <span>You are in view-only mode. Log in as Admin or Finance Manager to edit.</span>
+          <span>{t('funds.viewOnlyMode')}</span>
         </div>
       )}
 
-      {selectedFund ? (
+      {section === 'reports' ? (
+        /* ── REPORTS SECTION — upload / edit / delete documents ── */
+        <ReportsSection funds={funds} canEdit={canEdit} onChanged={loadFunds} />
+      ) : section === 'cashflow' ? (
+        /* ── CASHFLOW SECTION — empty for now ── */
+        <CashflowSection />
+      ) : selectedFund ? (
         /* ── DETAIL VIEW — one fund's full sections ── */
         selectedDetail ? (
           <FundSection
@@ -1085,19 +1801,17 @@ export default function FundManagement() {
           </div>
         )
       ) : (
-        /* ── LIST VIEW — upload bar + fund name cards ── */
+        /* ── MANAGE FUNDS — overall totals + in-detail calculations + fund cards ── */
         <>
-          {canEdit && funds.length > 0 && (
-            <FundUploadBar
-              funds={funds.map(f => ({ fund_id: f.fund_id, fund_name: f.fund_name }))}
-              onUploaded={() => loadFunds()}
-            />
-          )}
+          {/* Portfolio-wide overall totals, per-fund table & analysis */}
+          <PortfolioOverview onSelectFund={setSelectedFundId} />
+
+          {/* Document upload lives in the Reports section — not here */}
 
           {/* Search */}
           <div className="relative max-w-sm">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 theme-text-sub">🔍</span>
-            <input type="text" placeholder="Search funds…" value={search}
+            <input type="text" placeholder={t('funds.search')} value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 theme-input rounded-xl text-sm" />
           </div>
@@ -1109,8 +1823,8 @@ export default function FundManagement() {
           ) : filtered.length === 0 ? (
             <div className="text-center py-20 theme-text-muted">
               <p className="text-5xl mb-4">🏦</p>
-              <p className="text-base font-medium">No funds found</p>
-              {canEdit && <p className="text-sm mt-2">Click "+ Add Fund" to create your first fund.</p>}
+              <p className="text-base font-medium">{t('funds.noFunds')}</p>
+              {canEdit && <p className="text-sm mt-2">{t('funds.noFundsCreate')}</p>}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
