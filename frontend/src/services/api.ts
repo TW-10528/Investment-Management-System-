@@ -1,7 +1,7 @@
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 
-// Use Vite proxy (/api → localhost:8001) in dev; absolute URL in production
+// Use Vite proxy (/api → localhost:8003) in dev; absolute URL in production
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
 const api: AxiosInstance = axios.create({

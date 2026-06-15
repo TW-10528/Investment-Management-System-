@@ -106,7 +106,7 @@ export default function Login() {
       const detail = e.response?.data?.detail;
 
       if (!e.response && (e.code === 'ERR_NETWORK' || e.code === 'ECONNREFUSED')) {
-        setErrMsg('Cannot connect to server. Please ensure the backend is running on port 8001.');
+        setErrMsg('Cannot connect to server. Please ensure the backend is running on port 8003.');
         setErrType('warning');
       } else if (status === 403 && detail?.includes('pending')) {
         setErrMsg('Your account is awaiting administrator approval. You will be notified once approved.');
