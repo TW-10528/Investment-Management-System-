@@ -36,6 +36,7 @@ interface CallDraft {
 interface FundForm {
   // Step 1
   fund_name     : string;
+  fund_key      : string;
   fund_name_jp  : string;
   manager       : string;
   administrator : string;
@@ -68,8 +69,12 @@ const STRATEGIES = [
   'Hedge Fund', 'Other',
 ];
 
+function toFundKey(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+
 const BLANK: FundForm = {
-  fund_name:'', fund_name_jp:'', manager:'', administrator:'',
+  fund_name:'', fund_key:'', fund_name_jp:'', manager:'', administrator:'',
   strategy:'', vintage_year: String(new Date().getFullYear()), currency:'USD',
   commitment_usd:'', entry_fx_rate:'', contract_date:'',
   investment_period_start:'', investment_period_end:'',
@@ -257,7 +262,7 @@ export default function AddFundWizard({ onClose }: { onClose: () => void }) {
     try {
       // 1. Create fund
       const fRes = await fundsAPI.create({
-        fund_name: form.fund_name, fund_name_jp: form.fund_name_jp,
+        fund_name: form.fund_name, fund_key: form.fund_key || undefined, fund_name_jp: form.fund_name_jp,
         manager: form.manager, administrator: form.administrator,
         strategy: form.strategy,
         vintage_year: form.vintage_year ? parseInt(form.vintage_year) : null,
@@ -337,7 +342,24 @@ export default function AddFundWizard({ onClose }: { onClose: () => void }) {
             <div className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Fund Name *">
-                  <Input value={form.fund_name} onChange={v => set('fund_name', v)} placeholder="e.g. Hamilton Lane Secondary Fund VI-B" />
+                  <Input
+                    value={form.fund_name}
+                    onChange={v => {
+                      set('fund_name', v);
+                      // Auto-generate key only while still blank or unchanged from auto-generated value
+                      if (!form.fund_key || form.fund_key === toFundKey(form.fund_name)) {
+                        set('fund_key', toFundKey(v));
+                      }
+                    }}
+                    placeholder="e.g. Hamilton Lane Secondary Fund VI-B"
+                  />
+                </Field>
+                <Field label="Fund Key" hint="Auto-generated · lowercase and hyphens · used to match uploaded PDFs">
+                  <Input
+                    value={form.fund_key}
+                    onChange={v => set('fund_key', v.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    placeholder="e.g. hamilton-lane"
+                  />
                 </Field>
                 <Field label="Japanese Name">
                   <Input value={form.fund_name_jp} onChange={v => set('fund_name_jp', v)} placeholder="例: SDGs 投資事業有限責任組合" />

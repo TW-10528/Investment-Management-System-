@@ -325,7 +325,7 @@ router.post('/extractors/test', async (c) => {
   const notice = await prisma.notice.findUnique({ where: { id: noticeId } })
   if (!notice) return c.json({ detail: 'Notice not found' }, 404)
 
-  const { extractByKeyword } = await import('../../services/pdfParser')
+  const { extractByKeyword } = await import('../../services/keywordExtractor')
   const fs   = await import('fs')
   const path = await import('path')
   const { config } = await import('../../config/index')

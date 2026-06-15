@@ -7,7 +7,6 @@ import type { HonoEnv } from '../../types/index'
 import { auth } from '../../middleware/auth'
 import { canEdit } from '../../middleware/guard'
 import { prisma } from '../../lib/prisma'
-import { parsePdf } from '../../services/pdfParser'
 import { parseFundPdf } from '../../services/fundParsers/index'
 import { resolveFund } from '../../services/fundParsers/fund-resolver'
 import { notifyAllAdmins, notifyUser } from '../../services/notificationService'
@@ -166,28 +165,17 @@ router.post('/upload', async (c) => {
   const buffer   = Buffer.from(await file.arrayBuffer())
   fs.writeFileSync(filepath, buffer)
 
-  // Try fund-specific parser first; fall back to generic parser
-  let extractedData: any
+  // AI extraction via Ollama — works for all fund types including unknown ones
   let resolvedFundId = fundId ?? null
 
   const fundParsed = await parseFundPdf(buffer, file.name)
-  if (fundParsed.fundKey !== 'unknown') {
-    // Known fund — use fund-specific extraction
-    const { rawText: _, ...stored } = fundParsed
-    extractedData = stored
+  const { rawText: _, ...stored } = fundParsed
+  let extractedData: any = stored
 
-    // Auto-resolve fundId if not manually supplied
-    if (!resolvedFundId) {
-      const resolved = await resolveFund(fundParsed.fundKey)
-      if (resolved) resolvedFundId = resolved.id
-    }
-  } else {
-    // Unknown fund — fall back to generic parser
-    const generic = await parsePdf(buffer)
-    if (noticeType && noticeType !== 'auto' && noticeType !== generic.noticeType) {
-      generic.noticeType = noticeType as typeof generic.noticeType
-    }
-    extractedData = generic
+  // Auto-resolve fundId from the AI-detected fund key if not manually supplied
+  if (!resolvedFundId && fundParsed.fundKey !== 'unknown') {
+    const resolved = await resolveFund(fundParsed.fundKey)
+    if (resolved) resolvedFundId = resolved.id
   }
 
   const finalNoticeType: string = extractedData.noticeType ?? noticeType ?? 'capital_call'

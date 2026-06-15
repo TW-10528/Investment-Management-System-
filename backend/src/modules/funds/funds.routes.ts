@@ -12,6 +12,12 @@ import { CalculationEngine } from '../../services/calculationEngine'
 const router = new Hono<HonoEnv>()
 router.use('*', auth)
 
+// Slugify a fund name into a stable, lowercase fund key (e.g. "Hamilton Lane" → "hamilton-lane")
+function toFundKey(explicit: string | undefined, fundName: string): string {
+  const base = (explicit?.trim() || fundName || '').toLowerCase()
+  return base.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
+}
+
 // GET /
 router.get('/', async (c) => {
   const funds     = await prisma.fund.findMany({ orderBy: { fundName: 'asc' } })
@@ -27,6 +33,7 @@ router.get('/:id', async (c) => {
   return c.json({
     id:                     fund.id,
     fund_name:              fund.fundName,
+    fund_key:               fund.fundKey ?? null,
     fund_name_jp:           fund.fundNameJp,
     manager:                fund.manager,
     administrator:          fund.administrator,
@@ -295,6 +302,7 @@ router.post('/', async (c) => {
 
   const data: any = {
     fundName:          body.fund_name,
+    fundKey:           toFundKey(body.fund_key, body.fund_name),
     fundNameJp:        body.fund_name_jp    ?? null,
     manager:           body.manager         ?? null,
     administrator:     body.administrator   ?? null,
@@ -334,6 +342,7 @@ router.put('/:id', async (c) => {
   const data: any = {}
 
   if (body.fund_name             !== undefined) data.fundName            = body.fund_name
+  if (body.fund_key              !== undefined) data.fundKey             = body.fund_key?.trim() || null
   if (body.fund_name_jp          !== undefined) data.fundNameJp          = body.fund_name_jp
   if (body.manager               !== undefined) data.manager             = body.manager
   if (body.administrator         !== undefined) data.administrator       = body.administrator

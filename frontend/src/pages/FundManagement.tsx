@@ -1012,6 +1012,7 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
   function startEdit() {
     setForm({
       fund_name:               detail.fund_name,
+      fund_key:                detail.fund_key??'',
       fund_name_jp:            detail.fund_name_jp??'',
       manager:                 detail.manager??'',
       administrator:           detail.administrator??'',
@@ -1057,6 +1058,7 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y theme-border">
           {[
             ['Fund Name',           detail.fund_name],
+            ['Fund Key',            detail.fund_key ?? '—'],
             ['Japanese Name',       detail.fund_name_jp],
             ['Manager',             detail.manager],
             ['Administrator',       detail.administrator],
@@ -1093,6 +1095,7 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
     <div className="p-5 space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         <Field label="Fund Name"><input className={inp} value={form.fund_name??''} onChange={e=>sf('fund_name',e.target.value)} /></Field>
+        <Field label="Fund Key"><input className={inp} value={form.fund_key??''} onChange={e=>sf('fund_key',e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,''))} placeholder="e.g. hamilton-lane" /></Field>
         <Field label="Japanese Name"><input className={inp} value={form.fund_name_jp??''} onChange={e=>sf('fund_name_jp',e.target.value)} /></Field>
         <Field label="Manager"><input className={inp} value={form.manager??''} onChange={e=>sf('manager',e.target.value)} /></Field>
         <Field label="Administrator"><input className={inp} value={form.administrator??''} onChange={e=>sf('administrator',e.target.value)} /></Field>
@@ -1439,6 +1442,13 @@ export default function FundManagement() {
   }, []);
 
   useEffect(() => { loadFunds(); }, [loadFunds]);
+
+  // Reset selected fund when the upload queue pill is clicked from another page/view
+  useEffect(() => {
+    function handler() { setSelectedFundId(null); }
+    window.addEventListener('ims-reset-fund-selection', handler);
+    return () => window.removeEventListener('ims-reset-fund-selection', handler);
+  }, []);
 
   const activeCount   = funds.filter(f => f.is_active !== false).length;
   const inactiveCount = funds.length - activeCount;

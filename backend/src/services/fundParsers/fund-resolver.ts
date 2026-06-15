@@ -22,30 +22,32 @@ export interface ResolvedFund {
   commitmentUsd: number
 }
 
+function mapFund(fund: { id: string; fundName: string; commitmentUsd: any }): ResolvedFund {
+  return { id: fund.id, fundName: fund.fundName, commitmentUsd: parseFloat(fund.commitmentUsd.toString()) }
+}
+
 /**
  * Find the Fund DB record for a given fundKey.
- * Searches by fund name (case-insensitive) using the patterns above.
- * Returns null if no matching fund exists in the DB yet.
+ * Step 1: direct lookup by the fund_key column (set when fund was created/migrated).
+ * Step 2: legacy name-pattern fallback for any fund missing a fund_key.
  */
 export async function resolveFund(fundKey: string): Promise<ResolvedFund | null> {
+  // Direct DB lookup — O(1), covers all funds created via the UI with a key set
+  const byKey = await prisma.fund.findFirst({
+    where: { fundKey, isActive: true },
+    select: { id: true, fundName: true, commitmentUsd: true },
+  })
+  if (byKey) return mapFund(byKey)
+
+  // Legacy fallback: name-pattern matching for funds that predate the fund_key column
   const patterns = FUND_NAME_PATTERNS[fundKey]
   if (!patterns) return null
-
   for (const pattern of patterns) {
     const fund = await prisma.fund.findFirst({
-      where: {
-        fundName: { contains: pattern, mode: 'insensitive' },
-        isActive: true,
-      },
+      where: { fundName: { contains: pattern, mode: 'insensitive' }, isActive: true },
       select: { id: true, fundName: true, commitmentUsd: true },
     })
-    if (fund) {
-      return {
-        id:           fund.id,
-        fundName:     fund.fundName,
-        commitmentUsd: parseFloat(fund.commitmentUsd.toString()),
-      }
-    }
+    if (fund) return mapFund(fund)
   }
 
   return null

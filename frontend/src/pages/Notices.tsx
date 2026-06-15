@@ -86,7 +86,6 @@ function UploadModal({
 }: { funds: { id: string; fund_name: string }[]; onClose: () => void; onSuccess: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [file,       setFile]       = useState<File | null>(null);
-  const [noticeType, setNoticeType] = useState<string>('auto');
   const [fundId,     setFundId]     = useState('');
   const [uploading,  setUploading]  = useState(false);
   const [dragging,   setDragging]   = useState(false);
@@ -104,8 +103,7 @@ function UploadModal({
     if (!file) { toast.error('Please select a PDF file.'); return; }
     const fd = new FormData();
     fd.append('file', file);
-    if (noticeType !== 'auto') fd.append('notice_type', noticeType);
-    if (fundId)                fd.append('fund_id', fundId);
+    if (fundId) fd.append('fund_id', fundId);
     setUploading(true);
     try {
       const r  = await noticesAPI.upload(fd);
@@ -167,32 +165,6 @@ function UploadModal({
             )}
             <input ref={fileRef} type="file" accept=".pdf" className="hidden"
               onChange={e => setFile(e.target.files?.[0] ?? null)} />
-          </div>
-
-          {/* Notice type */}
-          <div>
-            <label className="block text-xs font-semibold theme-text-muted uppercase tracking-wide mb-2">
-              Document Type
-            </label>
-            <div className="grid grid-cols-4 gap-2">
-              {([
-                ['auto', '🤖', 'Auto-Detect'],
-                ['capital_call', '📋', 'Capital Call'],
-                ['distribution', '💰', 'Distribution'],
-                ['financial_statement', '📊', 'Financials'],
-              ] as const).map(([v, icon, label]) => (
-                <button key={v} type="button" onClick={() => setNoticeType(v)}
-                  className="flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-all"
-                  style={{
-                    background:  noticeType === v ? C.indigoBg : undefined,
-                    borderColor: noticeType === v ? C.indigo   : C.slateBdr,
-                    color:       noticeType === v ? C.indigo   : undefined,
-                  }}>
-                  <span className="text-lg">{icon}</span>
-                  <span className="text-center leading-tight">{label}</span>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Fund */}

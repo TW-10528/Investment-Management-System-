@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { notificationsAPI } from '../services/api';
 
@@ -24,14 +24,14 @@ const TYPE_ICONS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  user_registered:  'text-blue-400',
-  user_approved:    'text-emerald-400',
-  user_rejected:    'text-red-400',
-  notice_uploaded:  'text-indigo-400',
-  notice_approved:  'text-emerald-400',
-  notice_rejected:  'text-red-400',
-  capital_call_due: 'text-amber-400',
-  general:          'text-gray-400',
+  user_registered:  '#60a5fa',
+  user_approved:    '#34d399',
+  user_rejected:    '#f87171',
+  notice_uploaded:  '#818cf8',
+  notice_approved:  '#34d399',
+  notice_rejected:  '#f87171',
+  capital_call_due: '#fbbf24',
+  general:          '#94a3b8',
 };
 
 function timeAgo(iso: string): string {
@@ -46,11 +46,10 @@ function timeAgo(iso: string): string {
 
 export default function NotificationBell() {
   const navigate = useNavigate();
-  const [open,         setOpen]         = useState(false);
+  const [open,          setOpen]          = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unread,        setUnread]        = useState(0);
   const [loading,       setLoading]       = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -65,15 +64,6 @@ export default function NotificationBell() {
     const id = setInterval(load, 30_000);
     return () => clearInterval(id);
   }, [load]);
-
-  // Close on outside click
-  useEffect(() => {
-    function onOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', onOutside);
-    return () => document.removeEventListener('mousedown', onOutside);
-  }, []);
 
   async function markRead(n: Notification) {
     if (!n.is_read) {
@@ -96,7 +86,7 @@ export default function NotificationBell() {
   }
 
   return (
-    <div className="relative" ref={ref}>
+    <>
       {/* Bell button */}
       <button
         onClick={() => { setOpen(v => !v); if (!open) load(); }}
@@ -111,79 +101,142 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Dropdown */}
+      {/* Panel + backdrop */}
       {open && (
-        <div className="absolute right-0 top-11 w-[360px] rounded-2xl shadow-2xl z-50 overflow-hidden"
-             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3"
-               style={{ borderBottom: '1px solid var(--border)' }}>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold theme-text">Notifications</span>
-              {unread > 0 && (
-                <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400">
-                  {unread} new
-                </span>
+        <>
+          {/* Transparent backdrop — closes panel on outside click */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+          />
+
+          {/* Notification panel — fixed in the top-right of the main content area */}
+          <div
+            className="fixed z-50 flex flex-col rounded-2xl shadow-2xl overflow-hidden"
+            style={{
+              top:       '16px',
+              right:     '16px',
+              width:     '380px',
+              maxHeight: 'calc(100vh - 32px)',
+              background: 'var(--color-card)',
+              border:     '1px solid var(--color-card-border)',
+              boxShadow:  '0 25px 50px -12px rgba(0,0,0,0.45), 0 0 0 1px rgba(99,102,241,0.15)',
+            }}
+          >
+            {/* Header */}
+            <div
+              className="flex items-center justify-between px-5 py-3.5 flex-shrink-0"
+              style={{ borderBottom: '1px solid var(--color-card-border)' }}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="text-base">🔔</span>
+                <span className="text-sm font-bold theme-text">Notifications</span>
+                {unread > 0 && (
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171' }}>
+                    {unread} new
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {unread > 0 && (
+                  <button
+                    onClick={markAll}
+                    disabled={loading}
+                    className="text-xs transition-colors disabled:opacity-50"
+                    style={{ color: '#818cf8' }}
+                  >
+                    Mark all read
+                  </button>
+                )}
+                <button
+                  onClick={() => setOpen(false)}
+                  className="w-6 h-6 rounded-lg flex items-center justify-center text-sm theme-text-muted hover:theme-text transition-colors"
+                  style={{ background: 'rgba(100,116,139,0.1)' }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="overflow-y-auto flex-1">
+              {notifications.length === 0 ? (
+                <div className="py-16 text-center px-6">
+                  <p className="text-4xl mb-3 opacity-30">🔔</p>
+                  <p className="text-sm font-medium theme-text">All caught up</p>
+                  <p className="text-xs theme-text-muted mt-1">No notifications yet</p>
+                </div>
+              ) : (
+                <div>
+                  {notifications.map((n, i) => (
+                    <button
+                      key={n.id}
+                      onClick={() => markRead(n)}
+                      className="w-full flex items-start gap-3 px-5 py-3.5 text-left transition-colors hover:bg-white/5 group"
+                      style={{
+                        background:   !n.is_read ? 'rgba(99,102,241,0.05)' : undefined,
+                        borderBottom: i < notifications.length - 1 ? '1px solid var(--color-card-border)' : undefined,
+                      }}
+                    >
+                      {/* Unread indicator */}
+                      <div className="flex-shrink-0 mt-1 w-2 flex items-start justify-center">
+                        {!n.is_read && (
+                          <span className="w-2 h-2 rounded-full bg-indigo-500 block" />
+                        )}
+                      </div>
+
+                      {/* Icon */}
+                      <span className="text-base flex-shrink-0 mt-0.5">
+                        {TYPE_ICONS[n.type] ?? '🔔'}
+                      </span>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className={`text-xs font-semibold leading-snug ${n.is_read ? 'theme-text-muted' : 'theme-text'}`}>
+                            {n.title}
+                          </p>
+                          <span className="text-[10px] theme-text-muted flex-shrink-0 mt-0.5">
+                            {timeAgo(n.created_at)}
+                          </span>
+                        </div>
+                        <p className="text-xs theme-text-muted leading-relaxed mt-0.5 line-clamp-2">
+                          {n.message}
+                        </p>
+                        {n.link && (
+                          <p className="text-[11px] mt-1.5 font-medium group-hover:underline"
+                            style={{ color: TYPE_COLORS[n.type] ?? '#818cf8' }}>
+                            View →
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-            {unread > 0 && (
-              <button onClick={markAll} disabled={loading}
-                className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors disabled:opacity-50">
-                Mark all read
-              </button>
-            )}
-          </div>
 
-          {/* List */}
-          <div className="max-h-[400px] overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="py-12 text-center">
-                <p className="text-3xl mb-2">🔔</p>
-                <p className="text-sm theme-text-muted">No notifications yet</p>
-              </div>
-            ) : (
-              notifications.map(n => (
+            {/* Footer */}
+            {notifications.length > 0 && (
+              <div
+                className="px-5 py-2.5 flex items-center justify-between flex-shrink-0"
+                style={{ borderTop: '1px solid var(--color-card-border)' }}
+              >
+                <span className="text-[11px] theme-text-muted">
+                  {notifications.length} notification{notifications.length !== 1 ? 's' : ''}
+                </span>
                 <button
-                  key={n.id}
-                  onClick={() => markRead(n)}
-                  className="w-full flex items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-white/5"
-                  style={{
-                    background:  n.is_read ? 'transparent' : 'rgba(99,102,241,0.05)',
-                    borderBottom: '1px solid var(--border)',
-                  }}
+                  onClick={() => setOpen(false)}
+                  className="text-xs theme-text-muted hover:theme-text transition-colors"
                 >
-                  <span className="text-lg flex-shrink-0 mt-0.5">{TYPE_ICONS[n.type] ?? '🔔'}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <p className={`text-xs font-semibold truncate ${n.is_read ? 'theme-text-muted' : 'theme-text'}`}>
-                        {n.title}
-                      </p>
-                      <span className="text-[10px] theme-text-muted flex-shrink-0">{timeAgo(n.created_at)}</span>
-                    </div>
-                    <p className="text-xs theme-text-muted leading-relaxed line-clamp-2">{n.message}</p>
-                    {n.link && (
-                      <p className={`text-[10px] mt-1 ${TYPE_COLORS[n.type] ?? 'text-indigo-400'}`}>
-                        View →
-                      </p>
-                    )}
-                  </div>
-                  {!n.is_read && (
-                    <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0 mt-1.5" />
-                  )}
+                  Close
                 </button>
-              ))
+              </div>
             )}
           </div>
-
-          {notifications.length > 0 && (
-            <div className="px-4 py-2.5 text-center" style={{ borderTop: '1px solid var(--border)' }}>
-              <button onClick={() => setOpen(false)} className="text-xs theme-text-muted hover:theme-text transition-colors">
-                Close
-              </button>
-            </div>
-          )}
-        </div>
+        </>
       )}
-    </div>
+    </>
   );
 }

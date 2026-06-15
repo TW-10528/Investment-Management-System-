@@ -7,6 +7,7 @@ export interface FxRate {
 export interface FundSummary {
   fund_id: string;
   fund_name: string;
+  fund_key?: string | null;
   fund_name_jp?: string;
   strategy?: string;
   manager?: string;
@@ -166,7 +167,7 @@ export interface NoticeUpload {
   id: string;
   fund_id?: string;
   fund_name?: string;
-  notice_type: 'capital_call' | 'distribution' | 'financial_statement';
+  notice_type: 'capital_call' | 'distribution' | 'capital_and_distribution' | 'financial_statement';
   status: 'pending' | 'approved' | 'rejected';
   /** Display name — set by API as originalName ?? filename */
   file_name: string;
@@ -186,7 +187,9 @@ export interface ExtractedNoticeData {
   noticeType?:      string;
   confidenceGrade?: 'high' | 'medium' | 'low';
   confidence?:      number;
+  fundKey?:         string;
   fundName?:        string;
+  noticeDate?:      string;
   amounts?:         number[];
   dates?:           string[];
   keywords?:        string[];
@@ -202,6 +205,12 @@ export interface ExtractedNoticeData {
   dueDate?:             string;
   fxRate?:              number;
   wireReference?:       string;
+  commitmentUsd?:       number;
+  totalCalledUsd?:      number;
+  unfundedUsd?:         number;
+  returnOfCapitalUsd?:  number;
+  gainUsd?:             number;
+  interestUsd?:         number;
   // Distribution
   distributionUsd?:   number;
   distributionDate?:  string;

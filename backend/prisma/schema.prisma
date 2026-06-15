@@ -55,6 +55,7 @@ model User {
 model Fund {
   id                    String    @id @default(uuid())
   fundName              String    @map("fund_name")
+  fundKey               String?   @unique @map("fund_key")
   fundNameJp            String?   @map("fund_name_jp")
   manager               String?
   administrator         String?

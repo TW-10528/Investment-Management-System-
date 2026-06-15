@@ -43,6 +43,29 @@ export default function Layout() {
   const [pendingUsers,   setPendingUsers]   = useState(0);
   const [showSettings,   setShowSettings]   = useState(false);
   const [showLangMenu,   setShowLangMenu]   = useState(false);
+  const [queueSummary,   setQueueSummary]   = useState<{ done: number; failed: number; waiting: number } | null>(null);
+
+  /* Upload queue indicator — reads localStorage, stays in sync via custom event */
+  useEffect(() => {
+    function update() {
+      try {
+        const stored = JSON.parse(localStorage.getItem('ims_upload_queue') ?? '[]');
+        if (!Array.isArray(stored) || stored.length === 0) { setQueueSummary(null); return; }
+        const done    = stored.filter((i: any) => i.status === 'done').length;
+        const failed  = stored.filter((i: any) => i.status === 'failed').length;
+        const waiting = stored.filter((i: any) => i.status === 'waiting').length;
+        if (done + failed + waiting === 0) { setQueueSummary(null); return; }
+        setQueueSummary({ done, failed, waiting });
+      } catch { setQueueSummary(null); }
+    }
+    update();
+    window.addEventListener('ims-queue-update', update);
+    window.addEventListener('storage', update);
+    return () => {
+      window.removeEventListener('ims-queue-update', update);
+      window.removeEventListener('storage', update);
+    };
+  }, []);
 
   /* Poll pending counts every 30s (admin only) */
   useEffect(() => {
@@ -281,6 +304,29 @@ export default function Layout() {
       {/* Modals & overlays */}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showLangMenu && <div className="fixed inset-0 z-40" onClick={() => setShowLangMenu(false)} />}
+
+      {/* Upload queue indicator */}
+      {queueSummary && (
+        <button
+          onClick={() => {
+            navigate('/funds');
+            window.dispatchEvent(new CustomEvent('ims-reset-fund-selection'));
+          }}
+          className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold shadow-xl transition-all hover:scale-105"
+          style={{
+            background: queueSummary.failed > 0 ? 'rgba(239,68,68,0.92)' : 'rgba(16,185,129,0.92)',
+            color:  'white',
+            border: '1px solid rgba(255,255,255,0.2)',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          📤
+          {queueSummary.done > 0    && <span>{queueSummary.done} done</span>}
+          {queueSummary.failed > 0  && <span>{queueSummary.done > 0 ? ' · ' : ''}{queueSummary.failed} failed</span>}
+          {queueSummary.waiting > 0 && <span>{(queueSummary.done + queueSummary.failed) > 0 ? ' · ' : ''}{queueSummary.waiting} waiting</span>}
+          <span style={{ opacity: 0.75 }}>— view queue</span>
+        </button>
+      )}
     </div>
   );
 }

@@ -167,6 +167,7 @@ export class CalculationEngine {
       return {
         fund_id:            fund.id,
         fund_name:          fund.fundName,
+        fund_key:           fund.fundKey ?? null,
         fund_name_jp:       fund.fundNameJp,
         manager:            fund.manager,
         strategy:           fund.strategy,
@@ -193,6 +194,7 @@ export class CalculationEngine {
     return {
       fund_id:             fund.id,
       fund_name:           fund.fundName,
+      fund_key:            fund.fundKey ?? null,
       fund_name_jp:        fund.fundNameJp,
       manager:             fund.manager,
       strategy:            fund.strategy,

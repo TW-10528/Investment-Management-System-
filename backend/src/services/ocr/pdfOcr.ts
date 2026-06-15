@@ -5,8 +5,8 @@
 // pdf-parse returns almost nothing. For those we rasterize each page to a PNG and
 // run Tesseract (Japanese + English) purely in Node, no system packages required.
 //
-// Language models live in backend/ocr-langs/{jpn,eng}.traineddata.gz so OCR needs
-// no network access at runtime.
+// Language models live in backend/ocr-langs/{jpn,eng}.traineddata.gz (git LFS) so OCR
+// needs no network access at runtime.
 
 import path from 'path'
 import { createWorker } from 'tesseract.js'
