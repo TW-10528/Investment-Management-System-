@@ -28,12 +28,19 @@ async function main() {
   const fund = await prisma.fund.create({
     data: {
       fundName:      FUND_NAME,
-      manager:       '株式会社サードウェーブ',
-      administrator: '株式会社サードウェーブ',
+      fundNameJp:    'SDGs投資事業有限責任組合',
+      // 無限責任組合員 (GP / managing partner) per the notices — renamed AFM in 2026.
+      // (株式会社サードウェーブ is the LP being billed, not the manager.)
+      manager:       'AFM株式会社（旧 アストマックス・ファンド・マネジメント株式会社）',
+      administrator: 'AFM株式会社（旧 アストマックス・ファンド・マネジメント株式会社）',
       strategy:      'Other',
       vintageYear:   2022,
       currency:      'JPY',
-      commitmentUsd: 1_000_000_000,   // ¥1,000,000,000 (JPY held in this field; no FX)
+      contractDate:  new Date('2022-10-07'),
+      // ¥3,000,000,000 = total commitment across the three closes (2022-10-07 ¥1B →
+      // 2023-10-02 ¥2B → 2024-09-20 ¥3B, per 投資キャッシュフロー_SDGS LPS.xlsx).
+      // JPY held in this field; no FX (matches the extractor, which keeps yen in *Usd).
+      commitmentUsd: 3_000_000_000,
       isActive:      true,
     },
   })

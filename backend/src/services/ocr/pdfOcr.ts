@@ -12,6 +12,17 @@ import path from 'path'
 import { createWorker } from 'tesseract.js'
 import { pdfToPng } from 'pdf-to-png-converter'
 
+// ponytail: Windows fix for pdf-to-png-converter. It feeds pdfjs a cMapUrl ending
+// in "\" (path.sep), but pdfjs 5.x throws unless the URL ends in "/", and the lib
+// exposes no override. Patch its normalizePath to use forward slashes. Remove when
+// the lib fixes Windows paths or accepts a cMapUrl prop. (CommonJS build — require ok.)
+{
+  const npPath = path.join(path.dirname(require.resolve('pdf-to-png-converter')), 'normalizePath.js')
+  const npMod = require(npPath)
+  const orig = npMod.normalizePath
+  npMod.normalizePath = (p: string) => orig(p).replace(/\\/g, '/')
+}
+
 const LANG_PATH = path.join(process.cwd(), 'ocr-langs')
 
 // CJK = Hiragana, Katakana, CJK ideographs, and fullwidth forms. Used to strip the

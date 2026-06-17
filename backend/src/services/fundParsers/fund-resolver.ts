@@ -16,6 +16,10 @@ const FUND_NAME_PATTERNS: Record<string, string[]> = {
   'capula-grv':     ['Capula Global Relative Value Trust', 'Capula'],
 }
 
+// Set true once if this DB lacks the fund_key column (add_fund_key migration not
+// applied), so resolveFund stops re-running — and re-logging — a query it knows fails.
+let fundKeyColumnMissing = false
+
 export interface ResolvedFund {
   id:           string
   fundName:     string
@@ -32,12 +36,20 @@ function mapFund(fund: { id: string; fundName: string; commitmentUsd: any }): Re
  * Step 2: legacy name-pattern fallback for any fund missing a fund_key.
  */
 export async function resolveFund(fundKey: string): Promise<ResolvedFund | null> {
-  // Direct DB lookup — O(1), covers all funds created via the UI with a key set
-  const byKey = await prisma.fund.findFirst({
-    where: { fundKey, isActive: true },
-    select: { id: true, fundName: true, commitmentUsd: true },
-  })
-  if (byKey) return mapFund(byKey)
+  // Direct DB lookup — O(1) when the fund_key column exists. Databases that haven't
+  // applied the add_fund_key migration have no such column, so the query throws;
+  // we note that once and skip it thereafter, falling through to name matching.
+  if (!fundKeyColumnMissing) {
+    try {
+      const byKey = await prisma.fund.findFirst({
+        where: { fundKey, isActive: true },
+        select: { id: true, fundName: true, commitmentUsd: true },
+      })
+      if (byKey) return mapFund(byKey)
+    } catch {
+      fundKeyColumnMissing = true   // column absent — use the name fallback from now on
+    }
+  }
 
   // Legacy fallback: name-pattern matching for funds that predate the fund_key column
   const patterns = FUND_NAME_PATTERNS[fundKey]
@@ -51,4 +63,32 @@ export async function resolveFund(fundKey: string): Promise<ResolvedFund | null>
   }
 
   return null
+}
+
+/**
+ * Live { fundKey, fundName }[] for active funds, for injecting into the AI prompt.
+ * Uses the fund_key column when present; otherwise (column not migrated) derives
+ * each key by matching the name-pattern map against active funds, so the list
+ * still works without the column.
+ */
+export async function listKnownFunds(): Promise<{ fundKey: string; fundName: string }[]> {
+  if (!fundKeyColumnMissing) {
+    try {
+      const rows = await prisma.fund.findMany({
+        where: { isActive: true, fundKey: { not: null } },
+        select: { fundKey: true, fundName: true },
+      })
+      return rows.map(r => ({ fundKey: r.fundKey!, fundName: r.fundName }))
+    } catch {
+      fundKeyColumnMissing = true
+    }
+  }
+
+  const active = await prisma.fund.findMany({ where: { isActive: true }, select: { fundName: true } })
+  const out: { fundKey: string; fundName: string }[] = []
+  for (const [fundKey, patterns] of Object.entries(FUND_NAME_PATTERNS)) {
+    const match = active.find(f => patterns.some(p => f.fundName.toLowerCase().includes(p.toLowerCase())))
+    if (match) out.push({ fundKey, fundName: match.fundName })
+  }
+  return out
 }

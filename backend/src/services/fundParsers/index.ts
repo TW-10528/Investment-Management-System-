@@ -5,6 +5,7 @@
 import pdfParse from 'pdf-parse'
 import { textWithOcrFallback } from '../ocr/pdfOcr'
 import { extractFundNoticeWithAI } from './aiExtractor'
+import { extractSdgNotice } from './sdgExtractor'
 import type { ParsedFundNotice } from './types'
 
 export type { ParsedFundNotice }
@@ -27,7 +28,11 @@ export async function parseFundPdf(
     console.log(`[EXTRACT] OCR     : produced ${text.length.toLocaleString()} chars`)
   }
 
-  const result = await extractFundNoticeWithAI(text, fileName, knownFunds)
+  // The SDG fund is a single fixed Japanese template — a deterministic regex reads
+  // its amounts exactly. Use it before falling back to the AI extractor (which is
+  // kept for the other funds' varied English formats).
+  const sdg = extractSdgNotice(text, fileName)
+  const result = sdg ?? await extractFundNoticeWithAI(text, fileName, knownFunds)
 
   // Prepend OCR info to the extraction log if OCR was used
   if (usedOcr && result.extractionLog) {

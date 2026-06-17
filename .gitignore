@@ -9,3 +9,5 @@ backend/node_modules/
 node_modules/
 backend/*.db
 backend/uploads/
+# Decompressed OCR models — regenerated at runtime from the tracked *.gz (git LFS)
+backend/ocr-langs/*.traineddata

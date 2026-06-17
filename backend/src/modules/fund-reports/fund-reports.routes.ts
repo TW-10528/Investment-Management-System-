@@ -13,7 +13,7 @@ import { auth } from '../../middleware/auth'
 import { canEdit } from '../../middleware/guard'
 import { prisma } from '../../lib/prisma'
 import { parseFundPdf } from '../../services/fundParsers/index'
-import { resolveFund } from '../../services/fundParsers/fund-resolver'
+import { resolveFund, listKnownFunds } from '../../services/fundParsers/fund-resolver'
 import { CalculationEngine } from '../../services/calculationEngine'
 import { notifyAllAdmins, notifyUser } from '../../services/notificationService'
 import { config } from '../../config/index'
@@ -77,12 +77,9 @@ router.post('/upload', async (c) => {
   const safe         = originalName.replace(/[^a-zA-Z0-9._-]/g, '_')
   const buffer       = Buffer.from(await file.arrayBuffer())
 
-  // Fetch all active funds with a key so the AI prompt lists them dynamically
-  const fundRows = await prisma.fund.findMany({
-    where: { isActive: true, fundKey: { not: null } },
-    select: { fundKey: true, fundName: true },
-  })
-  const knownFunds = fundRows.map(f => ({ fundKey: f.fundKey!, fundName: f.fundName }))
+  // Active funds as { fundKey, fundName } so the AI prompt lists them dynamically.
+  // (Tolerates DBs without the fund_key column — derives keys by name.)
+  const knownFunds = await listKnownFunds()
 
   // AI extraction — OCR + local LLM via Ollama (fund list injected into prompt)
   const parsed = await parseFundPdf(buffer, originalName, knownFunds)
