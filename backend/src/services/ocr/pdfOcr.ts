@@ -3,26 +3,39 @@
 // Most fund PDFs carry a text layer that pdf-parse reads directly. Some funds —
 // notably the Japanese SDG notices — are scanned images with no text layer, so
 // pdf-parse returns almost nothing. For those we rasterize each page to a PNG and
-// run Tesseract (Japanese + English) purely in Node, no system packages required.
+// run PaddleOCR (Baidu PP-OCR, Japanese + Latin) via the paddle-venv subprocess.
 //
-// Language models live in backend/ocr-langs/{jpn,eng}.traineddata.gz so OCR needs
-// no network access at runtime.
+// See paddleOcr.ts for the subprocess wrapper; scripts/paddle_ocr.py is the
+// sidecar that calls PaddleOCR's Python API. PaddleOCR reads Japanese financial
+// tables (amounts, commas, kanji labels) far more reliably than Tesseract:
+// side-by-side on the same SDG test image Tesseract garbled "363,602,836円" into
+// "363,.602,.836円" while PaddleOCR read every digit and comma correctly.
 
 import path from 'path'
-import { createWorker } from 'tesseract.js'
 import { pdfToPng } from 'pdf-to-png-converter'
+import { paddleOcrImageBuffers, paddleOcrImage } from './paddleOcr'
 
-const LANG_PATH = path.join(process.cwd(), 'ocr-langs')
+// Windows fix for pdf-to-png-converter: it feeds pdfjs a cMapUrl ending in "\"
+// (path.sep), but pdfjs 5.x throws unless the URL ends in "/", and the lib
+// exposes no override. Patch its normalizePath to use forward slashes. No-op
+// on Linux/Mac (paths already use "/"). Remove when the lib fixes Windows
+// paths or accepts a cMapUrl prop. (CommonJS build — require ok.)
+{
+  const npPath = path.join(path.dirname(require.resolve('pdf-to-png-converter')), 'normalizePath.js')
+  const npMod = require(npPath)
+  const orig = npMod.normalizePath
+  npMod.normalizePath = (p: string) => orig(p).replace(/\\/g, '/')
+}
 
 // CJK = Hiragana, Katakana, CJK ideographs, and fullwidth forms. Used to strip the
-// spaces Tesseract inserts between Japanese glyphs.
+// spaces some OCR engines insert between Japanese glyphs.
 const CJK = '\\u3040-\\u30ff\\u3400-\\u9fff\\uff00-\\uffef'
 
 /**
- * Clean up Japanese OCR output so the label/amount regexes match:
- *  - circled numbers ①②③…⑳ and ⓪ → ASCII digits
+ * Normalise Japanese OCR output so the label/amount regexes match:
  *  - fullwidth digits ０-９ → ASCII digits
- *  - remove the spaces Tesseract inserts between CJK glyphs and inside numbers
+ *  - circled numbers ①②③…⑳ and ⓪ → ASCII digits
+ *  - remove spaces between CJK glyphs and inside number groups
  */
 export function normalizeOcrText(text: string): string {
   if (!text) return ''
@@ -51,49 +64,82 @@ export const WEAK_TEXT_THRESHOLD = 40
 
 /**
  * OCR every page of a scanned PDF and return the combined text.
- * Returns '' if rasterization or OCR fails (caller keeps the pdf-parse text).
+ *
+ * Options:
+ *   viewportScale  — PNG render DPI factor (default 2.0 = ~144 DPI).
+ *                    Use 1.0 (~72 DPI) for large legal text where speed matters more than
+ *                    sub-pixel accuracy — runs ~3× faster than 2.0 on CPU.
+ *   pageSampleLimit — when the PDF has MORE than this many pages, only rasterise and OCR
+ *                    the first 3 + last 2 pages (where commitment amounts / key labels live).
+ *                    Capital-call notices are 1–5 pages so the limit never fires for them.
  */
-export async function ocrPdf(buffer: Buffer): Promise<string> {
-  let worker: Awaited<ReturnType<typeof createWorker>> | null = null
+export async function ocrPdf(
+  buffer: Buffer,
+  opts: { pageSampleLimit?: number; viewportScale?: number } = {},
+): Promise<string> {
+  const { pageSampleLimit, viewportScale = 2.0 } = opts
   try {
-    const pages = await pdfToPng(buffer, {
-      viewportScale: 4.0,             // 4x render — needed to read amounts inside
-                                      // bordered tables (e.g. SDG 払込み頂く金額 row)
-    })
-    if (!pages.length) return ''
-
-    // jpn+eng: Japanese body text plus the Latin "SDG" / numbers.
-    worker = await createWorker('jpn+eng', 1, {
-      langPath: LANG_PATH,
-      gzip:     true,
-      cachePath: LANG_PATH,
-    })
-    // PSM 11 (sparse text) finds amounts scattered through table cells that the
-    // default layout analysis drops — without it the SDG 払込み頂く金額 figure was
-    // being missed while the bottom-of-table 現在の出資未履行金額 was read.
-    await worker.setParameters({ tessedit_pageseg_mode: '11' as any })
-
-    const parts: string[] = []
-    for (const page of pages) {
-      const { data } = await worker.recognize(page.content)
-      if (data.text) parts.push(data.text)
+    // For large PDFs, limit which pages we rasterize.
+    // pdf-parse reads the page count cheaply (no rendering), then pdfToPng receives
+    // an explicit pagesToProcess list so skipped pages are never rendered.
+    let pagesToProcess: number[] | undefined = undefined
+    if (pageSampleLimit != null) {
+      try {
+        const pdfParse  = (await import('pdf-parse')).default
+        const meta      = await pdfParse(buffer, { max: 0 })
+        const totalPages: number = (meta as any).numpages ?? 0
+        if (totalPages > pageSampleLimit) {
+          // 1-indexed: first 3 pages (cover / definitions) + last 2 pages (signatures).
+          // Commitment amounts and key fund labels are always in these sections.
+          const head      = Math.min(3, totalPages)
+          const tailStart = Math.max(head + 1, totalPages - 1)  // last 2 pages, non-overlapping
+          const tail      = Array.from(
+            { length: Math.min(2, Math.max(0, totalPages - tailStart + 1)) },
+            (_, i) => tailStart + i,
+          )
+          pagesToProcess = [...Array.from({ length: head }, (_, i) => i + 1), ...tail]
+          console.info(
+            `[ocrPdf] large PDF (${totalPages} pages) — sampling pages [${pagesToProcess.join(', ')}] at ${viewportScale}×`,
+          )
+        }
+      } catch { /* fall through and rasterize all pages */ }
     }
-    return normalizeOcrText(parts.join('\n'))
+
+    const pages = await pdfToPng(buffer, {
+      viewportScale,
+      ...(pagesToProcess ? { pagesToProcess } : {}),
+    })
+    const buffers = pages.map(p => p.content).filter((c): c is Buffer => !!c)
+    if (!buffers.length) return ''
+    const text = await paddleOcrImageBuffers(buffers, 'japan')
+    return normalizeOcrText(text)
   } catch (err: any) {
-    console.error('[ocrPdf] OCR failed:', err?.message ?? err)
+    console.error('[ocrPdf] rasterization failed:', err?.message ?? err)
     return ''
-  } finally {
-    if (worker) { try { await worker.terminate() } catch { /* ignore */ } }
   }
+}
+
+/**
+ * OCR a standalone scanned image (PNG/JPG/etc. — not a PDF) and return the
+ * normalized text. Used for fund notices delivered as a photo/scan of a page
+ * rather than a PDF file.
+ */
+export async function ocrImage(buffer: Buffer): Promise<string> {
+  const text = await paddleOcrImage(buffer, 'japan')
+  return normalizeOcrText(text)
 }
 
 /**
  * Return the best available text for a PDF: pdf-parse text when it's substantial,
  * otherwise OCR text. `pdfText` is what pdf-parse already extracted.
  */
-export async function textWithOcrFallback(buffer: Buffer, pdfText: string): Promise<string> {
+export async function textWithOcrFallback(
+  buffer: Buffer,
+  pdfText: string,
+  opts: { pageSampleLimit?: number } = {},
+): Promise<string> {
   if ((pdfText?.trim().length ?? 0) >= WEAK_TEXT_THRESHOLD) return pdfText
-  const ocrText = await ocrPdf(buffer)
+  const ocrText = await ocrPdf(buffer, opts)
   // Keep whichever is longer (OCR can occasionally come back empty).
   return ocrText.trim().length > (pdfText?.trim().length ?? 0) ? ocrText : pdfText
 }

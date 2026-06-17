@@ -90,6 +90,7 @@ model Fund {
   fundReports       FundReport[]
   sigfSnapshot      SigfSnapshot?
   commitments       Commitment[]
+  commitmentHistory FundCommitmentHistory[]
 
   @@map("funds")
 }
@@ -142,6 +143,9 @@ model CapitalCall {
   // Manual cash-flow override (col G). When set, the ledger uses this instead of -B + C.
   // Used for funds whose cash flow is entered by hand until automated extraction exists.
   manualCashFlowUsd   Decimal?   @db.Decimal(20, 6) @map("manual_cash_flow_usd")
+  // SDG: remaining unfunded after this call (本出資後の出資未履行金額).
+  // When set, overrides the generic F = prev_F - B + D formula for this row.
+  unfundedAfterCallUsd Decimal?  @db.Decimal(20, 2) @map("unfunded_after_call_usd")
   status              CallStatus @default(pending)
   wireReference       String?    @map("wire_reference")
   wireFeeJpy          Decimal?   @default(0) @db.Decimal(12, 2) @map("wire_fee_jpy")
@@ -375,6 +379,26 @@ model CalculationResult {
   rule CalculationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
 
   @@map("calculation_results")
+}
+
+// Commitment history for funds whose LP commitment grows over time (e.g. SDG).
+// Each row records a NEW total commitment amount effective from a given date.
+// The calculation engine looks up the row with effectiveDate ≤ transactionDate to
+// determine what commitment was in force on the day of each capital call.
+// Old rows are NEVER deleted — they protect the historical F calculations.
+model FundCommitmentHistory {
+  id               String   @id @default(uuid())
+  fundId           String   @map("fund_id")
+  commitmentAmount Decimal  @db.Decimal(20, 2) @map("commitment_amount")
+  effectiveDate    DateTime @map("effective_date") @db.Date
+  notes            String?
+
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  fund Fund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  @@index([fundId, effectiveDate])
+  @@map("fund_commitment_history")
 }
 
 model Notification {

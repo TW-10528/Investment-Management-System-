@@ -94,8 +94,8 @@ npx prisma generate
 ### 5. Start dev server
 ```bash
 npm run dev
-# → http://localhost:8001
-# → http://localhost:8001/health
+# → http://localhost:8004
+# → http://localhost:8004/health
 ```
 
 ### Build for production
@@ -110,7 +110,7 @@ npm run start   # node dist/main.js
 
 ```env
 # Server
-PORT=8001
+PORT=8004
 ENVIRONMENT=local
 
 # PostgreSQL (matches docker-compose defaults)
@@ -186,7 +186,7 @@ Hard cap: **max 10 active users**.
 
 ## API Reference
 
-**Base URL:** `http://localhost:8001/api/v1`
+**Base URL:** `http://localhost:8004/api/v1`
 
 ---
 
@@ -412,12 +412,12 @@ This backend follows the **Aviary Hono Backend Starter Kit v1.2.0** patterns:
 File: `frontend/src/services/api.ts`
 
 ```typescript
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8004/api/v1'
 ```
 
 Frontend `.env`:
 ```env
-VITE_API_URL=http://localhost:8001/api/v1
+VITE_API_URL=http://localhost:8004/api/v1
 ```
 
 The API contract is **100% compatible** with the original Python/FastAPI backend — all endpoints, methods, and JSON shapes are identical. No frontend changes required.

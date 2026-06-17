@@ -4,7 +4,7 @@
 # Docker is used ONLY for PostgreSQL.
 #
 #   docker compose up -d         # start the database (port 6000)
-#   cd backend  && npm run dev    # backend  → http://localhost:8001
+#   cd backend  && npm run dev    # backend  → http://localhost:8004
 #   cd frontend && npm run dev    # frontend → http://localhost:5173
 #
 # First-time setup on a fresh machine (e.g. a teammate cloning the repo):

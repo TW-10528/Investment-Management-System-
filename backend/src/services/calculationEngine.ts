@@ -30,6 +30,10 @@ export interface Transaction {
   capitalReceived: Decimal   // C
   reinvestable:    Decimal   // D
   manualCashFlow?: Decimal | null   // when set, overrides G (= -B + C)
+  // SDG: remaining unfunded after this call (本出資後の出資未履行金額).
+  // When set, the investment capacity F = this value directly instead of prev_F - B + D.
+  // Handles the SDG fund's per-notice remaining commitment (which accounts for commitment increases).
+  unfundedAfterCall?: Decimal | null
   callId?:         string
   distId?:         string
   wireReference?:  string | null
@@ -64,12 +68,29 @@ export interface FundSnapshot {
 
 export class CalculationEngine {
 
-  /** Build a full Excel-style ledger from sorted transactions. */
+  /** Build a full Excel-style ledger from sorted transactions.
+   *
+   * `commitmentHistory` — optional sorted list of commitment step-ups (SDG).
+   * Each entry is `{ commitmentAmount, effectiveDate }`. For each transaction
+   * the engine picks the entry with the largest effectiveDate ≤ tx.date and
+   * computes F = commitment_at_date - E + D.  When no history is supplied (or
+   * no entry is found for a date) the engine falls back to unfundedAfterCall
+   * or the generic prev_F - B + D formula.
+   */
   static buildLedger(
-    commitmentUsd: Decimal,
-    transactions:  Transaction[],
-    defaultFx:     Decimal = new Decimal('150'),
+    commitmentUsd:     Decimal,
+    transactions:      Transaction[],
+    defaultFx:         Decimal = new Decimal('150'),
+    commitmentHistory: Array<{ commitmentAmount: Decimal; effectiveDate: Date }> = [],
   ): { rows: LedgerRow[]; snapshot: FundSnapshot } {
+    // Pre-sort history descending so the first match is always the latest applicable entry.
+    const histSorted = [...commitmentHistory].sort((a, b) => b.effectiveDate.getTime() - a.effectiveDate.getTime())
+
+    function commitmentAt(date: Date): Decimal | null {
+      const entry = histSorted.find(h => h.effectiveDate <= date)
+      return entry ? entry.commitmentAmount : null
+    }
+
     const sorted = [...transactions].sort((a, b) => a.date.getTime() - b.date.getTime())
 
     let E = new Decimal(0)   // cumulative called
@@ -84,8 +105,20 @@ export class CalculationEngine {
       const D    = tx.reinvestable
       const rate = tx.fxRate ?? defaultFx
 
-      E = E.plus(B)                // E = prev_E + B
-      F = F.minus(B).plus(D)       // F = prev_F - B + D
+      E = E.plus(B).minus(D)      // E = prev_E + B − D
+
+      // F — two cases, both consistent with F = commitment − E:
+      //  1. Commitment history entry available: F = commitment_at_date − E
+      //  2. Standard formula: F = prev_F − B + D
+      // Document-reported unfunded (unfundedAfterCall) is NOT used for F because
+      // individual notices only subtract their own call from commitment and miss
+      // prior calls in the same period, producing incorrect chained values.
+      const histCommitment = histSorted.length > 0 ? commitmentAt(tx.date) : null
+      if (histCommitment != null && histCommitment.gt(0)) {
+        F = histCommitment.minus(E)  // F = commitment − E  (D already subtracted in E)
+      } else {
+        F = F.minus(B).plus(D)       // F = prev_F − B + D
+      }
       // G = -B + C, unless a manual cash-flow value was entered for this row.
       const G = tx.manualCashFlow != null ? tx.manualCashFlow : new Decimal(0).minus(B).plus(C)
       H = H.plus(G)                // H = prev_H + G
@@ -103,17 +136,30 @@ export class CalculationEngine {
 
     const totalCalled    = rows.reduce((s, r) => s.plus(r.capitalPaidIn),   new Decimal(0))
     const totalReceived  = rows.reduce((s, r) => s.plus(r.capitalReceived), new Decimal(0))
-    const drawnPct       = commitmentUsd.gt(0)
-      ? totalCalled.div(commitmentUsd).mul(100).toDecimalPlaces(2)
-      : new Decimal(0)
     const lastRow        = rows[rows.length - 1]
 
+    // Snapshot commitment: prefer the most recent history entry (latest commitment step-up)
+    // over the fund-level commitmentUsd when history is present.
+    const latestHistCommitment = histSorted.length > 0 ? histSorted[0].commitmentAmount : null
+    const snapshotCommitment   = latestHistCommitment ?? commitmentUsd
+
+    // drawnPct: use the latest effective commitment.
+    const drawnPct = snapshotCommitment.gt(0)
+      ? totalCalled.div(snapshotCommitment).mul(100).toDecimalPlaces(2)
+      : new Decimal(0)
+
+    // unfundedUsd = F from the last ledger row. The row's investmentCapacity already
+    // accounts for commitment history step-ups and the correct E = ΣB − ΣD formula.
+    const unfundedUsd = lastRow != null
+      ? lastRow.investmentCapacity
+      : commitmentUsd
+
     const snapshot: FundSnapshot = {
-      commitmentUsd,
+      commitmentUsd: snapshotCommitment,
       totalCalledUsd:     totalCalled,
       totalReceivedUsd:   totalReceived,
       drawnPct,
-      unfundedUsd:        commitmentUsd.minus(totalCalled),
+      unfundedUsd,
       investmentCapacity: lastRow?.investmentCapacity ?? commitmentUsd,
       netCashPosition:    lastRow?.netCashPosition    ?? new Decimal(0),
       dpi:                totalCalled.gt(0)

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 
-// Use Vite proxy (/api → localhost:8001) in dev; absolute URL in production
+// Use Vite proxy (/api → localhost:8004) in dev; absolute URL in production
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
 const api: AxiosInstance = axios.create({
@@ -78,6 +78,10 @@ export const fundsAPI = {
   updateCommitment: (id: string, cid: string, d: any) => api.patch(`/funds/${id}/commitments/${cid}`, d),
   deleteCommitment: (id: string, cid: string)         => api.delete(`/funds/${id}/commitments/${cid}`),
   commitmentLedger: (id: string, cid: string)         => api.get(`/funds/${id}/commitments/${cid}/ledger`),
+  // Commitment history — time-stepped commitment amounts (SDG, Siguler Guff)
+  getCommitmentHistory:    (id: string)         => api.get(`/funds/${id}/commitment-history`),
+  addCommitmentHistory:    (id: string, d: any) => api.post(`/funds/${id}/commitment-history`, d),
+  deleteCommitmentHistory: (id: string, hid: string) => api.delete(`/funds/${id}/commitment-history/${hid}`),
 };
 
 // ── Capital Calls ─────────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import FundDetail from './pages/FundDetail';
 import FxRates from './pages/FxRates';
 import Users from './pages/Users';
 import Notifications from './pages/Notifications';
+import AiExtract    from './pages/AiExtract';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('authToken');
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="funds/:id"  element={<FundDetail />} />
           <Route path="fx-rates"   element={<FxRates />} />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="ai-extract"   element={<AiExtract />} />
 
           {/* Admin-only */}
           <Route

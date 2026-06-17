@@ -9,6 +9,47 @@ import { fundReportsAPI } from '../services/api';
 import { fmt } from '../lib/format';
 import toast from 'react-hot-toast';
 
+function PdfModal({ docId, fileName, onClose }: { docId: string; fileName: string; onClose: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let objUrl = '';
+    fundReportsAPI.file(docId)
+      .then(r => { objUrl = URL.createObjectURL(r.data); setUrl(objUrl); })
+      .catch(() => toast.error('Could not load file'));
+    return () => { if (objUrl) URL.revokeObjectURL(objUrl); };
+  }, [docId]);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="theme-card border theme-border rounded-2xl shadow-2xl w-full max-w-5xl h-[88vh] flex flex-col overflow-hidden"
+           onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-3 border-b theme-border flex items-center justify-between gap-3 flex-shrink-0">
+          <p className="text-sm font-semibold theme-text truncate">📄 {fileName}</p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {url && (
+              <a href={url} target="_blank" rel="noreferrer"
+                 className="px-3 py-1.5 rounded-lg text-xs font-medium border theme-border theme-text-muted hover:theme-text transition-colors">
+                Open in new tab ↗
+              </a>
+            )}
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-lg flex items-center justify-center theme-text-muted hover:theme-text text-lg">×</button>
+          </div>
+        </div>
+        <div className="flex-1 min-h-0" style={{ background: '#525659' }}>
+          {url
+            ? <iframe src={url} title={fileName} className="w-full h-full" />
+            : <div className="h-full flex items-center justify-center">
+                <div className="w-8 h-8 border-4 border-white/30 border-t-transparent rounded-full animate-spin" />
+              </div>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   fundId:   string;
   canEdit:  boolean;
@@ -38,6 +79,7 @@ function docTime(d: any): number {
 export default function FundDocuments({ fundId, canEdit, onChanged }: Props) {
   const [docs, setDocs]       = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewDoc, setViewDoc] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -116,7 +158,11 @@ export default function FundDocuments({ fundId, canEdit, onChanged }: Props) {
                         {doc.confidence_grade ?? 'low'}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 flex items-center gap-2">
+                      <button onClick={() => setViewDoc({ id: doc.id, name: doc.file_name })}
+                        className="px-2 py-1 rounded text-xs font-medium text-indigo-400 hover:bg-indigo-500/10 transition-colors">
+                        View
+                      </button>
                       {canEdit && (
                         <button onClick={() => del(doc)}
                           className="px-2 py-1 rounded text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors">
@@ -130,6 +176,10 @@ export default function FundDocuments({ fundId, canEdit, onChanged }: Props) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {viewDoc && (
+        <PdfModal docId={viewDoc.id} fileName={viewDoc.name} onClose={() => setViewDoc(null)} />
       )}
     </div>
   );

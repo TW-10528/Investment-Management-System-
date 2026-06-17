@@ -1,138 +1,123 @@
-# Thirdwave IMS — Quick Start Guide
+# Thirdwave IMS — Quick Start
 
-## Stack
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 18 + Vite + Tailwind CSS |
-| Backend  | **Hono v4** + TypeScript + Prisma + PostgreSQL |
-| Auth     | JWT (8h) + bcrypt passwords |
-| DB       | PostgreSQL 16 (via existing `postgres-db` Docker container, port **6000**) |
+## Prerequisites
+
+| Tool | Minimum version | Install |
+|------|-----------------|---------|
+| Node.js | 20 | https://nodejs.org |
+| npm | 10 | (bundled with Node) |
+| Docker Desktop | any | https://docs.docker.com/get-docker/ |
 
 ---
 
-## 🚀 One-time Setup
+## First-time setup (clone → running in one command)
 
-### 1 — Backend
+```bash
+git clone <repo-url>
+cd inv
+bash setup.sh
+```
+
+`setup.sh` handles everything automatically:
+1. Copies `backend/.env.example` → `backend/.env`
+2. Starts PostgreSQL via Docker Compose (`localhost:5435`)
+3. Installs `npm` dependencies for backend and frontend
+4. Runs Prisma migrations (`prisma migrate deploy`)
+5. Seeds the database with demo users and fund data
+
+Then start the app:
+
+```bash
+bash start.sh
+```
+
+---
+
+## Daily development
+
+```bash
+bash start.sh
+```
+
+Or manually in two terminals:
+
+```bash
+# Terminal 1
+cd backend && npm run dev      # Hono API → http://localhost:8004
+
+# Terminal 2
+cd frontend && npm run dev     # Vite → http://localhost:5173
+```
+
+---
+
+## Credentials
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@thirdwave.co.jp | Admin123! |
+
+Other users self-register via the signup page (admin must approve).
+
+---
+
+## Services
+
+| Service | URL |
+|---------|-----|
+| App | http://localhost:5173 |
+| API | http://localhost:8004/api/v1 |
+| Health | http://localhost:8004/health |
+| PostgreSQL | localhost:5435 (container: `ims_postgres`) |
+
+---
+
+## Database commands
 
 ```bash
 cd backend
 
-# Install Node dependencies
-npm install
-
-# Configure environment (already pre-configured for local postgres-db container)
-# DATABASE_URL points to localhost:6000 (existing postgres-db Docker container)
-cat .env   # verify DATABASE_URL="postgresql://ims_user:ims_password@localhost:6000/ims_db"
-
-# Create DB user & database (one-time, if not already done)
-docker exec postgres-db psql -U postgres -c "CREATE USER ims_user WITH PASSWORD 'ims_password' CREATEDB;"
-docker exec postgres-db psql -U postgres -c "CREATE DATABASE ims_db OWNER ims_user;"
-
-# Run migrations
-npx prisma migrate dev --name init
-
-# Seed with demo data (3 funds, 4 capital calls, distributions, NAV, investments)
-npm run db:seed
-
-# Start dev server
-npm run dev
-# → http://localhost:8001
-# → http://localhost:8001/health
-```
-
-### 2 — Frontend
-
-```bash
-cd frontend
-
-# Install (one-time)
-npm install
-
-# Start dev server
-npm run dev
-# → http://localhost:5173
+npm run db:seed      # Re-seed with demo data (wipes existing data)
+npm run db:migrate   # Create a new migration after schema changes
+npm run db:reset     # Drop everything and re-migrate + re-seed
+npx prisma studio    # Open GUI to browse the database
 ```
 
 ---
 
-## 🔄 Daily Development Start
+## Stack
 
-```bash
-# Terminal 1 — Backend
-cd ~/ims-project/backend && npm run dev
-
-# Terminal 2 — Frontend
-cd ~/ims-project/frontend && npm run dev
-```
-
----
-
-## 🔑 Demo Credentials (after seed)
-
-| Role | Email | Password |
-|------|-------|---------|
-| Admin | admin@thirdwave.co.jp | Admin123! |
-| Finance Manager | finance@thirdwave.co.jp | Staff123! |
-| Board Member | board@thirdwave.co.jp | Staff123! |
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 19 + Vite + Tailwind CSS |
+| Backend | Hono v4 + TypeScript + Node.js |
+| ORM | Prisma 5 + PostgreSQL 16 |
+| Auth | JWT (8h) + bcrypt |
+| Infrastructure | Docker Compose (Postgres) |
 
 ---
 
-## 📊 Demo Data (seeded)
+## Troubleshooting
 
-### Funds
-| Fund | Strategy | Commitment |
-|------|----------|-----------|
-| GS Vintage X | Buyout | $10M |
-| BlackRock Credit Alt V | Credit | $5M |
-| KKR Growth VIII | Growth | $8M |
+**401 on login** — the database is empty. Run `cd backend && npm run db:seed`.
 
-### Portfolio KPIs (seeded state)
-- **Total Commitment**: $23M
-- **Paid-in**: $5.8M (25% drawn)
-- **Distributions**: $870K
-- **Total NAV**: $19.8M
-- **DPI**: 0.15x
-- **TVPI**: 3.56x
-- **FX Rate**: ¥149.85/USD (latest MUFG TTM)
+**`Cannot find module`** — run `npm install` in the relevant directory.
+
+**Port 8004 or 5173 already in use** — `start.sh` kills previous processes automatically; or run `lsof -ti:8004 | xargs kill -9`.
+
+**PostgreSQL not reachable** — `cd backend && docker compose up -d postgres`, then wait ~5s.
+
+**Schema out of date after `git pull`** — `cd backend && npx prisma migrate deploy && npx prisma generate`.
 
 ---
 
-## 🏗 Access Points
+## Production checklist
 
-| Service | URL |
-|---------|-----|
-| Frontend | http://localhost:5173 |
-| Backend API | http://localhost:8001/api/v1 |
-| Health check | http://localhost:8001/health |
-| PostgreSQL | localhost:6000 (docker: postgres-db) |
-
----
-
-## 🎯 Key Features
-
-- **Advanced Dashboard** — TVPI, DPI gauges, portfolio health score, strategy allocation pie, deployment-by-fund chart
-- **Role-Based Access** — Admin/Finance can edit; Board Member/User are view-only
-- **5-language i18n** — EN, JA, ZH, TL, KO across all pages
-- **Dark Mode** — theme-* CSS variables throughout
-- **PDF Notices** — Upload GP notice PDFs → auto-extract → admin approve → creates CF records
-- **Calculation Engine** — Excel B→H formula replication with decimal.js precision
-- **OTP Password Reset** — dev mode prints code to console; configure SMTP for production
-
----
-
-## 🗃 Prisma Schema Models
-
-`users` · `funds` · `capital_calls` · `distributions` · `fx_rates` · `nav_records` · `investment_targets` · `notices` · `audit_logs` · `otp_tokens`
-
----
-
-## 🏭 Production Checklist
-
-- [ ] `SECRET_KEY`: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
-- [ ] `DATABASE_URL`: set to production PostgreSQL
-- [ ] `SMTP_USER` / `SMTP_PASSWORD`: configure for real email
-- [ ] `ALLOWED_ORIGINS`: add production domain
-- [ ] `ENVIRONMENT=production`
-- [ ] `npx prisma migrate deploy`
-- [ ] Mount `./uploads` as persistent volume
-- [ ] HTTPS reverse proxy (Nginx / Azure App Service / Caddy)
+- [ ] Generate a real secret key: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`  → set as `SECRET_KEY` in `.env`
+- [ ] Set `DATABASE_URL` to your production PostgreSQL
+- [ ] Set `SMTP_USER` / `SMTP_PASSWORD` for email (OTP reset)
+- [ ] Set `ALLOWED_ORIGINS` to your production domain
+- [ ] Set `ENVIRONMENT=production`
+- [ ] Run `npx prisma migrate deploy` (not `migrate dev`)
+- [ ] Mount `./uploads` as a persistent volume
+- [ ] Put a TLS-terminating reverse proxy in front (Nginx, Caddy, Azure App Service)

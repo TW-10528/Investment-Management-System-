@@ -62,6 +62,15 @@ router.get('/:id/ledger', async (c) => {
 
   const commitment = new Decimal(fund.commitmentUsd.toString())
 
+  // Fetch commitment history for funds that use it (e.g. SDG).
+  const histRecords = await prisma.fundCommitmentHistory.findMany({
+    where: { fundId: fund.id }, orderBy: { effectiveDate: 'asc' },
+  })
+  const commitmentHistory = histRecords.map((h: any) => ({
+    commitmentAmount: new Decimal(h.commitmentAmount.toString()),
+    effectiveDate:    h.effectiveDate as Date,
+  }))
+
   const txns = [
     ...paidCalls.map((cc: any) => ({
       date:            cc.executionDate ?? cc.dueDate,
@@ -72,6 +81,7 @@ router.get('/:id/ledger', async (c) => {
       capitalReceived: new Decimal(cc.distributionUsd.toString()),
       reinvestable:    new Decimal(cc.reinvestableUsd.toString()),
       manualCashFlow:  cc.manualCashFlowUsd != null ? new Decimal(cc.manualCashFlowUsd.toString()) : null,
+      unfundedAfterCall: cc.unfundedAfterCallUsd != null ? new Decimal(cc.unfundedAfterCallUsd.toString()) : null,
       callId:          cc.id,
       wireReference:   cc.wireReference,
       notes:           cc.notes ?? null,
@@ -99,7 +109,7 @@ router.get('/:id/ledger', async (c) => {
     return c.json({ fund_id: fund.id, fund_name: fund.fundName, commitment: parseFloat(commitment.toString()), rows: [], snapshot: null })
   }
 
-  const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns)
+  const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new Decimal('150'), commitmentHistory)
   const f = (d: Decimal) => parseFloat(d.toString())
 
   return c.json({
@@ -152,16 +162,20 @@ const num = (d: any) => parseFloat(d.toString())
 function buildCommitmentLedger(commitmentAmount: Decimal, paidCalls: any[], distributions: any[]) {
   const txns = [
     ...paidCalls.map((cc: any) => ({
-      date:            cc.executionDate ?? cc.dueDate,
-      txType:          'capital_call' as const,
-      description:     `Capital Call #${cc.callNumber}`,
-      fxRate:          cc.fxRate ? new Decimal(cc.fxRate.toString()) : null,
-      capitalPaidIn:   new Decimal(cc.grossCallUsd.toString()),
-      capitalReceived: new Decimal(cc.distributionUsd.toString()),
-      reinvestable:    new Decimal(cc.reinvestableUsd.toString()),
-      manualCashFlow:  cc.manualCashFlowUsd != null ? new Decimal(cc.manualCashFlowUsd.toString()) : null,
-      callId:          cc.id,
-      wireReference:   cc.wireReference,
+      date:              cc.executionDate ?? cc.dueDate,
+      txType:            'capital_call' as const,
+      description:       `Capital Call #${cc.callNumber}`,
+      fxRate:            cc.fxRate ? new Decimal(cc.fxRate.toString()) : null,
+      capitalPaidIn:     new Decimal(cc.grossCallUsd.toString()),
+      capitalReceived:   new Decimal(cc.distributionUsd.toString()),
+      reinvestable:      new Decimal(cc.reinvestableUsd.toString()),
+      manualCashFlow:    cc.manualCashFlowUsd != null ? new Decimal(cc.manualCashFlowUsd.toString()) : null,
+      // SDG: use stored post-call remaining as F override (handles commitment changes).
+      unfundedAfterCall: cc.unfundedAfterCallUsd != null
+        ? new Decimal(cc.unfundedAfterCallUsd.toString())
+        : null,
+      callId:            cc.id,
+      wireReference:     cc.wireReference,
     })),
     ...distributions.map((d: any) => ({
       date:            d.distributionDate,
@@ -276,6 +290,85 @@ router.delete('/:id/commitments/:cid', async (c) => {
     prisma.notice.deleteMany({ where: { commitmentId: cid } }),
     prisma.commitment.delete({ where: { id: cid } }),
   ])
+  return c.json({ ok: true })
+})
+
+// ── Commitment History (SDG-style time-stepped commitments) ───────────────────
+// Each row records a new total commitment amount effective from a date.
+// The calculation engine uses this to compute F = commitment_at_date - E + D.
+
+// GET /:id/commitment-history
+router.get('/:id/commitment-history', async (c) => {
+  const fundId = c.req.param('id')
+  const history = await prisma.fundCommitmentHistory.findMany({
+    where: { fundId }, orderBy: { effectiveDate: 'asc' },
+  })
+  return c.json(history.map((h: any) => ({
+    id:               h.id,
+    fund_id:          h.fundId,
+    commitment_amount: num(h.commitmentAmount),
+    effective_date:   h.effectiveDate.toISOString().slice(0, 10),
+    notes:            h.notes ?? null,
+    created_at:       h.createdAt.toISOString(),
+  })))
+})
+
+// POST /:id/commitment-history — add a new commitment step-up
+router.post('/:id/commitment-history', async (c) => {
+  const fundId = c.req.param('id')
+  const fund   = await prisma.fund.findUnique({ where: { id: fundId } })
+  if (!fund) return c.json({ detail: 'Fund not found' }, 404)
+
+  const b = await c.req.json().catch(() => ({}))
+  if (!b.commitment_amount || !b.effective_date) {
+    return c.json({ detail: 'commitment_amount and effective_date are required' }, 400)
+  }
+  const amount = parseFloat(b.commitment_amount)
+  if (isNaN(amount) || amount <= 0) return c.json({ detail: 'commitment_amount must be a positive number' }, 400)
+
+  const record = await prisma.fundCommitmentHistory.create({
+    data: {
+      fundId,
+      commitmentAmount: new Decimal(amount),
+      effectiveDate:    new Date(b.effective_date),
+      notes:            b.notes ?? null,
+    },
+  })
+
+  // Keep fund.commitmentUsd in sync with the latest history entry so the
+  // dashboard always shows the current commitment without extra queries.
+  const latest = await prisma.fundCommitmentHistory.findFirst({
+    where: { fundId }, orderBy: { effectiveDate: 'desc' },
+  })
+  if (latest) {
+    await prisma.fund.update({
+      where: { id: fundId },
+      data:  { commitmentUsd: new Decimal(latest.commitmentAmount.toString()) },
+    })
+  }
+
+  return c.json({
+    id:                record.id,
+    fund_id:           record.fundId,
+    commitment_amount: num(record.commitmentAmount),
+    effective_date:    record.effectiveDate.toISOString().slice(0, 10),
+    notes:             record.notes ?? null,
+  }, 201)
+})
+
+// DELETE /:id/commitment-history/:hid
+router.delete('/:id/commitment-history/:hid', async (c) => {
+  const { id: fundId, hid } = c.req.param()
+  await prisma.fundCommitmentHistory.delete({ where: { id: hid } })
+
+  // Re-sync fund.commitmentUsd to the new latest entry (or 0 if all deleted).
+  const latest = await prisma.fundCommitmentHistory.findFirst({
+    where: { fundId }, orderBy: { effectiveDate: 'desc' },
+  })
+  await prisma.fund.update({
+    where: { id: fundId },
+    data:  { commitmentUsd: latest ? new Decimal(latest.commitmentAmount.toString()) : new Decimal(0) },
+  })
   return c.json({ ok: true })
 })
 

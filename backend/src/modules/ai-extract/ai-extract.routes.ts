@@ -1,0 +1,268 @@
+import { Hono }        from 'hono'
+import type { HonoEnv } from '../../types/index'
+import { extractPdfText } from './ocr'
+import { config }        from '../../config/index'
+import {
+  SYSTEM_PROMPT, CLASSIFIER_PROMPT, EXTRACTOR_PROMPTS,
+} from './prompts'
+import { applyCalcEngine, runCrossChecks } from './calc'
+import type { PrevState } from './calc'
+import { extractSdgNotice } from '../../services/fundParsers/sdgExtractor'
+
+const router = new Hono<HonoEnv>()
+
+// ── POST /api/v1/ai-extract/test ──────────────────────────────────────────────
+// Accepts: multipart form with:
+//   file         – PDF file
+//   prev_e       – previous cumulative contributions  (default 0)
+//   prev_f       – previous unfunded commitment       (default 0)
+//   prev_g       – previous net cash flow             (default 0)
+//   model_url    – Ollama/vLLM base URL               (optional, overrides config)
+//   model_name   – model name                         (optional, overrides config)
+router.post('/test', async (c) => {
+  try {
+    const body      = await c.req.parseBody()
+    const fileField = body['file']
+
+    if (!fileField || typeof fileField === 'string') {
+      return c.json({ detail: 'No PDF file uploaded. Send multipart form with field "file".' }, 400)
+    }
+
+    const file   = fileField as File
+    const buffer = Buffer.from(await file.arrayBuffer())
+
+    // ── Extract PDF text (OCR fallback for scanned PDFs) ──────────────────
+    let pdfText = ''
+    let usedOcr = false
+    try {
+      const result = await extractPdfText(buffer)
+      pdfText  = result.text
+      usedOcr  = result.usedOcr
+    } catch {
+      return c.json({ detail: 'Could not parse PDF. Ensure the file is a valid PDF.' }, 400)
+    }
+
+    if (!pdfText || pdfText.length < 20) {
+      return c.json({
+        detail: 'Could not extract text from this PDF even after OCR. The file may be corrupt or in an unsupported format.',
+      }, 422)
+    }
+
+    // ── Previous state for calc engine ────────────────────────────────────
+    const prev: PrevState = {
+      E: parseFloat(String(body['prev_e'] ?? '0')) || 0,
+      F: parseFloat(String(body['prev_f'] ?? '0')) || 0,
+      G: parseFloat(String(body['prev_g'] ?? '0')) || 0,
+    }
+
+    // ── Model config ──────────────────────────────────────────────────────
+    const modelUrl  = String(body['model_url']  || config.aiModelUrl).replace(/\/+$/, '')
+    const modelName = String(body['model_name'] || config.aiModelName)
+
+    // ── SDG deterministic fast-path ───────────────────────────────────────
+    // The deterministic regex extractor is more reliable than the AI classifier
+    // for SDG documents (AI can mis-classify capital-call notices as COMMITMENT_NOTICE
+    // and the AI model itself may be unavailable). Any document the extractor
+    // recognises as SDG bypasses Stage 1 & 2 entirely.
+    // If no amount was found (confidence = 0.3) the frontend shows 0 with a low
+    // gate score so the user knows to review — still better than a 500 error.
+    const sdgDet = extractSdgNotice(pdfText, file.name)
+    if (sdgDet) {
+      const detReportType = sdgDet.noticeType === 'distribution' ? 'DISTRIBUTION' : 'CAPITAL_CALL'
+      const detExtraction = {
+        transaction_date:                sdgDet.dueDate,
+        B_capital_contribution:          sdgDet.grossCallUsd  || null,
+        C_distribution_received:         sdgDet.distributionUsd || null,
+        D_reinvestable:                  sdgDet.reinvestableUsd || null,
+        return_of_capital:               null,
+        gain:                            null,
+        interest:                        sdgDet.interestUsd ?? null,
+        report_provided_unfunded_before: sdgDet.currentUnfundedUsd || null,
+        report_provided_remaining_after: sdgDet.unfundedUsd || null,
+        subsequent_close_interest:       null,
+        notes:                           (sdgDet.extractionLog ?? []).join(' | '),
+        extraction_confidence:           Math.round(sdgDet.confidence * 100),
+      }
+      const detCalc   = applyCalcEngine(detExtraction as unknown as import('./calc').Extracted, 'SDG', prev)
+      const detChecks = runCrossChecks(detExtraction as unknown as import('./calc').Extracted, detCalc)
+      const detConf   = Math.round(sdgDet.confidence * 100)
+      return c.json({
+        pdf_characters: pdfText.length,
+        pdf_preview:    pdfText.slice(0, 500),
+        classification: {
+          fund_key:         'SDG',
+          fund_display_name: sdgDet.fundName,
+          report_type:      detReportType,
+          currency:         'JPY',
+          confidence_score: detConf,
+          deterministic:    true,
+        },
+        extraction:    detExtraction,
+        calculation:   detCalc,
+        cross_checks:  detChecks,
+        confidence_gate: confidenceGate(detConf, detConf),
+        model_used: 'deterministic/sdg-extractor',
+      })
+    }
+
+    // ── Stage 1: Classify ─────────────────────────────────────────────────
+    const classifyPrompt = CLASSIFIER_PROMPT.replace('{{DOCUMENT_TEXT}}', truncate(pdfText, 6000))
+    const stage1Raw = await callModel(modelUrl, modelName, SYSTEM_PROMPT, classifyPrompt)
+    const classification = parseJSON(stage1Raw)
+
+    if (!classification) {
+      return c.json({
+        detail:   'Model returned invalid JSON for classification.',
+        raw_response: stage1Raw,
+      }, 502)
+    }
+
+    const { fund_key, fund_display_name, report_type, currency, confidence_score } = classification
+    const isUnknown = !fund_key || fund_key === 'UNKNOWN' || confidence_score < 75
+
+    // ── Stage 2: Extract ──────────────────────────────────────────────────
+    const extractorTemplate = EXTRACTOR_PROMPTS[fund_key] ?? EXTRACTOR_PROMPTS['UNKNOWN']
+    const extractPrompt     = extractorTemplate.replace('{{DOCUMENT_TEXT}}', truncate(pdfText, 8000))
+    const stage2Raw = await callModel(modelUrl, modelName, SYSTEM_PROMPT, extractPrompt)
+    const extraction = parseJSON(stage2Raw)
+
+    if (!extraction) {
+      return c.json({
+        detail:   'Model returned invalid JSON for extraction.',
+        classification,
+        raw_response: stage2Raw,
+      }, 502)
+    }
+
+    // ── Stage 3: Deterministic calc (AI never does this) ──────────────────
+    let calcResult   = null
+    let crossChecks  = null
+
+    if (!isUnknown && report_type !== 'COMMITMENT_NOTICE') {
+      calcResult  = applyCalcEngine(extraction as unknown as import('./calc').Extracted, fund_key, prev)
+      crossChecks = runCrossChecks(extraction as unknown as import('./calc').Extracted, calcResult)
+    }
+
+    // ── Confidence gate ───────────────────────────────────────────────────
+    const extractionConf = extraction.extraction_confidence ?? extraction.mapping_confidence ?? 0
+    const gate = confidenceGate(confidence_score, extractionConf)
+
+    return c.json({
+      // ── Input
+      pdf_characters: pdfText.length,
+      pdf_preview:    pdfText.slice(0, 500),
+
+      // ── Stage 1
+      classification: {
+        fund_key,
+        fund_display_name,
+        report_type,
+        currency,
+        confidence_score,
+      },
+
+      // ── Stage 2
+      extraction,
+
+      // ── Stage 3 (deterministic — null for UNKNOWN funds)
+      calculation: calcResult,
+      cross_checks: crossChecks,
+
+      // ── Gate
+      confidence_gate: gate,
+      model_used: `${modelUrl} / ${modelName}`,
+    })
+  } catch (err: any) {
+    if (err.message?.includes('fetch') || err.code === 'ECONNREFUSED') {
+      return c.json({
+        detail: `Cannot reach AI model at ${config.aiModelUrl}. Is Ollama/vLLM running?`,
+        hint:   'Start Ollama: ollama serve  |  then pull: ollama pull qwen2.5:32b',
+      }, 503)
+    }
+    console.error('[ai-extract]', err)
+    return c.json({ detail: err.message ?? 'Internal error' }, 500)
+  }
+})
+
+// ── GET /api/v1/ai-extract/status ─────────────────────────────────────────────
+router.get('/status', async (c) => {
+  const url  = c.req.query('model_url')  || config.aiModelUrl
+  const name = c.req.query('model_name') || config.aiModelName
+  const headers: Record<string, string> = {}
+  if (config.aiApiKey) headers['Authorization'] = `Bearer ${config.aiApiKey}`
+  try {
+    const res  = await fetch(`${url.replace(/\/+$/, '')}/v1/models`, {
+      headers,
+      signal: AbortSignal.timeout(3000),
+    })
+    const data = res.ok ? await res.json() as any : null
+    // vLLM returns { object: "list", data: [{ id: "model-name", ... }] }
+    const models: string[] = (data?.data ?? []).map((m: any) => m.id ?? m.name ?? m)
+    const available = models.some(m => m === name || m.startsWith(name.split(':')[0]))
+    return c.json({
+      reachable: res.ok,
+      target_model: name,
+      model_available: available,
+      models_on_server: models,
+    })
+  } catch {
+    return c.json({ reachable: false, target_model: name, model_available: false, models_on_server: [] })
+  }
+})
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+async function callModel(baseUrl: string, model: string, system: string, user: string): Promise<string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (config.aiApiKey) headers['Authorization'] = `Bearer ${config.aiApiKey}`
+
+  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+    method:  'POST',
+    headers,
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user',   content: user   },
+      ],
+      temperature: 0.1,
+      stream: false,
+      chat_template_kwargs: { enable_thinking: false },
+    }),
+    signal: AbortSignal.timeout(120_000),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Model API error ${res.status}: ${text.slice(0, 200)}`)
+  }
+
+  const data    = await res.json() as any
+  const content = data?.choices?.[0]?.message?.content ?? ''
+  return content
+}
+
+function parseJSON(raw: string): Record<string, any> | null {
+  const s = raw?.trim() ?? ''
+  // Strip markdown fences if model wraps output
+  const cleaned = s.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim()
+  try { return JSON.parse(cleaned) } catch { /* fall through */ }
+  // Try to find first {...} block
+  const match = cleaned.match(/\{[\s\S]*\}/)
+  if (match) { try { return JSON.parse(match[0]) } catch { /* ignore */ } }
+  return null
+}
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? text.slice(0, max) + '\n...[truncated]' : text
+}
+
+function confidenceGate(classify: number, extract: number) {
+  const min = Math.min(classify, extract)
+  if (min >= 95) return { level: 'auto',    label: 'Auto-process',                color: 'green'  }
+  if (min >= 90) return { level: 'warning', label: 'Auto-process + flag warning', color: 'yellow' }
+  if (min >= 75) return { level: 'review',  label: 'Manual review required',      color: 'orange' }
+  return             { level: 'reject',  label: 'Do not save — manual entry',  color: 'red'    }
+}
+
+export default router

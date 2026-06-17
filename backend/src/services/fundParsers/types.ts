@@ -5,7 +5,6 @@ import type { NbRealEstateReport } from './nb-real-estate/types'
 import type { HamiltonLaneReport } from './hamilton-lane/types'
 import type { HamiltonStrategicReport } from './hamilton-strategic/types'
 import type { DoverStreetReport } from './dover-street/types'
-import type { SdgLpsReport } from './sdg-lps/types'
 
 export interface InvestmentTarget {
   projectName: string
@@ -40,10 +39,11 @@ export interface ParsedFundNotice {
   taxExpenseUsd?:    number
 
   // ── Commitment reconciliation ──────────────────────────────────────────────
-  commitmentUsd:   number   // total LP commitment
-  totalCalledUsd:  number   // cumulative called to date (from reconciliation table)
-  unfundedUsd:     number   // outstanding / remaining commitment
-  callPct:         number   // e.g. 0.049 for 4.90%
+  commitmentUsd:      number   // total LP commitment
+  totalCalledUsd:     number   // cumulative called to date (from reconciliation table)
+  unfundedUsd:        number   // remaining AFTER this call (本出資後の出資未履行金額 for SDG)
+  currentUnfundedUsd?: number  // SDG: remaining BEFORE this call (現在の出資未履行金額)
+  callPct:            number   // e.g. 0.049 for 4.90%
 
   // ── Finance-detail columns (informational; surfaced in the ledger) ─────────
   // Return of capital / realized gain / interest from the notice's distribution.
@@ -61,9 +61,12 @@ export interface ParsedFundNotice {
   confidence:      number             // 0–1
   confidenceGrade: 'high' | 'medium' | 'low'
   rawText?:        string             // optional for debugging
+  extractionLog?:  string[]           // deterministic extractors' human-readable trace (e.g. SDG)
 
-  // ── Rich per-fund report (NB Real Estate, Hamilton Lane, Dover, SDG) ───────
+  // ── Rich per-fund report (NB Real Estate, Hamilton Lane, Dover) ───────────
   // Full extractor output (breakdown, calculated Excel fields, validation).
   // Stored on Notice.extractedData.fundReport and shown on the document detail panel.
-  fundReport?:     NbRealEstateReport | HamiltonLaneReport | HamiltonStrategicReport | DoverStreetReport | SdgLpsReport
+  // SDG uses the simpler deterministic sdgExtractor.ts, which has no equivalent
+  // rich report — extractionLog above is its diagnostic trail instead.
+  fundReport?:     NbRealEstateReport | HamiltonLaneReport | HamiltonStrategicReport | DoverStreetReport
 }

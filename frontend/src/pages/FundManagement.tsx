@@ -949,29 +949,177 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
               </tr>
             </thead>
             <tbody className="divide-y theme-border">
-              {rows.map((row, i) => {
-                const isCall    = row.tx_type === 'capital_call';
-                const isEditing = editIdx === i;
-                const hasId     = !!(row.call_id || row.dist_id);
-                const { min: rowDateMin, max: rowDateMax } = getDateRange(i);
+              {(() => {
+                // Merge adjacent rows that share the same date where one is a capital_call
+                // and the other is a distribution. These come from combined notices (e.g. a
+                // call + income distribution on the same settlement date). Merging them into
+                // one row keeps the ledger compact: B and C appear side-by-side, E/F/G/H
+                // show the final state after both legs of the transaction.
+                type MergedRow =
+                  | { kind: 'single'; row: LedgerRow; idx: number }
+                  | { kind: 'merged'; call: LedgerRow; callIdx: number; dist: LedgerRow; distIdx: number }
 
-                return (
+                const display: MergedRow[] = []
+                let i = 0
+                while (i < rows.length) {
+                  const curr = rows[i]
+                  const next = rows[i + 1]
+                  if (
+                    curr.tx_type === 'capital_call' &&
+                    next?.tx_type === 'distribution' &&
+                    next.date === curr.date
+                  ) {
+                    display.push({ kind: 'merged', call: curr, callIdx: i, dist: next, distIdx: i + 1 })
+                    i += 2
+                  } else if (
+                    curr.tx_type === 'distribution' &&
+                    next?.tx_type === 'capital_call' &&
+                    next.date === curr.date
+                  ) {
+                    // dist appears before call (unusual ordering) — still merge
+                    display.push({ kind: 'merged', call: next, callIdx: i + 1, dist: curr, distIdx: i })
+                    i += 2
+                  } else {
+                    display.push({ kind: 'single', row: curr, idx: i })
+                    i++
+                  }
+                }
+
+                return display.map((dr, di) => {
+                  if (dr.kind === 'merged') {
+                    const { call, callIdx, dist, distIdx } = dr
+                    const rate      = murcRates[call.date] ?? call.fx_rate
+                    const combinedG = (call.cash_flow ?? 0) + (dist.cash_flow ?? 0)
+                    // Notes for merged row (call note above dist note)
+                    const callEditing = editIdx === callIdx
+                    const distEditing = editIdx === distIdx
+
+                    return (
+                      <tr key={`merged-${di}`} className="theme-row-hover transition-colors">
+                        {/* Date */}
+                        <td className="px-3 py-3 whitespace-nowrap theme-text-muted">{fmt.date(call.date)}</td>
+
+                        {/* Description — dual badge */}
+                        <td className="px-3 py-3 min-w-[220px]">
+                          <div className="flex flex-col gap-0.5">
+                            <div>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded mr-1.5 bg-red-500/15 text-red-400">↓ Call</span>
+                              <span className="theme-text text-base">{call.description}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded mr-1.5 bg-emerald-500/15 text-emerald-400">↑ Dist</span>
+                              <span className="theme-text text-base">{dist.description}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* FX */}
+                        <td className="px-3 py-3 text-right font-mono theme-text-muted whitespace-nowrap">
+                          {rateLoading ? <span className="opacity-40 text-xs">…</span>
+                            : rate ? <span title="MURC TTM rate">{rate.toFixed(2)}</span>
+                            : '—'}
+                        </td>
+
+                        {/* B Called */}
+                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color: call.capital_paid_in ? C.red : 'inherit'}}>
+                          {call.capital_paid_in ? fmt.usd(call.capital_paid_in) : <span className="theme-text-muted">—</span>}
+                        </td>
+
+                        {/* B (¥) */}
+                        <td className="px-3 py-3 text-right font-mono" style={{color: call.capital_paid_in ? 'rgba(239,68,68,0.65)' : 'inherit'}}>
+                          {call.capital_paid_in
+                            ? rateLoading ? <span className="opacity-40 text-xs">…</span> : jpyStr(call.capital_paid_in, rate)
+                            : <span className="theme-text-muted">—</span>}
+                        </td>
+
+                        {/* C Received */}
+                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color: dist.capital_received ? C.emerald : 'inherit'}}>
+                          {dist.capital_received ? fmt.usd(dist.capital_received) : <span className="theme-text-muted">—</span>}
+                        </td>
+
+                        {/* C (¥) */}
+                        <td className="px-3 py-3 text-right font-mono" style={{color: dist.capital_received ? 'rgba(16,185,129,0.65)' : 'inherit'}}>
+                          {dist.capital_received
+                            ? rateLoading ? <span className="opacity-40 text-xs">…</span> : jpyStr(dist.capital_received, rate)
+                            : <span className="theme-text-muted">—</span>}
+                        </td>
+
+                        {/* D Reinvest */}
+                        <td className="px-3 py-3 text-right font-mono theme-text-muted">
+                          {dist.reinvestable ? fmt.usd(dist.reinvestable) : '—'}
+                        </td>
+
+                        {/* E–H: take final state from dist row (last leg of the combined tx) */}
+                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.indigo}}>{fmt.usd(dist.cumulative_called)}</td>
+                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.violet}}>{fmt.usd(dist.investment_capacity)}</td>
+                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:combinedG<0?C.red:C.emerald}}>{fmt.usd(combinedG)}</td>
+                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:dist.net_cash_position<0?C.red:C.emerald}}>{fmt.usd(dist.net_cash_position)}</td>
+
+                        {/* Distribution detail */}
+                        {showDetail && (
+                          <>
+                            <td className="px-3 py-3 text-right font-mono theme-text-muted">{dist.return_of_capital ? fmt.usd(dist.return_of_capital) : '—'}</td>
+                            <td className="px-3 py-3 text-right font-mono theme-text-muted">{dist.gain ? fmt.usd(dist.gain) : '—'}</td>
+                            <td className="px-3 py-3 text-right font-mono theme-text-muted">{dist.interest ? fmt.usd(dist.interest) : '—'}</td>
+                          </>
+                        )}
+
+                        {/* Review — stacked: call note on top, dist note below */}
+                        <td className="px-3 py-3 min-w-[220px]">
+                          {[{ row: call, rowIdx: callIdx, isEditing: callEditing, label: 'Call' },
+                            { row: dist, rowIdx: distIdx, isEditing: distEditing, label: 'Dist' }].map(({ row: nr, rowIdx: ni, isEditing: isEd, label }) => (
+                            <div key={label} className={label === 'Dist' ? 'mt-1.5' : ''}>
+                              {isEd ? (
+                                <div className="flex flex-col gap-1">
+                                  <input type="text" autoFocus placeholder={`${label} review…`}
+                                    className="theme-input rounded px-2 py-1 text-base border theme-border w-full"
+                                    value={noteText} onChange={e => setNoteText(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') saveNote(nr, noteText); if (e.key === 'Escape') setEditIdx(null); }} />
+                                  <div className="flex gap-1">
+                                    <button onClick={() => saveNote(nr, noteText)} disabled={saving}
+                                      className="px-2 py-0.5 rounded text-xs bg-indigo-600 text-white disabled:opacity-50">{saving ? '…' : 'Save'}</button>
+                                    {nr.notes && <button onClick={() => saveNote(nr, '')} disabled={saving}
+                                      className="px-2 py-0.5 rounded text-xs text-red-400 border border-red-500/30">Delete</button>}
+                                    <button onClick={() => setEditIdx(null)} className="px-2 py-0.5 text-xs theme-text-muted">Cancel</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5 group">
+                                  <span className={`text-[10px] font-bold theme-text-muted opacity-50 w-6 flex-shrink-0`}>{label}:</span>
+                                  <span className={`text-xs flex-1 ${nr.notes ? 'theme-text' : 'theme-text-muted opacity-30 italic'}`}>{nr.notes || '—'}</span>
+                                  {canEdit && editIdx === null && editDateIdx === null && (
+                                    <button onClick={() => openNote(nr, ni)}
+                                      className="opacity-0 group-hover:opacity-100 flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] theme-text-muted hover:text-indigo-400 hover:bg-indigo-500/10 border theme-border transition-all">
+                                      Edit
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </td>
+                      </tr>
+                    )
+                  }
+
+                  // ── Single (unmerged) row ──────────────────────────────────────────
+                  const { row, idx: i } = dr
+                  const isCall    = row.tx_type === 'capital_call';
+                  const isEditing = editIdx === i;
+                  const hasId     = !!(row.call_id || row.dist_id);
+                  const { min: rowDateMin, max: rowDateMax } = getDateRange(i);
+
+                  return (
                     <tr key={`row-${i}`} className="theme-row-hover transition-colors">
 
-                      {/* Date — click to edit; range locked to this row's sliding 3-row window */}
+                      {/* Date — click to edit */}
                       <td className="px-3 py-3 whitespace-nowrap">
                         {canEdit && hasId && editDateIdx === i ? (
                           <div className="flex items-center gap-1">
-                            <input
-                              type="date"
-                              autoFocus
-                              value={editDateVal}
-                              min={rowDateMin}
-                              max={rowDateMax}
+                            <input type="date" autoFocus value={editDateVal} min={rowDateMin} max={rowDateMax}
                               onChange={e => setEditDateVal(e.target.value)}
                               onKeyDown={e => { if (e.key === 'Enter' && editDateVal) saveDate(row, i, editDateVal); if (e.key === 'Escape') setEditDateIdx(null); }}
-                              className="theme-input border theme-border rounded px-2 py-0.5 text-xs"
-                            />
+                              className="theme-input border theme-border rounded px-2 py-0.5 text-xs" />
                             <button onClick={() => { if (editDateVal) saveDate(row, i, editDateVal); }} disabled={dateSaving || !editDateVal}
                               className="text-xs px-1.5 py-0.5 bg-indigo-600 text-white rounded disabled:opacity-40">
                               {dateSaving ? '…' : '✓'}
@@ -997,7 +1145,7 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
                         <span className="theme-text text-base">{row.description}</span>
                       </td>
 
-                      {/* FX — MURC TTM rate for this transaction date */}
+                      {/* FX */}
                       <td className="px-3 py-3 text-right font-mono theme-text-muted whitespace-nowrap">
                         {rateLoading
                           ? <span className="opacity-40 text-xs">…</span>
@@ -1011,12 +1159,10 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
                         {row.capital_paid_in ? fmt.usd(row.capital_paid_in) : <span className="theme-text-muted">—</span>}
                       </td>
 
-                      {/* B (¥) — JPY using MURC rate for this date */}
+                      {/* B (¥) */}
                       <td className="px-3 py-3 text-right font-mono" style={{color: row.capital_paid_in ? 'rgba(239,68,68,0.65)' : 'inherit'}}>
                         {row.capital_paid_in
-                          ? rateLoading
-                            ? <span className="opacity-40 text-xs">…</span>
-                            : jpyStr(row.capital_paid_in, murcRates[row.date] ?? row.fx_rate)
+                          ? rateLoading ? <span className="opacity-40 text-xs">…</span> : jpyStr(row.capital_paid_in, murcRates[row.date] ?? row.fx_rate)
                           : <span className="theme-text-muted">—</span>}
                       </td>
 
@@ -1025,12 +1171,10 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
                         {row.capital_received ? fmt.usd(row.capital_received) : <span className="theme-text-muted">—</span>}
                       </td>
 
-                      {/* C (¥) — JPY using MURC rate for this date */}
+                      {/* C (¥) */}
                       <td className="px-3 py-3 text-right font-mono" style={{color: row.capital_received ? 'rgba(16,185,129,0.65)' : 'inherit'}}>
                         {row.capital_received
-                          ? rateLoading
-                            ? <span className="opacity-40 text-xs">…</span>
-                            : jpyStr(row.capital_received, murcRates[row.date] ?? row.fx_rate)
+                          ? rateLoading ? <span className="opacity-40 text-xs">…</span> : jpyStr(row.capital_received, murcRates[row.date] ?? row.fx_rate)
                           : <span className="theme-text-muted">—</span>}
                       </td>
 
@@ -1045,7 +1189,7 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
                       <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:row.cash_flow<0?C.red:C.emerald}}>{fmt.usd(row.cash_flow)}</td>
                       <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:row.net_cash_position<0?C.red:C.emerald}}>{fmt.usd(row.net_cash_position)}</td>
 
-                      {/* Distribution detail — hidden for Goldman / Siguler / Capula */}
+                      {/* Distribution detail */}
                       {showDetail && (
                         <>
                           <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.return_of_capital ? fmt.usd(row.return_of_capital) : '—'}</td>
@@ -1058,15 +1202,10 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
                       <td className="px-3 py-3 min-w-[220px]">
                         {isEditing ? (
                           <div className="flex flex-col gap-1.5">
-                            <input
-                              type="text"
-                              autoFocus
-                              placeholder="Type your review…"
+                            <input type="text" autoFocus placeholder="Type your review…"
                               className="theme-input rounded px-2 py-1.5 text-base border theme-border w-full"
-                              value={noteText}
-                              onChange={e => setNoteText(e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Enter') saveNote(row, noteText); if (e.key === 'Escape') setEditIdx(null); }}
-                            />
+                              value={noteText} onChange={e => setNoteText(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') saveNote(row, noteText); if (e.key === 'Escape') setEditIdx(null); }} />
                             <div className="flex items-center gap-1.5">
                               <button onClick={() => saveNote(row, noteText)} disabled={saving}
                                 className="px-2.5 py-1 rounded text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 transition-colors">
@@ -1108,12 +1247,274 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
                         )}
                       </td>
                     </tr>
-                );
-              })}
+                  );
+                })
+              })()}
             </tbody>
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMMITMENT HISTORY TAB — SDG-style time-stepped commitments
+// Shows a chronological list of commitment step-ups; lets admins add a new
+// tranche and warns when the current commitment is nearly fully drawn.
+// ─────────────────────────────────────────────────────────────────────────────
+interface CommitmentHistoryEntry {
+  id: string;
+  fund_id: string;
+  commitment_amount: number;
+  effective_date: string;   // YYYY-MM-DD
+  notes: string | null;
+  created_at: string;
+}
+
+function ordinal(n: number): string {
+  const s = n % 100;
+  if (s >= 11 && s <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
+}
+
+function CommitmentsTab({
+  fundId, canEdit, currentCommitment, investmentCapacity, onChanged,
+}: {
+  fundId: string;
+  canEdit: boolean;
+  currentCommitment: number;
+  investmentCapacity: number;
+  onChanged?: () => void;
+}) {
+  const [history, setHistory]     = useState<CommitmentHistoryEntry[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [adding, setAdding]       = useState(false);
+  const [deleting, setDeleting]   = useState<string | null>(null);
+  const [form, setForm]           = useState({ commitment_amount: '', effective_date: '', notes: '' });
+  const [saving, setSaving]       = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fundsAPI.getCommitmentHistory(fundId)
+      .then((r: any) => setHistory(r.data ?? []))
+      .finally(() => setLoading(false));
+  }, [fundId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function addCommitment() {
+    const amount = parseFloat(form.commitment_amount);
+    if (!amount || amount <= 0 || !form.effective_date) {
+      toast.error('Enter a valid amount and effective date'); return;
+    }
+    setSaving(true);
+    try {
+      await fundsAPI.addCommitmentHistory(fundId, {
+        commitment_amount: amount,
+        effective_date:    form.effective_date,
+        notes:             form.notes || null,
+      });
+      toast.success('Commitment added');
+      setForm({ commitment_amount: '', effective_date: '', notes: '' });
+      setAdding(false);
+      load();
+      onChanged?.();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? 'Failed to add commitment');
+    } finally { setSaving(false); }
+  }
+
+  async function deleteEntry(id: string) {
+    if (!confirm('Delete this commitment entry? Historical calculations that used it will change.')) return;
+    setDeleting(id);
+    try {
+      await fundsAPI.deleteCommitmentHistory(fundId, id);
+      toast.success('Entry deleted');
+      load();
+      onChanged?.();
+    } catch { toast.error('Failed to delete'); }
+    finally { setDeleting(null); }
+  }
+
+  // Determine if the current commitment is nearly exhausted.
+  const latest   = history[history.length - 1];
+  const latestAmt = latest ? latest.commitment_amount : currentCommitment;
+  const remainPct = latestAmt > 0 ? (investmentCapacity / latestAmt) * 100 : 100;
+  const nearlyFull = remainPct <= 10 && latestAmt > 0;
+
+  const inp = 'theme-input border theme-border rounded px-3 py-2 text-sm w-full';
+
+  return (
+    <div className="px-5 py-4 space-y-5">
+
+      {/* ── Near-full warning banner ── */}
+      {nearlyFull && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl border"
+             style={{ background:'rgba(245,158,11,0.08)', borderColor:'rgba(245,158,11,0.3)' }}>
+          <span className="text-xl flex-shrink-0">⚠️</span>
+          <div>
+            <p className="text-sm font-semibold" style={{ color:'#f59e0b' }}>
+              Current commitment is {remainPct.toFixed(1)}% remaining
+            </p>
+            <p className="text-xs theme-text-muted mt-0.5">
+              The active commitment (¥{latestAmt.toLocaleString('ja-JP')}) is nearly fully drawn.
+              Add the next commitment tranche below before uploading further capital call reports.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Total commitment summary card ── */}
+      {!loading && history.length > 0 && (
+        <div className="rounded-xl border theme-border p-4 flex items-center justify-between gap-6"
+             style={{ background:'rgba(99,102,241,0.06)' }}>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest theme-text-muted mb-1">
+              Total Commitment ({history.length} {history.length === 1 ? 'tranche' : 'tranches'})
+            </p>
+            <p className="text-2xl font-bold tabular-nums" style={{ color:'#1e40af' }}>
+              ¥{latestAmt.toLocaleString('ja-JP')}
+            </p>
+            <p className="text-xs theme-text-muted mt-0.5">
+              {remainPct.toFixed(1)}% remaining · effective {fmt.date(latest.effective_date)}
+            </p>
+          </div>
+          {canEdit && !adding && (
+            <button onClick={() => setAdding(true)}
+              className="flex-shrink-0 text-sm px-4 py-2 rounded-lg font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+              + Add Tranche
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Commitment list ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold theme-text">Commitment Tranches</h3>
+          {canEdit && !adding && history.length === 0 && (
+            <button onClick={() => setAdding(true)}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+              + Add Commitment
+            </button>
+          )}
+        </div>
+
+        {loading ? (
+          <p className="text-sm theme-text-muted py-4">Loading…</p>
+        ) : history.length === 0 ? (
+          <div className="text-center py-8 border border-dashed theme-border rounded-xl">
+            <p className="text-sm theme-text-muted">No commitment history yet.</p>
+            <p className="text-xs theme-text-muted mt-1">
+              Add the first entry to enable date-based commitment tracking for this fund.
+            </p>
+          </div>
+        ) : (
+          <div className="border theme-border rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead style={{ background:'var(--color-header-bg)' }}>
+                <tr className="border-b theme-border">
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold theme-text-muted uppercase tracking-wide">Tranche</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold theme-text-muted uppercase tracking-wide">Effective Date</th>
+                  <th className="px-4 py-2.5 text-right text-[10px] font-semibold theme-text-muted uppercase tracking-wide">Commitment (¥)</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold theme-text-muted uppercase tracking-wide">Notes</th>
+                  {canEdit && <th className="px-4 py-2.5" />}
+                </tr>
+              </thead>
+              <tbody className="divide-y theme-border">
+                {history.map((h, idx) => {
+                  const isCurrent = idx === history.length - 1;
+                  const label = `${ordinal(idx + 1)} Commitment`;
+                  return (
+                    <tr key={h.id} className="theme-row-hover"
+                        style={isCurrent ? { background:'rgba(99,102,241,0.04)' } : {}}>
+                      <td className="px-4 py-3 font-semibold theme-text whitespace-nowrap">
+                        {label}
+                        {isCurrent && (
+                          <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-400">
+                            Current
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 theme-text-muted">{fmt.date(h.effective_date)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold theme-text">
+                        ¥{h.commitment_amount.toLocaleString('ja-JP')}
+                      </td>
+                      <td className="px-4 py-3 text-xs theme-text-muted">{h.notes || '—'}</td>
+                      {canEdit && (
+                        <td className="px-4 py-3 text-right">
+                          <button onClick={() => deleteEntry(h.id)} disabled={deleting === h.id}
+                            className="text-xs text-red-400 hover:bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 transition-colors disabled:opacity-40">
+                            {deleting === h.id ? '…' : 'Delete'}
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Add commitment form ── */}
+      {adding && (
+        <div className="border theme-border rounded-xl p-4 space-y-3"
+             style={{ background:'rgba(99,102,241,0.04)' }}>
+          <h4 className="text-sm font-semibold theme-text">New Commitment Tranche</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs theme-text-muted mb-1">Commitment Amount (¥)</label>
+              <input type="number" placeholder="e.g. 200000000" className={inp}
+                value={form.commitment_amount}
+                onChange={e => setForm(f => ({ ...f, commitment_amount: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-xs theme-text-muted mb-1">Effective Date</label>
+              <input type="date" className={inp}
+                value={form.effective_date}
+                onChange={e => setForm(f => ({ ...f, effective_date: e.target.value }))} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs theme-text-muted mb-1">Notes (optional)</label>
+            <input type="text" placeholder="e.g. Second close, additional LP subscription" className={inp}
+              value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+          </div>
+          {form.commitment_amount && history.length > 0 && parseFloat(form.commitment_amount) <= (latest?.commitment_amount ?? 0) && (
+            <p className="text-xs" style={{ color:'#f59e0b' }}>
+              ⚠️ New amount (¥{parseFloat(form.commitment_amount).toLocaleString('ja-JP')}) is not greater than the current commitment
+              (¥{latest.commitment_amount.toLocaleString('ja-JP')}). Commitments should only grow.
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button onClick={addCommitment} disabled={saving}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 transition-colors">
+              {saving ? 'Saving…' : 'Save Commitment'}
+            </button>
+            <button onClick={() => { setAdding(false); setForm({ commitment_amount: '', effective_date: '', notes: '' }); }}
+              className="px-4 py-2 rounded-lg text-sm theme-text-muted hover:theme-text border theme-border transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── How it works explainer ── */}
+      <div className="text-xs theme-text-muted space-y-1 border-t theme-border pt-3">
+        <p className="font-semibold theme-text">How commitment history works</p>
+        <p>Each entry defines the total LP commitment effective from that date.</p>
+        <p>When calculating the ledger, the engine picks the latest entry whose date ≤ transaction date and uses <code className="font-mono">F = commitment − cumulative called + reinvestable</code>.</p>
+        <p>Old entries are never overwritten — historical F values remain stable even after adding new tranches.</p>
+      </div>
     </div>
   );
 }
@@ -1250,15 +1651,15 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
 // ─────────────────────────────────────────────────────────────────────────────
 // FULL FUND SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-type TabKey = 'overview' | 'cashflow' | 'documents' | 'calls' | 'distributions' | 'nav' | 'ledger' | 'details';
+type TabKey = 'overview' | 'cashflow' | 'documents' | 'calls' | 'distributions' | 'nav' | 'ledger' | 'details' | 'commitments';
 
 function FundSection({
-  fund, detail, canEdit, onChanged,
+  fund, detail, canEdit, onChanged, initialTab,
 }: {
   fund: FundSummary; detail: FundDetail;
-  canEdit: boolean; onChanged: () => void;
+  canEdit: boolean; onChanged: () => void; initialTab?: TabKey;
 }) {
-  const [tab, setTab] = useState<TabKey>('cashflow');
+  const [tab, setTab] = useState<TabKey>(initialTab ?? 'ledger');
   const fundId   = fund.fund_id;
   const isActive = fund.is_active !== false;
   const dotColor = strategyColor[fund.strategy??''] ?? '#6b7280';
@@ -1267,6 +1668,25 @@ function FundSection({
   const paidIn   = Number(summary.total_called_usd  ?? 0);
   const powder   = Number(summary.unfunded_usd       ?? (Number(detail.commitment_usd) - paidIn));
   const drawn    = Number(summary.drawn_pct          ?? 0);
+
+  const isSdg = /sdg/i.test(detail.fund_name ?? '') || /sdg/i.test((detail as any).fund_key ?? '');
+
+  // For SDG funds, commitment grows over time. Fetch the latest history entry so
+  // the dashboard KPI always shows the current total commitment, not the static seed value.
+  const [latestHistCommitment, setLatestHistCommitment] = useState<number | null>(null);
+  const refreshHistCommitment = useCallback(() => {
+    if (!isSdg) return;
+    fundsAPI.getCommitmentHistory(fundId)
+      .then((r: any) => {
+        const entries: CommitmentHistoryEntry[] = r.data ?? [];
+        const last = entries[entries.length - 1];
+        setLatestHistCommitment(last ? last.commitment_amount : null);
+      })
+      .catch(() => {});
+  }, [fundId, isSdg]);
+  useEffect(() => { refreshHistCommitment(); }, [refreshHistCommitment]);
+
+  const displayCommitment = latestHistCommitment ?? Number(detail.commitment_usd);
 
   async function toggleActive() {
     if (!confirm(isActive ? 'Deactivate this fund?' : 'Reactivate this fund?')) return;
@@ -1279,12 +1699,13 @@ function FundSection({
   }
 
   const TABS: { key: TabKey; label: string }[] = [
-    { key:'cashflow',      label:'Cash Flow'      },
     { key:'ledger',        label:'Ledger'         },
+    { key:'cashflow',      label:'Cash Flow'      },
     { key:'calls',         label:'Capital Calls'  },
     { key:'distributions', label:'Distributions'  },
     { key:'nav',           label:'NAV Records'    },
     { key:'documents',     label:'Documents / Reports' },
+    ...(isSdg ? [{ key: 'commitments' as TabKey, label: 'Commitments' }] : []),
     { key:'details',       label:'Fund Details'   },
   ];
 
@@ -1332,10 +1753,10 @@ function FundSection({
       {/* ── KPIs ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 border-t theme-border divide-x theme-border">
         {[
-          { label:'LP Commitment',  value: fmt.usd(Number(detail.commitment_usd), true), note:'gross' },
-          { label:'Paid-in (E)',    value: fmt.usd(paidIn, true),                        note:`${drawn.toFixed(2)}% drawn` },
-          { label:'Dry Powder (F)', value: fmt.usd(powder, true),                        note:'unfunded' },
-          { label:'DPI',            value: `${Number(summary.dpi??0).toFixed(3)}×`,     note:'dist / paid-in' },
+          { label:'Total Commitment', value: fmt.usd(displayCommitment, true), note: isSdg && latestHistCommitment ? `${latestHistCommitment > 0 ? (paidIn / latestHistCommitment * 100).toFixed(2) : '0.00'}% drawn` : 'gross' },
+          { label:'Paid-in (E)',      value: fmt.usd(paidIn, true),            note:`${drawn.toFixed(2)}% drawn` },
+          { label:'Dry Powder (F)',   value: fmt.usd(powder, true),            note:'unfunded' },
+          { label:'DPI',             value: `${Number(summary.dpi??0).toFixed(3)}×`, note:'dist / paid-in' },
         ].map(m=>(
           <div key={m.label} className="px-5 py-4">
             <p className="text-[10px] font-bold uppercase tracking-widest theme-text-muted">{m.label}</p>
@@ -1378,6 +1799,12 @@ function FundSection({
         {tab==='distributions' && <DistsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='nav'           && <NavTab      fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='ledger'        && <LedgerTab   fundId={fundId} canEdit={canEdit} />}
+        {tab==='commitments'   && <CommitmentsTab
+          fundId={fundId} canEdit={canEdit}
+          currentCommitment={displayCommitment}
+          investmentCapacity={Number(summary.investment_capacity ?? summary.unfunded_usd ?? 0)}
+          onChanged={refreshHistCommitment}
+        />}
         {tab==='details'       && <DetailsTab  detail={detail} canEdit={canEdit} fundId={fundId} onSaved={onChanged} />}
       </div>
     </div>
@@ -1547,8 +1974,8 @@ function ReportFilesTile({
   );
 }
 
-function ReportsSection({ funds, canEdit, onChanged }:
-  { funds: FundSummary[]; canEdit: boolean; onChanged: () => void }) {
+function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
+  { funds: FundSummary[]; canEdit: boolean; onChanged: () => void; onOpenLedger: (fundId: string) => void }) {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [openFundId, setOpenFundId] = useState<string | null>(null);
@@ -1596,7 +2023,7 @@ function ReportsSection({ funds, canEdit, onChanged }:
       {canEdit && (
         <FundUploadBar
           funds={funds.map(f => ({ fund_id: f.fund_id, fund_name: f.fund_name }))}
-          onUploaded={() => { onChanged(); load(); }}
+          onUploaded={(fundId) => { onChanged(); load(); setOpenFundId(fundId); }}
         />
       )}
 
@@ -1637,9 +2064,17 @@ function ReportsSection({ funds, canEdit, onChanged }:
                   </div>
                   <span className="theme-text-muted text-lg flex-shrink-0">→</span>
                 </div>
-                <div className="flex items-center gap-2 mt-4 pt-3 border-t theme-border">
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t theme-border flex-wrap">
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: C.indigo,  background: C.indigoBg }}>{nCall} calls</span>
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: C.emerald, background: C.emeraldBg }}>{nDist} dists</span>
+                  <div className="ml-auto flex gap-2">
+                    <button
+                      onClick={e => { e.stopPropagation(); onOpenLedger(f.fund_id); }}
+                      className="text-[11px] font-semibold px-3 py-0.5 rounded-full border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors"
+                    >
+                      Ledger →
+                    </button>
+                  </div>
                 </div>
               </button>
             );
@@ -1679,15 +2114,13 @@ export default function FundManagement() {
   const [showInactive,setShowInactive]= useState(true);
   const [search,      setSearch]      = useState('');
   const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
+  const [openAtTab, setOpenAtTab]     = useState<TabKey>('ledger');
 
   // Section is driven by the URL (?section=…) so the left sidebar controls it
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const rawSection = searchParams.get('section');
   const section: 'manage' | 'reports' | 'cashflow' =
     rawSection === 'reports' || rawSection === 'cashflow' ? rawSection : 'manage';
-
-  // Leaving / switching section closes any open fund detail
-  useEffect(() => { setSelectedFundId(null); }, [section]);
 
   const loadFunds = useCallback(async () => {
     setLoading(true);
@@ -1781,7 +2214,7 @@ export default function FundManagement() {
 
       {section === 'reports' ? (
         /* ── REPORTS SECTION — upload / edit / delete documents ── */
-        <ReportsSection funds={funds} canEdit={canEdit} onChanged={loadFunds} />
+        <ReportsSection funds={funds} canEdit={canEdit} onChanged={loadFunds} onOpenLedger={fundId => { setOpenAtTab('ledger'); setSelectedFundId(fundId); setSearchParams(p => { const n = new URLSearchParams(p); n.delete('section'); return n; }); }} />
       ) : section === 'cashflow' ? (
         /* ── CASHFLOW SECTION — empty for now ── */
         <CashflowSection />
@@ -1793,6 +2226,7 @@ export default function FundManagement() {
             detail={selectedDetail}
             canEdit={canEdit}
             onChanged={() => { loadFunds(); }}
+            initialTab={openAtTab}
           />
         ) : (
           <div className="theme-card border theme-border rounded-2xl p-8 flex items-center gap-4">
@@ -1833,7 +2267,7 @@ export default function FundManagement() {
                   key={fund.fund_id}
                   fund={fund}
                   detail={details[fund.fund_id]}
-                  onClick={() => setSelectedFundId(fund.fund_id)}
+                  onClick={() => { setOpenAtTab('ledger'); setSelectedFundId(fund.fund_id); }}
                 />
               ))}
             </div>
