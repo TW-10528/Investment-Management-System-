@@ -51,9 +51,10 @@ function PdfModal({ docId, fileName, onClose }: { docId: string; fileName: strin
 }
 
 interface Props {
-  fundId:   string;
-  canEdit:  boolean;
+  fundId:    string;
+  canEdit:   boolean;
   onChanged: () => void;
+  currency?: string;
 }
 
 const C = { indigo: '#4f46e5', emerald: '#10b981', red: '#ef4444', violet: '#8b5cf6' };
@@ -76,7 +77,7 @@ function docTime(d: any): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
-export default function FundDocuments({ fundId, canEdit, onChanged }: Props) {
+export default function FundDocuments({ fundId, canEdit, onChanged, currency }: Props) {
   const [docs, setDocs]       = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewDoc, setViewDoc] = useState<{ id: string; name: string } | null>(null);
@@ -127,7 +128,7 @@ export default function FundDocuments({ fundId, canEdit, onChanged }: Props) {
           <table className="w-full text-sm">
             <thead style={{ background: 'var(--color-header-bg)' }}>
               <tr className="border-b theme-border text-xs">
-                {['File', 'Type', 'Notice Date', 'Due Date', 'Amount (USD)', 'Confidence', ''].map(h => (
+                {['File', 'Type', 'Notice Date', 'Due Date', currency === 'JPY' ? 'Amount (JPY)' : 'Amount (USD)', 'Confidence', ''].map(h => (
                   <th key={h} className={`px-4 py-2.5 font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h === 'File' || h === '' ? 'text-left' : 'text-right'}`}>{h}</th>
                 ))}
               </tr>
@@ -151,7 +152,7 @@ export default function FundDocuments({ fundId, canEdit, onChanged }: Props) {
                     <td className="px-4 py-3 text-right theme-text-muted whitespace-nowrap">{doc.notice_date ?? '—'}</td>
                     <td className="px-4 py-3 text-right theme-text-muted whitespace-nowrap">{doc.due_date ?? '—'}</td>
                     <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color: t.color }}>
-                      {amount ? fmt.usd(Number(amount)) : '—'}
+                      {amount ? (currency === 'JPY' ? fmt.jpy(Number(amount)) : fmt.usd(Number(amount))) : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${gradeStyle(doc.confidence_grade)}`}>

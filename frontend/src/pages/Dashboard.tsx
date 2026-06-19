@@ -8,9 +8,6 @@ import toast from 'react-hot-toast';
 
 const SUMMARY_REFRESH_MS = 60_000;   // dashboard summary + fx — 1 min
 
-// Prevents concurrent FX auto-saves when StrictMode double-invokes mount effects.
-// Stays true after a successful save; next poll finds today's rate via /fx-rates/latest anyway.
-let _fxAutoSaveGuard = false;
 
 // Formal / corporate palette — deep navy primary, muted green, teal, slate
 const C = {
@@ -26,55 +23,32 @@ function usd(n: number) { return fmt.usd(n); }
 function pct(n: number) { return n.toFixed(2) + '%'; }
 
 /* ── KPI card ─────────────────────────────────────────────────────────────── */
-function KpiCard({ label, value, full, sub, color = C.indigo, bg = C.indigoBg, bdr = C.indigoBdr }:
-  { label:string; value:string; full?:string; sub?:string; color?:string; bg?:string; bdr?:string }) {
+function KpiCard({ label, value, sub, jpySub, color = C.indigo, bg = C.indigoBg, bdr = C.indigoBdr }:
+  { label:string; value:string; sub?:string; jpySub?:string; color?:string; bg?:string; bdr?:string }) {
   return (
-    <div className="theme-card border rounded-xl p-5" style={{ borderColor: bdr, background: bg }}
-         title={full ? `${label}: ${full}` : undefined}>
+    <div className="theme-card border rounded-xl p-5" style={{ borderColor: bdr, background: bg }}>
       <p className="text-[10px] font-bold uppercase tracking-widest theme-text-muted mb-2">{label}</p>
-      <p className="text-2xl font-bold tabular-nums leading-none" style={{ color }}>{value}</p>
-      {full && <p className="text-xs font-semibold tabular-nums theme-text mt-1.5">{full}</p>}
+      <p className="text-xl font-bold tabular-nums leading-none break-all" style={{ color }}>{value}</p>
+      {jpySub && <p className="text-[11px] font-semibold tabular-nums theme-text-muted mt-1.5">{jpySub}</p>}
       {sub && <p className="text-[11px] theme-text-muted mt-1">{sub}</p>}
     </div>
   );
 }
 
 /* ── FX widget ────────────────────────────────────────────────────────────── */
-function FxWidget({ latestSaved, latestDate }:
-  { latestSaved: number|null; latestDate: string|null }) {
-  const { t } = useTranslation();
-  const todayJst   = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
-  const jstHour    = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })).getHours();
-  const todayRateMissing = !latestDate || latestDate !== todayJst;
-  // Warning only when today's rate is not yet in DB AND before 11:00 JST
-  const showWarning = todayRateMissing && jstHour < 11;
-
+function FxWidget({ prevRate, prevDate }:
+  { prevRate: number|null; prevDate: string|null }) {
   return (
-    <div className="space-y-2">
-      {showWarning && latestSaved && (
-        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
-          <span className="text-lg mt-0.5">🕐</span>
-          <div>
-            <p className="font-semibold text-sm">{t('fxRates.murcWarningTitle')}</p>
-            <p className="text-xs mt-0.5 text-amber-400/80">
-              {t('fxRates.murcWarningBody')} ({latestDate} — ¥{latestSaved.toFixed(2)}).
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Rate card */}
-      <div className="theme-card border rounded-xl px-5 py-4">
-        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">USD / JPY · MUFG TTM Rate</p>
-        <p className="text-3xl font-bold tabular-nums mt-1" style={{ color: latestSaved ? C.emerald : C.slate }}>
-          {latestSaved ? `¥${latestSaved.toFixed(2)}` : '—'}
-        </p>
-        <p className="text-[10px] theme-text-muted mt-1">
-          {latestDate
-            ? `MUFG TTM · ${new Date(latestDate + 'T00:00:00').toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}`
-            : t('fxRates.fetchToday')}
-        </p>
-      </div>
+    <div className="theme-card border rounded-xl px-5 py-4">
+      <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">USD / JPY · Previous Day Close · MUFG TTM</p>
+      <p className="text-3xl font-bold tabular-nums mt-1" style={{ color: prevRate ? C.emerald : C.slate }}>
+        {prevRate ? `¥${prevRate.toFixed(2)}` : '—'}
+      </p>
+      <p className="text-[10px] theme-text-muted mt-1">
+        {prevDate
+          ? `As of ${new Date(prevDate + 'T00:00:00').toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}`
+          : 'Rate unavailable'}
+      </p>
     </div>
   );
 }
@@ -117,38 +91,24 @@ export default function Dashboard() {
   const loadDashboard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
     try {
-      const [r, fxR] = await Promise.all([
+      // Previous business day in JST (go back 1 day; skip weekends)
+      const prevJst = (() => {
+        const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+        d.setDate(d.getDate() - 1);
+        while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+        return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+      })();
+
+      const [r, fxPrev] = await Promise.all([
         dashboardAPI.summary(),
-        fxRatesAPI.latest(),
+        fxRatesAPI.historical(prevJst, 'USD', 'JPY', true),   // fallback=latest
       ]);
       setData(r.data);
       setLastUpdated(new Date());
 
-      const todayJst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
-      const jstHour  = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })).getHours();
-      const savedDate = fxR.data?.date ?? null;
-
-      if (savedDate === todayJst) {
-        // Today's rate already in DB — use it directly
-        setLatestSaved(fxR.data.usd_jpy);
-        setLatestDate(savedDate);
-      } else if (jstHour >= 11) {
-        // After 11:00 JST and today's rate missing — auto-fetch and save
-        if (!_fxAutoSaveGuard) {
-          _fxAutoSaveGuard = true;
-          try {
-            const live = await fxRatesAPI.historical(todayJst, 'USD', 'JPY');
-            if (live.data?.usd_jpy) {
-              await fxRatesAPI.create({ rate_date: todayJst, usd_jpy: live.data.usd_jpy, source: 'murc_ttm' });
-              setLatestSaved(live.data.usd_jpy);
-              setLatestDate(todayJst);
-            }
-          } catch { /* leave guard set — don't re-hit MURC every 60s poll when today's rate isn't published yet (or it's a non-trading/future date). Picked up on next page load. */ }
-        }
-      } else if (fxR.data?.usd_jpy) {
-        // Before 11:00 JST — show last saved rate with warning
-        setLatestSaved(fxR.data.usd_jpy);
-        setLatestDate(savedDate);
+      if (fxPrev.data?.usd_jpy) {
+        setLatestSaved(fxPrev.data.usd_jpy);
+        setLatestDate(fxPrev.data.date ?? prevJst);
       }
     } catch {
       if (!silent) toast.error('Failed to load dashboard');
@@ -240,11 +200,18 @@ export default function Dashboard() {
 
       {/* ── Headline portfolio values (main overall only) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <KpiCard label="Total Value"        value={fmt.usdAbbr(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))}
-                 full={fmt.usdFull(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))}
-                 sub="Distributions + NAV" color={C.indigo} />
-        <KpiCard label="Total Commitments"  value={fmt.usdAbbr(data.total_commitment_usd)}
-                 full={fmt.usdFull(data.total_commitment_usd)}
+        {(() => {
+          const totalValue = data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd);
+          return (
+            <KpiCard label="Total Value (Distributions + NAV)"
+                     value={fmt.usdFull(totalValue)}
+                     jpySub={latestSaved ? fmt.jpy(totalValue * latestSaved) : undefined}
+                     sub="Distributions + NAV" color={C.indigo} />
+          );
+        })()}
+        <KpiCard label="Total Commitments"
+                 value={fmt.usdFull(data.total_commitment_usd)}
+                 jpySub={latestSaved ? fmt.jpy(data.total_commitment_usd * latestSaved) : undefined}
                  sub={`${data.total_funds} funds · ${pct(data.drawn_pct)} drawn`} />
         <KpiCard label="Net IRR"            value={data.irr != null ? `${data.irr.toFixed(1)}%` : '—'}
                  sub="since inception"
@@ -254,7 +221,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── FX Rate ── */}
-      <FxWidget latestSaved={latestSaved} latestDate={latestDate} />
+      <FxWidget prevRate={latestSaved} prevDate={latestDate} />
 
       {/* ── Funds — compact table, essential columns only ── */}
       {activeFunds.length > 0 && (
@@ -287,14 +254,14 @@ export default function Dashboard() {
                   return (
                     <tr key={f.fund_id} className="theme-row-hover transition-colors">
                       <td className="px-5 py-3">
-                        <Link to="/funds" className="font-semibold theme-text hover:text-indigo-600 text-sm transition-colors">{f.fund_name}</Link>
+                        <Link to={`/funds?fund=${f.fund_id}`} className="font-semibold theme-text hover:text-indigo-600 text-sm transition-colors">{f.fund_name}</Link>
                         {f.fund_name_jp && <p className="text-[10px] theme-text-muted mt-0.5">{f.fund_name_jp}</p>}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums theme-text" title={fmt.usdFull(f.commitment_usd)}>{fmt.usdAbbr(f.commitment_usd)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.indigo }}  title={fmt.usdFull(f.total_called_usd)}>{fmt.usdAbbr(f.total_called_usd)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.emerald }} title={fmt.usdFull(f.total_received_usd)}>{fmt.usdAbbr(f.total_received_usd)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums" style={{ color: C.violet }} title={fmt.usdFull(navUsd)}>{fmt.usdAbbr(navUsd)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold theme-text" title={fmt.usdFull(valueUsd)}>{fmt.usdAbbr(valueUsd)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums theme-text">{fmt.usdFull(f.contract_commitment_usd ?? f.commitment_usd)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.indigo }}>{fmt.usdFull(f.total_called_usd)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.emerald }}>{fmt.usdFull(f.total_received_usd)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums" style={{ color: C.violet }}>{fmt.usdFull(navUsd)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold theme-text">{fmt.usdFull(valueUsd)}</td>
                     </tr>
                   );
                 })}
@@ -302,11 +269,11 @@ export default function Dashboard() {
               <tfoot className="border-t theme-divider" style={{ background: 'rgba(99,102,241,0.03)' }}>
                 <tr>
                   <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">Total</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold theme-text" title={fmt.usdFull(data.total_commitment_usd)}>{fmt.usdAbbr(data.total_commitment_usd)}</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}  title={fmt.usdFull(data.total_called_usd)}>{fmt.usdAbbr(data.total_called_usd)}</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.emerald }} title={fmt.usdFull(data.total_received_usd)}>{fmt.usdAbbr(data.total_received_usd)}</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }} title={fmt.usdFull(data.total_nav_usd)}>{fmt.usdAbbr(data.total_nav_usd)}</td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold theme-text" title={fmt.usdFull(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))}>{fmt.usdAbbr(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))}</td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{fmt.usdFull(data.total_commitment_usd)}</td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{fmt.usdFull(data.total_called_usd)}</td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.emerald }}>{fmt.usdFull(data.total_received_usd)}</td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }}>{fmt.usdFull(data.total_nav_usd)}</td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{fmt.usdFull(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))}</td>
                 </tr>
               </tfoot>
             </table>

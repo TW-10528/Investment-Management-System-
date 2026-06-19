@@ -1,32 +1,32 @@
-# ── Thirdwave IMS — local development database ───────────────────────────────
+# ── Thirdwave IMS — local development database (working-branch3) ──────────────
 #
 # The backend (Hono / Node) and frontend (Vite / React) run directly via npm —
 # Docker is used ONLY for PostgreSQL.
 #
-#   docker compose up -d         # start the database (port 6000)
-#   cd backend  && npm run dev    # backend  → http://localhost:8004
-#   cd frontend && npm run dev    # frontend → http://localhost:5173
+#   docker compose up -d         # start the database (port 6001)
+#   cd backend  && npm run dev    # backend  → http://localhost:8005
+#   cd frontend && npm run dev    # frontend → http://localhost:5174
 #
 # First-time setup on a fresh machine (e.g. a teammate cloning the repo):
 #   docker compose up -d
 #   cd backend && npm install && npm run db:migrate && npm run db:seed && npm run dev
 #
 # The credentials + port below MUST match backend/.env → DATABASE_URL:
-#   postgresql://ims_user:ims_password@localhost:6000/ims_db
+#   postgresql://ims_user:ims_password@localhost:6001/ims_db
 
 services:
   db:
     image: postgres:16-alpine
-    container_name: ims_db
+    container_name: ims_db3
     restart: unless-stopped
     environment:
       POSTGRES_USER: ims_user
       POSTGRES_PASSWORD: ims_password
       POSTGRES_DB: ims_db
     ports:
-      - "6000:5432"          # host 6000 → matches DATABASE_URL in backend/.env
+      - "6001:5432"          # host 6001 → matches DATABASE_URL in backend/.env
     volumes:
-      - ims_pgdata:/var/lib/postgresql/data
+      - ims_pgdata3:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ims_user -d ims_db"]
       interval: 10s
@@ -34,4 +34,4 @@ services:
       retries: 5
 
 volumes:
-  ims_pgdata:
+  ims_pgdata3:

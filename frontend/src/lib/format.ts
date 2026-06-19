@@ -1,17 +1,23 @@
 /** Formatting helpers */
 
+// Intl currency-style formatting resolves the currency symbol from locale data,
+// which on Japanese-locale browsers returns "ドル" for USD instead of "$".
+// We avoid that by hardcoding "$" / "¥" and using plain number formatting only.
+function wFmt(n: number, decimals = 0): string {
+  const abs = Math.abs(n);
+  const s   = abs.toFixed(decimals);
+  const [int, frac] = s.split('.');
+  const withCommas  = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return frac !== undefined ? `${withCommas}.${frac}` : withCommas;
+}
+
 export const fmt = {
   usd: (v: number, _compact = false) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency', currency: 'USD',
-      minimumFractionDigits: 2, maximumFractionDigits: 2,
-    }).format(v),
+    `${v < 0 ? '-' : ''}$${wFmt(v, 2)}`,
 
   /** Exact dollars, no cents — e.g. $1,234,567,890 */
   usdFull: (v: number) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency', currency: 'USD', maximumFractionDigits: 0,
-    }).format(v),
+    `${v < 0 ? '-' : ''}$${wFmt(v, 0)}`,
 
   /** Abbreviated, professional — e.g. $1.23B, $45.6M, $980K */
   usdAbbr: (v: number) => {
