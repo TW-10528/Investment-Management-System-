@@ -93,9 +93,10 @@ export class CalculationEngine {
 
     const sorted = [...transactions].sort((a, b) => a.date.getTime() - b.date.getTime())
 
-    let E = new Decimal(0)   // cumulative called
-    let F = commitmentUsd    // investment capacity
-    let H = new Decimal(0)   // net cash position
+    let E    = new Decimal(0)   // cumulative called (pure sum of B — D does NOT reduce E)
+    let cumD = new Decimal(0)   // cumulative reinvestable (tracked separately for F)
+    let F    = commitmentUsd    // investment capacity
+    let H    = new Decimal(0)   // net cash position
 
     const rows: LedgerRow[] = []
 
@@ -105,19 +106,17 @@ export class CalculationEngine {
       const D    = tx.reinvestable
       const rate = tx.fxRate ?? defaultFx
 
-      E = E.plus(B).minus(D)      // E = prev_E + B − D
+      E    = E.plus(B)        // E = prev_E + B  (cumulative capital called, D never reduces E)
+      cumD = cumD.plus(D)     // track cumulative reinvestable separately
 
-      // F — two cases, both consistent with F = commitment − E:
-      //  1. Commitment history entry available: F = commitment_at_date − E
-      //  2. Standard formula: F = prev_F − B + D
-      // Document-reported unfunded (unfundedAfterCall) is NOT used for F because
-      // individual notices only subtract their own call from commitment and miss
-      // prior calls in the same period, producing incorrect chained values.
+      // F — investment capacity = commitment − E + cumulative D
+      //  1. Commitment history entry available: use commitment_at_date
+      //  2. Standard: F = prev_F − B + D  (equivalent to commitment − E + cumD)
       const histCommitment = histSorted.length > 0 ? commitmentAt(tx.date) : null
       if (histCommitment != null && histCommitment.gt(0)) {
-        F = histCommitment.minus(E)  // F = commitment − E  (D already subtracted in E)
+        F = histCommitment.minus(E).plus(cumD)  // F = commitment − E + cumD
       } else {
-        F = F.minus(B).plus(D)       // F = prev_F − B + D
+        F = F.minus(B).plus(D)                  // F = prev_F − B + D
       }
       // G = -B + C, unless a manual cash-flow value was entered for this row.
       const G = tx.manualCashFlow != null ? tx.manualCashFlow : new Decimal(0).minus(B).plus(C)
@@ -290,8 +289,9 @@ export class CalculationEngine {
       strategy:            fund.strategy,
       vintage_year:        fund.vintageYear,
       currency:            fund.currency,
-      commitment_usd:      f(commitment),
-      total_called_usd:    called,
+      commitment_usd:          f(commitment),
+      contract_commitment_usd: fund.contractCommitmentUsd ? f(new Decimal(fund.contractCommitmentUsd.toString())) : null,
+      total_called_usd:        called,
       total_received_usd:  received,
       total_called_jpy:    f(totalCalledJpy),
       total_received_jpy:  f(totalReceivedJpy),

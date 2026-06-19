@@ -7,6 +7,7 @@
 import { Hono } from 'hono'
 import fs from 'fs'
 import path from 'path'
+import { createHash } from 'node:crypto'
 import Decimal from 'decimal.js'
 import type { HonoEnv } from '../../types/index'
 import { auth } from '../../middleware/auth'
@@ -86,8 +87,24 @@ router.post('/upload', async (c) => {
   const originalName = file.name
   const safe         = originalName.replace(/[^a-zA-Z0-9._-]/g, '_')
   const buffer       = Buffer.from(await file.arrayBuffer())
+  const fileHash     = createHash('sha256').update(buffer).digest('hex')
   const reqTypePre   = c.req.query('notice_type')
   const scopedFundIdPre = c.req.query('fund_id')
+
+  // ── Duplicate detection (before touching disk or DB) ──────────────────────
+  // Check by file hash so even a renamed copy of the same PDF is caught.
+  const hashScope = scopedFundIdPre ? { fundId: scopedFundIdPre, fileHash } : { fileHash }
+  const existing = await prisma.notice.findFirst({ where: hashScope as any })
+  if (existing) {
+    const uploadedAt = existing.createdAt.toISOString().slice(0, 10)
+    return c.json({
+      detail:        'duplicate_report',
+      message:       `This file has already been uploaded (${existing.originalName ?? existing.filename}, on ${uploadedAt}). Please check your existing reports.`,
+      existing_id:   existing.id,
+      uploaded_at:   uploadedAt,
+      original_name: existing.originalName ?? existing.filename,
+    }, 409)
+  }
 
   // ── Fast path: commitment notices bypass fund-parser recognition ─────────────
   // Subscription / investment agreements (出資契約書 etc.) don't contain the
@@ -122,6 +139,7 @@ router.post('/upload', async (c) => {
       data: {
         filename:      relPath,
         originalName,
+        fileHash,
         noticeType:    'commitment_notice',
         status:        'approved',
         approvedAt:    new Date(),
@@ -350,6 +368,7 @@ router.post('/upload', async (c) => {
         data: {
           filename:      relPath,
           originalName,
+          fileHash,
           noticeType,
           status:        'approved',
           approvedAt:    new Date(),
@@ -382,7 +401,7 @@ router.post('/upload', async (c) => {
   // SDG and Siguler Guff are excluded: their commitment is entered manually in
   // fund settings — not extracted from any document.
   const FUNDS_WITH_COMMITMENT_IN_REPORT = [
-    'nb-real-estate', 'hamilton-lane', 'hamilton-strategic', 'dover-street', 'capula-grv',
+    'nb-real-estate', 'hamilton-lane', 'hamilton-strategic', 'dover-street', 'capula-grv', 'goldman-sachs',
   ]
   if (FUNDS_WITH_COMMITMENT_IN_REPORT.includes(parsed.fundKey) && (parsed.commitmentUsd ?? 0) > 0) {
     const currentCommitment = parseFloat(resolvedFund.commitmentUsd.toString())

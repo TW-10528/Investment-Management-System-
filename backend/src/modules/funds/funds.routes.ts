@@ -33,8 +33,9 @@ router.get('/:id', async (c) => {
     strategy:               fund.strategy,
     vintage_year:           fund.vintageYear,
     currency:               fund.currency,
-    commitment_usd:         parseFloat(fund.commitmentUsd.toString()),
-    entry_fx_rate:          fund.entryFxRate ? parseFloat(fund.entryFxRate.toString()) : null,
+    commitment_usd:          parseFloat(fund.commitmentUsd.toString()),
+    contract_commitment_usd: fund.contractCommitmentUsd ? parseFloat(fund.contractCommitmentUsd.toString()) : null,
+    entry_fx_rate:           fund.entryFxRate ? parseFloat(fund.entryFxRate.toString()) : null,
     management_fee_pct:     fund.managementFeePct ? parseFloat(fund.managementFeePct.toString()) : 0,
     carry_pct:              fund.carryPct ? parseFloat(fund.carryPct.toString()) : 0,
     hurdle_rate_pct:        fund.hurdleRatePct ? parseFloat(fund.hurdleRatePct.toString()) : 0,
@@ -436,8 +437,52 @@ router.put('/:id', async (c) => {
   if (body.strategy              !== undefined) data.strategy            = body.strategy
   if (body.vintage_year          !== undefined) data.vintageYear         = body.vintage_year ? parseInt(body.vintage_year) : null
   if (body.currency              !== undefined) data.currency            = body.currency
-  if (body.commitment_usd        !== undefined) data.commitmentUsd       = new Decimal(body.commitment_usd)
-  if (body.entry_fx_rate         !== undefined) data.entryFxRate         = body.entry_fx_rate ? new Decimal(body.entry_fx_rate) : null
+  if (body.commitment_usd !== undefined) {
+    const newAmt = new Decimal(body.commitment_usd)
+    const oldAmt = new Decimal(fund.commitmentUsd.toString())
+
+    // When commitment actually changes, protect existing ledger rows by anchoring
+    // the old AND new values in FundCommitmentHistory so date-based F calculation
+    // uses the correct commitment per row rather than the flat fund-level value.
+    if (!newAmt.equals(oldAmt)) {
+      const [callCount, distCount, histCount] = await Promise.all([
+        prisma.capitalCall.count({ where: { fundId: fund.id, status: { in: ['approved', 'paid'] } } }),
+        prisma.distribution.count({ where: { fundId: fund.id } }),
+        prisma.fundCommitmentHistory.count({ where: { fundId: fund.id } }),
+      ])
+
+      if (callCount > 0 || distCount > 0) {
+        if (histCount === 0) {
+          // First-ever change — record the original commitment at the earliest tx date
+          // so all existing rows keep their current F values.
+          const [earliestCall, earliestDist] = await Promise.all([
+            prisma.capitalCall.findFirst({
+              where: { fundId: fund.id, status: { in: ['approved', 'paid'] } },
+              orderBy: { executionDate: 'asc' },
+            }),
+            prisma.distribution.findFirst({
+              where: { fundId: fund.id },
+              orderBy: { distributionDate: 'asc' },
+            }),
+          ])
+          const dates = [earliestCall?.executionDate, earliestDist?.distributionDate].filter(Boolean) as Date[]
+          const anchorDate = dates.length > 0
+            ? new Date(Math.min(...dates.map(d => d.getTime())))
+            : new Date()
+          await prisma.fundCommitmentHistory.create({
+            data: { fundId: fund.id, commitmentAmount: oldAmt, effectiveDate: anchorDate, notes: 'Initial commitment (auto-anchored)' },
+          })
+        }
+        // New commitment takes effect from today — only future transactions use it.
+        await prisma.fundCommitmentHistory.create({
+          data: { fundId: fund.id, commitmentAmount: newAmt, effectiveDate: new Date(), notes: 'Updated via Fund Details' },
+        })
+      }
+    }
+    data.commitmentUsd = newAmt
+  }
+  if (body.contract_commitment_usd !== undefined) data.contractCommitmentUsd = body.contract_commitment_usd ? new Decimal(body.contract_commitment_usd) : null
+  if (body.entry_fx_rate           !== undefined) data.entryFxRate           = body.entry_fx_rate ? new Decimal(body.entry_fx_rate) : null
   if (body.contract_date         !== undefined) data.contractDate        = body.contract_date ? new Date(body.contract_date) : null
   if (body.investment_period_start !== undefined) data.investmentPeriodStart = body.investment_period_start ? new Date(body.investment_period_start) : null
   if (body.investment_period_end   !== undefined) data.investmentPeriodEnd   = body.investment_period_end   ? new Date(body.investment_period_end)   : null

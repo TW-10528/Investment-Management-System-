@@ -75,9 +75,9 @@ export const WEAK_TEXT_THRESHOLD = 40
  */
 export async function ocrPdf(
   buffer: Buffer,
-  opts: { pageSampleLimit?: number; viewportScale?: number } = {},
+  opts: { pageSampleLimit?: number; viewportScale?: number; headPages?: number; tailPages?: number } = {},
 ): Promise<string> {
-  const { pageSampleLimit, viewportScale = 2.0 } = opts
+  const { pageSampleLimit, viewportScale = 2.0, headPages = 3, tailPages = 2 } = opts
   try {
     // For large PDFs, limit which pages we rasterize.
     // pdf-parse reads the page count cheaply (no rendering), then pdfToPng receives
@@ -89,12 +89,13 @@ export async function ocrPdf(
         const meta      = await pdfParse(buffer, { max: 0 })
         const totalPages: number = (meta as any).numpages ?? 0
         if (totalPages > pageSampleLimit) {
-          // 1-indexed: first 3 pages (cover / definitions) + last 2 pages (signatures).
-          // Commitment amounts and key fund labels are always in these sections.
-          const head      = Math.min(3, totalPages)
-          const tailStart = Math.max(head + 1, totalPages - 1)  // last 2 pages, non-overlapping
+          // 1-indexed: headPages from the front (cover / definitions) + tailPages from the
+          // back (signatures / totals). headPages/tailPages are caller-controlled so the
+          // AI-extract preview step can use fewer pages (faster) than the full ledger path.
+          const head      = Math.min(headPages, totalPages)
+          const tailStart = Math.max(head + 1, totalPages - tailPages + 1)
           const tail      = Array.from(
-            { length: Math.min(2, Math.max(0, totalPages - tailStart + 1)) },
+            { length: Math.min(tailPages, Math.max(0, totalPages - tailStart + 1)) },
             (_, i) => tailStart + i,
           )
           pagesToProcess = [...Array.from({ length: head }, (_, i) => i + 1), ...tail]

@@ -29,14 +29,16 @@ export async function extractPdfText(buffer: Buffer): Promise<{ text: string; us
     // read the key amounts — not full fidelity. Use 1× viewport scale (~72 DPI)
     // instead of the default 2×: runs ~3× faster on CPU (~7s/page vs ~24s/page)
     // and is sufficient for the large Japanese text in contracts and call notices.
-    // Limit to first 3 + last 2 pages for documents longer than 5 pages so a
-    // 29-page contract completes in ~40s instead of hitting the 300s timeout.
-    const ocrText = await ocrPdf(buffer, { pageSampleLimit: 5, viewportScale: 1.0 })
+    // Limit to first 2 + last 1 pages (3 total) for documents longer than 5 pages.
+    // 3 pages × ~60s/page on slow CPU = ~180s, safely under the 600s OCR timeout.
+    // headPages=2 covers the fund name / date; tailPages=1 covers the signature page
+    // where commitment amounts typically appear.
+    const ocrText = await ocrPdf(buffer, { pageSampleLimit: 5, viewportScale: 1.0, headPages: 2, tailPages: 1 })
     const text    = ocrText.trim().length > pdfText.length ? ocrText : pdfText
     return { text, usedOcr: true }
   } catch {
     // pdf-parse itself crashed (corrupt PDF, etc.) — still try OCR.
-    const text = await ocrPdf(buffer, { pageSampleLimit: 5, viewportScale: 1.0 })
+    const text = await ocrPdf(buffer, { pageSampleLimit: 5, viewportScale: 1.0, headPages: 2, tailPages: 1 })
     return { text, usedOcr: true }
   }
 }

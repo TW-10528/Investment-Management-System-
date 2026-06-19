@@ -26,8 +26,9 @@ const VENV_PYTHON = path.join(__dirname, '../../../paddle-venv/bin/python')
 const SCRIPT_PATH = path.join(__dirname, '../../../scripts/paddle_ocr.py')
 
 // Budget: 5s model load + N pages × ~25s/page at 2x scale.
-// 300s covers up to 10 pages before timeout — well above any fund notice.
-const TIMEOUT_MS = 300_000
+// 600s covers large scanned contracts (22-page subscription booklets etc.)
+// on CPU-only machines where each page can take 60s+ at default resolution.
+const TIMEOUT_MS = 600_000
 
 export type PaddleOcrLang = 'japan' | 'en'
 
