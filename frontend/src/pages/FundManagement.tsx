@@ -130,7 +130,7 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
       if (!rate) return '¥—';
       return '¥' + Math.round(usd * rate).toLocaleString('ja-JP');
     }
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(usd);
+    return fmt.usd(usd);
   }
 
   const load = useCallback(() =>
@@ -267,7 +267,7 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                   Cash Flow G {hasManualCf ? '(manual)' : '= −B + C'}
                 </p>
                 <p className="text-sm font-bold tabular-nums mt-0.5" style={{ color: cashFlowPreview < 0 ? C.red : C.emerald }}>
-                  {cashFlowPreview < 0 ? '−' : ''}{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(cashFlowPreview))}
+                  {cashFlowPreview < 0 ? '−' : ''}{fmt.usd(Math.abs(cashFlowPreview))}
                 </p>
               </div>
             </div>
@@ -309,7 +309,7 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                     {Number(cc.distribution_usd??0)>0 ? fmtCallAmt(Number(cc.distribution_usd), cc.fx_rate) : '—'}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold" style={{color: cf<0?C.red:C.emerald}}>
-                    {cf<0?'−':''}{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(Math.abs(cf))}
+                    {cf<0?'−':''}{fmt.usd(Math.abs(cf))}
                     {cc.manual_cash_flow_usd!=null && <span className="ml-1 text-[9px] font-bold px-1 rounded" style={{color:C.amber,background:'rgba(217,119,6,0.12)'}} title="Manual cash-flow entry">M</span>}
                   </td>
                   <td className="px-4 py-3 text-right theme-text-muted">{cc.fx_rate ? Number(cc.fx_rate).toFixed(2) : '—'}</td>
@@ -380,7 +380,7 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
       if (!rate) return '¥—';
       return '¥' + Math.round(Number(d.amount_usd) * rate).toLocaleString('ja-JP');
     }
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(d.amount_usd));
+    return fmt.usd(Number(d.amount_usd));
   }
 
   const load = useCallback(() =>
@@ -412,7 +412,7 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
         <p className="text-sm font-semibold theme-text">
           Distributions
           <span className="ml-2 text-xs font-normal theme-text-muted">{dists.length} records</span>
-          {total > 0 && <span className="ml-3 font-semibold" style={{color:C.emerald}}>{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(total)}</span>}
+          {total > 0 && <span className="ml-3 font-semibold" style={{color:C.emerald}}>{fmt.usd(total)}</span>}
         </p>
         <div className="flex items-center gap-2 flex-wrap">
           {/* MURC rate editor */}
@@ -506,7 +506,7 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
                   <td className="px-4 py-3 text-right theme-text-muted">{d.distribution_date}</td>
                   <td className="px-4 py-3 text-right theme-text">{d.dist_type}</td>
                   <td className="px-4 py-3 text-right font-semibold" style={{color:C.emerald}}>{fmtDistAmt(d)}</td>
-                  <td className="px-4 py-3 text-right theme-text-muted">{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(d.reinvestable_usd))}</td>
+                  <td className="px-4 py-3 text-right theme-text-muted">{fmt.usd(Number(d.reinvestable_usd))}</td>
                   <td className="px-4 py-3 text-right theme-text-muted">{d.fx_rate ? Number(d.fx_rate).toFixed(2):'—'}</td>
                   <td className="px-4 py-3">
                     {canEdit && (
@@ -763,7 +763,7 @@ function CashFlowTab({ fundId, currency }: { fundId: string; currency?: string }
 // LEDGER TAB — B Called / B (¥) / C Received / C (¥) adjacent columns, notes edit
 // FX column shows the MURC TTM rate for each transaction date (auto-fetched)
 // ─────────────────────────────────────────────────────────────────────────────
-function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
+function LedgerTab({ fundId, canEdit, currency }: { fundId:string; canEdit:boolean; currency?:string }) {
   const [rows, setRows]           = useState<LedgerRow[]>([]);
   const [snap, setSnap]           = useState<LedgerSnapshot|null>(null);
   const [fundName, setFundName]   = useState('');
@@ -818,6 +818,11 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
     if (!usd || !rate) return '—';
     return '¥' + Math.round(usd * rate).toLocaleString('ja-JP');
   }
+
+  const fmtAmt = (n: any) =>
+    n == null ? '—'
+    : currency === 'JPY' ? fmt.jpy(Number(n))
+    : fmt.usd(Number(n));
 
   function openNote(row: LedgerRow, idx: number) {
     setEditIdx(idx);
@@ -893,13 +898,13 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 divide-x theme-border border-b theme-border"
              style={{ background:'rgba(79,70,229,0.04)' }}>
           {[
-            ['Commitment',  fmt.usd(snap.commitment_usd, true)],
-            ['Paid-in',     fmt.usd(snap.total_called_usd, true)],
-            ['Received',    fmt.usd(snap.total_received_usd, true)],
+            ['Commitment',  fmtAmt(snap.commitment_usd)],
+            ['Paid-in',     fmtAmt(snap.total_called_usd)],
+            ['Received',    fmtAmt(snap.total_received_usd)],
             ['Drawn %',     fmt.pct(snap.drawn_pct)],
-            ['Unfunded',    fmt.usd(snap.unfunded_usd, true)],
-            ['F Inv.Cap',   fmt.usd(snap.investment_capacity, true)],
-            ['H Net Cash',  fmt.usd(snap.net_cash_position, true)],
+            ['Unfunded',    fmtAmt(snap.unfunded_usd)],
+            ['F Inv.Cap',   fmtAmt(snap.investment_capacity)],
+            ['H Net Cash',  fmtAmt(snap.net_cash_position)],
             ['DPI',         snap.dpi.toFixed(3)+'×'],
           ].map(([label, value]) => (
             <div key={String(label)} className="px-3 py-2.5">
@@ -1022,45 +1027,45 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
 
                         {/* B Called */}
                         <td className="px-3 py-3 text-right font-mono font-semibold" style={{color: call.capital_paid_in ? C.red : 'inherit'}}>
-                          {call.capital_paid_in ? fmt.usd(call.capital_paid_in) : <span className="theme-text-muted">—</span>}
+                          {call.capital_paid_in ? fmtAmt(call.capital_paid_in) : <span className="theme-text-muted">—</span>}
                         </td>
 
                         {/* B (¥) */}
                         <td className="px-3 py-3 text-right font-mono" style={{color: call.capital_paid_in ? 'rgba(239,68,68,0.65)' : 'inherit'}}>
-                          {call.capital_paid_in
+                          {call.capital_paid_in && currency !== 'JPY'
                             ? rateLoading ? <span className="opacity-40 text-xs">…</span> : jpyStr(call.capital_paid_in, rate)
                             : <span className="theme-text-muted">—</span>}
                         </td>
 
                         {/* C Received */}
                         <td className="px-3 py-3 text-right font-mono font-semibold" style={{color: dist.capital_received ? C.emerald : 'inherit'}}>
-                          {dist.capital_received ? fmt.usd(dist.capital_received) : <span className="theme-text-muted">—</span>}
+                          {dist.capital_received ? fmtAmt(dist.capital_received) : <span className="theme-text-muted">—</span>}
                         </td>
 
                         {/* C (¥) */}
                         <td className="px-3 py-3 text-right font-mono" style={{color: dist.capital_received ? 'rgba(16,185,129,0.65)' : 'inherit'}}>
-                          {dist.capital_received
+                          {dist.capital_received && currency !== 'JPY'
                             ? rateLoading ? <span className="opacity-40 text-xs">…</span> : jpyStr(dist.capital_received, rate)
                             : <span className="theme-text-muted">—</span>}
                         </td>
 
                         {/* D Reinvest */}
                         <td className="px-3 py-3 text-right font-mono theme-text-muted">
-                          {dist.reinvestable ? fmt.usd(dist.reinvestable) : '—'}
+                          {dist.reinvestable ? fmtAmt(dist.reinvestable) : '—'}
                         </td>
 
                         {/* E–H: take final state from dist row (last leg of the combined tx) */}
-                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.indigo}}>{fmt.usd(dist.cumulative_called)}</td>
-                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.violet}}>{fmt.usd(dist.investment_capacity)}</td>
-                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:combinedG<0?C.red:C.emerald}}>{fmt.usd(combinedG)}</td>
-                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:dist.net_cash_position<0?C.red:C.emerald}}>{fmt.usd(dist.net_cash_position)}</td>
+                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.indigo}}>{fmtAmt(dist.cumulative_called)}</td>
+                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.violet}}>{fmtAmt(dist.investment_capacity)}</td>
+                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:combinedG<0?C.red:C.emerald}}>{fmtAmt(combinedG)}</td>
+                        <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:dist.net_cash_position<0?C.red:C.emerald}}>{fmtAmt(dist.net_cash_position)}</td>
 
                         {/* Distribution detail */}
                         {showDetail && (
                           <>
-                            <td className="px-3 py-3 text-right font-mono theme-text-muted">{dist.return_of_capital ? fmt.usd(dist.return_of_capital) : '—'}</td>
-                            <td className="px-3 py-3 text-right font-mono theme-text-muted">{dist.gain ? fmt.usd(dist.gain) : '—'}</td>
-                            <td className="px-3 py-3 text-right font-mono theme-text-muted">{dist.interest ? fmt.usd(dist.interest) : '—'}</td>
+                            <td className="px-3 py-3 text-right font-mono theme-text-muted">{dist.return_of_capital ? fmtAmt(dist.return_of_capital) : '—'}</td>
+                            <td className="px-3 py-3 text-right font-mono theme-text-muted">{dist.gain ? fmtAmt(dist.gain) : '—'}</td>
+                            <td className="px-3 py-3 text-right font-mono theme-text-muted">{dist.interest ? fmtAmt(dist.interest) : '—'}</td>
                           </>
                         )}
 
@@ -1156,45 +1161,45 @@ function LedgerTab({ fundId, canEdit }: { fundId:string; canEdit:boolean }) {
 
                       {/* B Called (USD) */}
                       <td className="px-3 py-3 text-right font-mono font-semibold" style={{color: row.capital_paid_in ? C.red : 'inherit'}}>
-                        {row.capital_paid_in ? fmt.usd(row.capital_paid_in) : <span className="theme-text-muted">—</span>}
+                        {row.capital_paid_in ? fmtAmt(row.capital_paid_in) : <span className="theme-text-muted">—</span>}
                       </td>
 
                       {/* B (¥) */}
                       <td className="px-3 py-3 text-right font-mono" style={{color: row.capital_paid_in ? 'rgba(239,68,68,0.65)' : 'inherit'}}>
-                        {row.capital_paid_in
+                        {row.capital_paid_in && currency !== 'JPY'
                           ? rateLoading ? <span className="opacity-40 text-xs">…</span> : jpyStr(row.capital_paid_in, murcRates[row.date] ?? row.fx_rate)
                           : <span className="theme-text-muted">—</span>}
                       </td>
 
                       {/* C Received (USD) */}
                       <td className="px-3 py-3 text-right font-mono font-semibold" style={{color: row.capital_received ? C.emerald : 'inherit'}}>
-                        {row.capital_received ? fmt.usd(row.capital_received) : <span className="theme-text-muted">—</span>}
+                        {row.capital_received ? fmtAmt(row.capital_received) : <span className="theme-text-muted">—</span>}
                       </td>
 
                       {/* C (¥) */}
                       <td className="px-3 py-3 text-right font-mono" style={{color: row.capital_received ? 'rgba(16,185,129,0.65)' : 'inherit'}}>
-                        {row.capital_received
+                        {row.capital_received && currency !== 'JPY'
                           ? rateLoading ? <span className="opacity-40 text-xs">…</span> : jpyStr(row.capital_received, murcRates[row.date] ?? row.fx_rate)
                           : <span className="theme-text-muted">—</span>}
                       </td>
 
                       {/* D Reinvest */}
                       <td className="px-3 py-3 text-right font-mono theme-text-muted">
-                        {row.reinvestable ? fmt.usd(row.reinvestable) : '—'}
+                        {row.reinvestable ? fmtAmt(row.reinvestable) : '—'}
                       </td>
 
                       {/* E–H computed */}
-                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.indigo}}>{fmt.usd(row.cumulative_called)}</td>
-                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.violet}}>{fmt.usd(row.investment_capacity)}</td>
-                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:row.cash_flow<0?C.red:C.emerald}}>{fmt.usd(row.cash_flow)}</td>
-                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:row.net_cash_position<0?C.red:C.emerald}}>{fmt.usd(row.net_cash_position)}</td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.indigo}}>{fmtAmt(row.cumulative_called)}</td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:C.violet}}>{fmtAmt(row.investment_capacity)}</td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:row.cash_flow<0?C.red:C.emerald}}>{fmtAmt(row.cash_flow)}</td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold" style={{color:row.net_cash_position<0?C.red:C.emerald}}>{fmtAmt(row.net_cash_position)}</td>
 
                       {/* Distribution detail */}
                       {showDetail && (
                         <>
-                          <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.return_of_capital ? fmt.usd(row.return_of_capital) : '—'}</td>
-                          <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.gain ? fmt.usd(row.gain) : '—'}</td>
-                          <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.interest ? fmt.usd(row.interest) : '—'}</td>
+                          <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.return_of_capital ? fmtAmt(row.return_of_capital) : '—'}</td>
+                          <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.gain ? fmtAmt(row.gain) : '—'}</td>
+                          <td className="px-3 py-3 text-right font-mono theme-text-muted">{row.interest ? fmtAmt(row.interest) : '—'}</td>
                         </>
                       )}
 
@@ -1343,8 +1348,9 @@ function CommitmentsTab({
   }
 
   // Determine if the current commitment is nearly exhausted.
+  // Always show permanent contract commitment (currentCommitment = contractCommitmentUsd), not latest history entry
   const latest   = history[history.length - 1];
-  const latestAmt = latest ? latest.commitment_amount : currentCommitment;
+  const latestAmt = currentCommitment;
   const remainPct = latestAmt > 0 ? (investmentCapacity / latestAmt) * 100 : 100;
   const nearlyFull = remainPct <= 10 && latestAmt > 0;
 
@@ -1382,7 +1388,7 @@ function CommitmentsTab({
               ¥{latestAmt.toLocaleString('ja-JP')}
             </p>
             <p className="text-xs theme-text-muted mt-0.5">
-              {remainPct.toFixed(1)}% remaining · effective {fmt.date(latest.effective_date)}
+              {remainPct.toFixed(1)}% remaining · permanent contract amount
             </p>
           </div>
           {canEdit && !adding && (
@@ -1554,7 +1560,17 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
   async function save() {
     setSaving(true);
     try {
-      await fundsAPI.update(fundId, form);
+      const data = { ...form };
+      // Convert numeric fields to numbers
+      if (data.commitment_usd) data.commitment_usd = parseFloat(data.commitment_usd);
+      if (data.contract_commitment_usd) data.contract_commitment_usd = parseFloat(data.contract_commitment_usd);
+      if (data.entry_fx_rate) data.entry_fx_rate = parseFloat(data.entry_fx_rate);
+      if (data.vintage_year) data.vintage_year = parseInt(data.vintage_year);
+      if (data.fund_term_years) data.fund_term_years = parseInt(data.fund_term_years);
+      if (data.management_fee_pct) data.management_fee_pct = parseFloat(data.management_fee_pct);
+      if (data.carry_pct) data.carry_pct = parseFloat(data.carry_pct);
+      if (data.hurdle_rate_pct) data.hurdle_rate_pct = parseFloat(data.hurdle_rate_pct);
+      await fundsAPI.update(fundId, data);
       toast.success('Fund details saved');
       setEditing(false);
       onSaved();
@@ -1582,8 +1598,9 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
             ['Strategy',            detail.strategy],
             ['Vintage Year',        detail.vintage_year],
             ['Currency',            detail.currency],
-            ['Commitment (USD)',    detail.commitment_usd ? fmt.usd(Number(detail.commitment_usd)) : '—'],
-            ['Entry FX Rate',       detail.entry_fx_rate  ? Number(detail.entry_fx_rate).toFixed(4)  : '—'],
+            ['Commitment (USD)',         detail.commitment_usd ? fmt.usd(Number(detail.commitment_usd)) : '—'],
+            ['Contract Commitment (USD)', detail.contract_commitment_usd ? fmt.usd(Number(detail.contract_commitment_usd)) : '—'],
+            ['Entry FX Rate',            detail.entry_fx_rate ? Number(detail.entry_fx_rate).toFixed(4) : '—'],
             ['Contract Date',       detail.contract_date],
             ['Inv. Period Start',   detail.investment_period_start],
             ['Inv. Period End',     detail.investment_period_end],
@@ -1686,7 +1703,8 @@ function FundSection({
   }, [fundId, isSdg]);
   useEffect(() => { refreshHistCommitment(); }, [refreshHistCommitment]);
 
-  const displayCommitment = latestHistCommitment ?? Number(detail.commitment_usd);
+  // For commitments page: show ONLY permanent contract commitment (never show temporary commitment history)
+  const displayCommitment = Number(detail.contract_commitment_usd ?? 0);
 
   async function toggleActive() {
     if (!confirm(isActive ? 'Deactivate this fund?' : 'Reactivate this fund?')) return;
@@ -1708,6 +1726,8 @@ function FundSection({
     ...(isSdg ? [{ key: 'commitments' as TabKey, label: 'Commitments' }] : []),
     { key:'details',       label:'Fund Details'   },
   ];
+
+  const fmtMoney = (n: number) => detail.currency === 'JPY' ? fmt.jpy(n) : fmt.usd(n, true);
 
   return (
     <div className="theme-card border theme-border rounded-2xl overflow-hidden"
@@ -1753,9 +1773,9 @@ function FundSection({
       {/* ── KPIs ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 border-t theme-border divide-x theme-border">
         {[
-          { label:'Total Commitment', value: fmt.usd(displayCommitment, true), note: isSdg && latestHistCommitment ? `${latestHistCommitment > 0 ? (paidIn / latestHistCommitment * 100).toFixed(2) : '0.00'}% drawn` : 'gross' },
-          { label:'Paid-in (E)',      value: fmt.usd(paidIn, true),            note:`${drawn.toFixed(2)}% drawn` },
-          { label:'Dry Powder (F)',   value: fmt.usd(powder, true),            note:'unfunded' },
+          { label:'Total Commitment', value: fmtMoney(displayCommitment), note: isSdg && latestHistCommitment ? `${latestHistCommitment > 0 ? (paidIn / latestHistCommitment * 100).toFixed(2) : '0.00'}% drawn` : 'gross' },
+          { label:'Paid-in (E)',      value: fmtMoney(paidIn),          note:`${drawn.toFixed(2)}% drawn` },
+          { label:'Dry Powder (F)',   value: fmtMoney(powder),          note:'unfunded' },
           { label:'DPI',             value: `${Number(summary.dpi??0).toFixed(3)}×`, note:'dist / paid-in' },
         ].map(m=>(
           <div key={m.label} className="px-5 py-4">
@@ -1794,11 +1814,11 @@ function FundSection({
         </div>
 
         {tab==='cashflow'      && <CashFlowTab  fundId={fundId} currency={detail.currency} />}
-        {tab==='documents'     && <FundDocuments fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
+        {tab==='documents'     && <FundDocuments fundId={fundId} canEdit={canEdit} onChanged={onChanged} currency={detail.currency} />}
         {tab==='calls'         && <CallsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='distributions' && <DistsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='nav'           && <NavTab      fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
-        {tab==='ledger'        && <LedgerTab   fundId={fundId} canEdit={canEdit} />}
+        {tab==='ledger'        && <LedgerTab   fundId={fundId} canEdit={canEdit} currency={detail.currency} />}
         {tab==='commitments'   && <CommitmentsTab
           fundId={fundId} canEdit={canEdit}
           currentCommitment={displayCommitment}
@@ -2121,6 +2141,15 @@ export default function FundManagement() {
   const rawSection = searchParams.get('section');
   const section: 'manage' | 'reports' | 'cashflow' =
     rawSection === 'reports' || rawSection === 'cashflow' ? rawSection : 'manage';
+
+  // ?fund=<id> from dashboard fund links — auto-open that fund on mount
+  const fundParam = searchParams.get('fund');
+  useEffect(() => {
+    if (fundParam) {
+      setSelectedFundId(fundParam);
+      setOpenAtTab('ledger');
+    }
+  }, [fundParam]);
 
   const loadFunds = useCallback(async () => {
     setLoading(true);

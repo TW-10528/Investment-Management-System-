@@ -28,14 +28,24 @@ function jpDateAfter(text: string, idx: number): string | null {
 }
 
 // Amount immediately following a fixed label, e.g. "払込み頂く金額\n\n45,765,318円".
-// Allows up to 100 non-digit characters (newlines, "|", spaces, table borders)
-// that PaddleOCR or a text layer may insert between the label and the number.
-// The number must start AND end with a digit (prevents matching a lone "円").
-function amountAfter(text: string, label: string): number | null {
-  const re = new RegExp(label + '[^\\d]{0,100}([\\d][\\d,.\\uFF0E\\uFF0C]*\\d)')
+// label may be a string (exact match) or a RegExp (for OCR-variant patterns).
+// maxGap = max non-digit characters between the label end and the first digit.
+// Default 200: enough for newline + whitespace between a table cell label and its value.
+// [^\d] in the gap is safe because SDG labels contain no ASCII digits.
+function amountAfter(text: string, label: string | RegExp, maxGap = 200): number | null {
+  const labelSrc = label instanceof RegExp
+    ? label.source
+    : label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(labelSrc + `[^\\d]{0,${maxGap}}([\\d][\\d,.\\uFF0E\\uFF0C]*\\d)`)
   const m = re.exec(text)
   return m ? jpAmount(m[1]) : null
 }
+
+// PaddleOCR substitutes simplified Chinese / visually-similar kanji for some characters:
+//   込 → 达   頂 → 顶   額 → 额
+// These patterns accept both the correct Japanese form and the OCR variant.
+const RE_HARAIKOMI_KIN   = /払[込达]み[頂顶]く金[額额]/   // 払込み頂く金額
+const RE_HARAIKOMI_KIGEN = /払[込达]み期限/               // 払込み期限
 
 // SDG_271022 / "SDG_080426 3.pdf" → 2022-10-27 (DDMMYY). This filename
 // convention is the 実行日/value date and matched the Excel ledger exactly for
@@ -67,14 +77,16 @@ export function extractSdgNotice(text: string, fileName = ''): ParsedFundNotice 
   //   some scans → "SDG投資…"      (ｓ dropped entirely)
   // We therefore accept any "SDG" (case-insensitive) adjacent to 投資事業有限責任組合,
   // or サード (Thirdwave investor name) near the same phrase as a fallback.
-  const isSdg = (/SDG/i.test(text) || /サード/.test(text)) && /投資事業有限責任組合/.test(text)
+  // OCR also substitutes 資→资 in the fund name — accept both.
+  const isSdg = (/SDG/i.test(text) || /サード/.test(text)) && /投[資资]事業有限責任組合/.test(text)
   if (!isSdg) return null
 
   const log: string[] = [`SDG deterministic extractor (filename: ${fileName || 'n/a'})`]
 
   // ── Capital call amount ────────────────────────────────────────────────────
   // 払込み頂く金額 is the gross call wired OUT (Excel column B).
-  const callAmount = amountAfter(text, '払込み頂く金額')
+  // RE_HARAIKOMI_KIN handles OCR variants where 込→达 頂→顶 額→额.
+  const callAmount = amountAfter(text, RE_HARAIKOMI_KIN)
   const isCall = callAmount != null && callAmount > 0
 
   // ── Distribution amount ────────────────────────────────────────────────────
@@ -117,7 +129,7 @@ export function extractSdgNotice(text: string, fileName = ''): ParsedFundNotice 
   // Filename date is the 実行日/value date — proven exact against Excel for all
   // known notices. OCR'd due date is the fallback.
   const fileDate  = dateFromFileName(fileName)
-  const labelIdx  = text.search(/払込み期限|振込日/)
+  const labelIdx  = text.search(new RegExp(RE_HARAIKOMI_KIGEN.source + '|振込日'))
   const docDate   = labelIdx >= 0 ? jpDateAfter(text, labelIdx) : null
   const dueDate   = fileDate ?? docDate ?? new Date().toISOString().slice(0, 10)
   // Notice (letter) date: first date in the document, else the value date.

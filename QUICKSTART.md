@@ -46,7 +46,7 @@ Or manually in two terminals:
 cd backend && npm run dev      # Hono API → http://localhost:8004
 
 # Terminal 2
-cd frontend && npm run dev     # Vite → http://localhost:5173
+cd frontend && npm run dev     # Vite → http://localhost:5175
 ```
 
 ---

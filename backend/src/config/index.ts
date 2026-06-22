@@ -14,7 +14,7 @@ function getBool(key: string, fallback: boolean): boolean {
 }
 
 export const config = {
-  port:        getInt('PORT', 8004),
+  port:        getInt('PORT', 8005),
   environment: get('ENVIRONMENT', 'local'),
 
   // JWT

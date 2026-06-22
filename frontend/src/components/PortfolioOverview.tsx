@@ -250,14 +250,14 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
       <div>
         <h2 className="text-sm font-bold theme-text mb-3">Portfolio Summary</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
-        <KpiCard label="Total Commitments"   value={fmt.usdAbbr(data.total_commitment_usd)} full={fmt.usdFull(data.total_commitment_usd)} sub={`${data.total_funds} funds`} />
-        <KpiCard label="Total Contributions" value={fmt.usdAbbr(data.total_called_usd)}     full={fmt.usdFull(data.total_called_usd)}     sub={pct(data.drawn_pct) + ' drawn'} />
-        <KpiCard label="Total Distributions" value={fmt.usdAbbr(data.total_received_usd)}   full={fmt.usdFull(data.total_received_usd)}   sub={`DPI ${data.dpi.toFixed(2)}×`} color={C.emerald} bg={C.emeraldBg} bdr={C.emeraldBdr} />
-        <KpiCard label="Total NAV (Unreal.)" value={fmt.usdAbbr(data.total_nav_usd)}        full={fmt.usdFull(data.total_nav_usd)}        sub="latest reported" color={C.violet} bg="rgba(15,118,110,0.07)" bdr="rgba(15,118,110,0.2)" />
-        <KpiCard label="Total Value"         value={fmt.usdAbbr(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))} full={fmt.usdFull(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))} sub="Distributions + NAV" color={C.indigo} />
+        <KpiCard label="Total Commitments"   value={fmt.usdFull(data.total_commitment_usd)} sub={`${data.total_funds} funds`} />
+        <KpiCard label="Total Contributions" value={fmt.usdFull(data.total_called_usd)}     sub={pct(data.drawn_pct) + ' drawn'} />
+        <KpiCard label="Total Distributions" value={fmt.usdFull(data.total_received_usd)}   sub={`DPI ${data.dpi.toFixed(2)}×`} color={C.emerald} bg={C.emeraldBg} bdr={C.emeraldBdr} />
+        <KpiCard label="Total NAV (Unreal.)" value={fmt.usdFull(data.total_nav_usd)}        sub="latest reported" color={C.violet} bg="rgba(15,118,110,0.07)" bdr="rgba(15,118,110,0.2)" />
+        <KpiCard label="Total Value"         value={fmt.usdFull(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))} sub="Distributions + NAV" color={C.indigo} />
         <KpiCard label="MOIC"                value={`${(data.moic ?? data.tvpi ?? 0).toFixed(2)}×`} sub={`DPI ${data.dpi.toFixed(2)}× · TVPI ${(data.tvpi ?? 0).toFixed(2)}×`} color={C.emerald} bg={C.emeraldBg} bdr={C.emeraldBdr} />
         <KpiCard label="Net IRR"             value={data.irr != null ? `${data.irr.toFixed(1)}%` : '—'} sub="since inception" color={(data.irr ?? 0) < 0 ? C.red : C.emerald} bg={(data.irr ?? 0) < 0 ? C.redBg : C.emeraldBg} bdr={(data.irr ?? 0) < 0 ? C.redBdr : C.emeraldBdr} />
-        <KpiCard label="Dry Powder"          value={fmt.usdAbbr(data.dry_powder_usd)}      full={fmt.usdFull(data.dry_powder_usd)}       sub={pct(100 - data.drawn_pct) + ' available'} color={C.slate} bg={C.slateBg} bdr={C.slateBdr} />
+        <KpiCard label="Dry Powder"          value={fmt.usdFull(data.dry_powder_usd)}      sub={pct(100 - data.drawn_pct) + ' available'} color={C.slate} bg={C.slateBg} bdr={C.slateBdr} />
         </div>
       </div>
 

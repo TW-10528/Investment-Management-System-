@@ -13,6 +13,7 @@ export interface FundSummary {
   vintage_year?: number;
   currency?: string;
   commitment_usd: number;
+  contract_commitment_usd?: number | null;
   total_called_usd: number;
   total_called_jpy?: number;
   drawn_pct: number;

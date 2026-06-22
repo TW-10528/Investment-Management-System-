@@ -268,6 +268,7 @@ ENVIRONMENT=development
 SECRET_KEY=your-secret-key
 ALGORITHM=HS256
 ALLOWED_ORIGINS=http://localhost:5173
+
 ```
 
 ### Frontend (.env)

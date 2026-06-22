@@ -62,6 +62,7 @@ model Fund {
   vintageYear           Int?      @map("vintage_year")
   currency              String    @default("USD")
   commitmentUsd         Decimal   @default(0) @db.Decimal(20, 6) @map("commitment_usd")
+  contractCommitmentUsd Decimal?  @db.Decimal(20, 6) @map("contract_commitment_usd")
   commitmentJpy         BigInt?   @map("commitment_jpy")
   entryFxRate           Decimal?  @db.Decimal(12, 6) @map("entry_fx_rate")
   contractDate          DateTime? @map("contract_date") @db.Date
@@ -234,6 +235,7 @@ model Notice {
   id           String    @id @default(uuid())
   filename     String
   originalName String?   @map("original_name")
+  fileHash     String?   @map("file_hash")
   noticeType   String    @map("notice_type")
   status       String    @default("pending")
   fundId       String?   @map("fund_id")
