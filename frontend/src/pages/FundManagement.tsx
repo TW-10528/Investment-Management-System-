@@ -1951,11 +1951,14 @@ function PdfViewerModal({ doc, onClose }: { doc: any; onClose: () => void }) {
 }
 
 function ReportFilesTile({
-  title, kind, color, bg, rows, canEdit, onView, onDelete,
+  title, kind, color, bg, rows, canEdit, onView, onDelete, currency,
 }: {
   title: string; kind: 'call' | 'dist'; color: string; bg: string;
-  rows: any[]; canEdit: boolean; onView: (doc: any) => void; onDelete: (id: string) => void;
+  rows: any[]; canEdit: boolean; onView: (doc: any) => void; onDelete: (id: string) => void; currency?: string;
 }) {
+  const amountHeader = currency === 'JPY' ? 'Amount (JPY)' : 'Amount (USD)';
+  const fmtAmount = (amt: number) => currency === 'JPY' ? fmt.jpy(amt) : fmt.usd(amt);
+
   return (
     <div className="theme-card border theme-border rounded-2xl overflow-hidden">
       <div className="px-5 py-3 border-b theme-border flex items-center justify-between" style={{ background: bg }}>
@@ -1974,7 +1977,7 @@ function ReportFilesTile({
           <table className="w-full text-sm">
             <thead style={{ background: 'var(--color-header-bg)' }}>
               <tr className="border-b theme-border text-xs">
-                {['File', 'Notice Date', 'Due Date', 'Amount (USD)', ''].map(h => (
+                {['File', 'Notice Date', 'Due Date', amountHeader, ''].map(h => (
                   <th key={h} className={`px-4 py-2.5 font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h === 'File' || h === '' ? 'text-left' : 'text-right'}`}>{h}</th>
                 ))}
               </tr>
@@ -1987,7 +1990,7 @@ function ReportFilesTile({
                     <td className="px-4 py-3 theme-text max-w-[20rem] truncate" title={doc.file_name}>📄 {doc.file_name}</td>
                     <td className="px-4 py-3 text-right theme-text-muted whitespace-nowrap">{doc.notice_date ?? '—'}</td>
                     <td className="px-4 py-3 text-right theme-text-muted whitespace-nowrap">{doc.due_date ?? '—'}</td>
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color }}>{amount ? fmt.usd(Number(amount)) : '—'}</td>
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color }}>{amount ? fmtAmount(Number(amount)) : '—'}</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                       <button onClick={() => onView(doc)}
                         className="px-2 py-1 rounded text-xs font-medium text-indigo-600 hover:bg-indigo-500/10 transition-colors">
@@ -2079,9 +2082,9 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
             <span className="text-xs theme-text-muted">· {fundReports.length} file{fundReports.length !== 1 ? 's' : ''}</span>
           </div>
           <ReportFilesTile title="Capital Calls" kind="call" color={C.indigo}  bg={C.indigoBg}
-            rows={calls} canEdit={canEdit} onView={setViewerDoc} onDelete={del} />
+            rows={calls} canEdit={canEdit} onView={setViewerDoc} onDelete={del} currency={openFund.currency} />
           <ReportFilesTile title="Distributions" kind="dist" color={C.emerald} bg={C.emeraldBg}
-            rows={dists} canEdit={canEdit} onView={setViewerDoc} onDelete={del} />
+            rows={dists} canEdit={canEdit} onView={setViewerDoc} onDelete={del} currency={openFund.currency} />
         </div>
       ) : (
         /* ── Fund folders grid ── */
