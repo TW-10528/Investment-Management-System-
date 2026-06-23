@@ -1602,8 +1602,8 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
             ['Strategy',            detail.strategy],
             ['Vintage Year',        detail.vintage_year],
             ['Currency',            detail.currency],
-            ['Commitment (USD)',         detail.commitment_usd ? fmt.usd(Number(detail.commitment_usd)) : '—'],
-            ...(isSdg ? [['Contract Commitment (USD)', detail.contract_commitment_usd ? fmt.usd(Number(detail.contract_commitment_usd)) : '—']] : []),
+            [isSdg ? 'Commitment (JPY)' : 'Commitment (USD)',         detail.commitment_usd ? (isSdg ? `¥${Number(detail.commitment_usd).toLocaleString()}` : fmt.usd(Number(detail.commitment_usd))) : '—'],
+            ...(isSdg ? [['Contract Commitment (JPY)', detail.contract_commitment_usd ? `¥${Number(detail.contract_commitment_usd).toLocaleString()}` : '—']] : []),
             ['Entry FX Rate',            detail.entry_fx_rate ? Number(detail.entry_fx_rate).toFixed(4) : '—'],
             ['Contract Date',       detail.contract_date],
             ['Inv. Period Start',   detail.investment_period_start],
@@ -1648,9 +1648,9 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
             <option>USD</option><option>EUR</option><option>JPY</option>
           </select>
         </Field>
-        <Field label="Commitment (USD)"><input type="number" className={inp} value={form.commitment_usd??''} onChange={e=>sf('commitment_usd',e.target.value)} /></Field>
+        <Field label={isSdg ? "Commitment (JPY)" : "Commitment (USD)"}><input type="number" className={inp} value={form.commitment_usd??''} onChange={e=>sf('commitment_usd',e.target.value)} /></Field>
         {isSdg && (
-          <Field label="Contract Commitment (USD)"><input type="number" className={inp} value={form.contract_commitment_usd??''} onChange={e=>sf('contract_commitment_usd',e.target.value)} /></Field>
+          <Field label="Contract Commitment (JPY)"><input type="number" className={inp} value={form.contract_commitment_usd??''} onChange={e=>sf('contract_commitment_usd',e.target.value)} /></Field>
         )}
         <Field label="Entry FX Rate"><input type="number" step="0.0001" className={inp} value={form.entry_fx_rate??''} onChange={e=>sf('entry_fx_rate',e.target.value)} /></Field>
         <Field label="Contract Date"><input type="date" className={inp} value={form.contract_date??''} onChange={e=>sf('contract_date',e.target.value)} /></Field>
