@@ -1852,6 +1852,12 @@ function FundCard({ fund, detail, onClick }: { fund: FundSummary; detail?: FundD
   const summary  = (detail as any)?.summary ?? {};
   const commitment = Number(detail?.commitment_usd ?? 0);
   const drawn      = Number(summary.drawn_pct ?? 0);
+  const isSdg = /sdg/i.test(fund.fund_name ?? '');
+
+  // SDG fund displays JPY, others display USD
+  const commitmentDisplay = isSdg
+    ? `¥${commitment.toLocaleString()}`
+    : fmt.usd(commitment, true);
 
   return (
     <button onClick={onClick}
@@ -1878,7 +1884,7 @@ function FundCard({ fund, detail, onClick }: { fund: FundSummary; detail?: FundD
 
       <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t theme-border">
         {[
-          ['Commitment', fmt.usd(commitment, true)],
+          ['Commitment', commitmentDisplay],
           ['Drawn',      `${drawn.toFixed(1)}%`],
           ['DPI',        `${Number(summary.dpi ?? 0).toFixed(2)}×`],
         ].map(([label, value]) => (

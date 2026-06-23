@@ -216,6 +216,7 @@ async function main() {
   // SDG fund has both contract_commitment_usd (fixed) and commitment_usd (dynamic tranches)
   // Contract commitment is the base/standard value shown on dashboard
   // Commitment value changes as tranches are added in the Commitments page
+  // Currency is JPY - all amounts (capital calls, commitments) are in Japanese Yen
   await prisma.fund.create({
     data: {
       fundName:              'SDG Fund',
@@ -224,9 +225,9 @@ async function main() {
       administrator:         'Siguler Guff & Company, LP',
       strategy:              'Development',
       vintageYear:           2024,
-      currency:              'USD',
-      commitmentUsd:         0,  // Will be populated from PDF uploads
-      contractCommitmentUsd: 0,  // Will be manually set
+      currency:              'JPY',  // All amounts are in Japanese Yen, no FX conversion needed
+      commitmentUsd:         0,  // Will be populated from PDF uploads (in JPY)
+      contractCommitmentUsd: 0,  // Will be manually set (in JPY)
       entryFxRate:           154.20,
       isActive:              true,
     },
