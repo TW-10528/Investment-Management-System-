@@ -15,9 +15,12 @@ import type { ParsedFundNotice } from './types'
 
 // Strip every non-digit character and parse as integer.
 // Handles OCR-swapped separators: "123,456,789" / "123.456.789" / "59.527,840"
+// Also handles full-width digits (０-９) and converts them to ASCII
 // → 123456789 (all become the same integer once non-digits are stripped).
 function jpAmount(raw: string): number {
-  return parseInt(raw.replace(/[^\d]/g, ''), 10) || 0
+  // Convert full-width digits to ASCII digits
+  const normalized = raw.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+  return parseInt(normalized.replace(/[^\d]/g, ''), 10) || 0
 }
 
 // First "YYYY年M月D日" at or after `idx` in `text` → "YYYY-MM-DD" (null if none).
@@ -30,13 +33,14 @@ function jpDateAfter(text: string, idx: number): string | null {
 // Amount immediately following a fixed label, e.g. "払込み頂く金額\n\n45,765,318円".
 // label may be a string (exact match) or a RegExp (for OCR-variant patterns).
 // maxGap = max non-digit characters between the label end and the first digit.
-// Default 200: enough for newline + whitespace between a table cell label and its value.
+// Default 500: enough for table cells and newlines. Increased to handle table layouts.
 // [^\d] in the gap is safe because SDG labels contain no ASCII digits.
-function amountAfter(text: string, label: string | RegExp, maxGap = 200): number | null {
+function amountAfter(text: string, label: string | RegExp, maxGap = 500): number | null {
   const labelSrc = label instanceof RegExp
     ? label.source
     : label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const re = new RegExp(labelSrc + `[^\\d]{0,${maxGap}}([\\d][\\d,.\\uFF0E\\uFF0C]*\\d)`)
+  // Also match full-width digits (０-９) and full-width punctuation (，、。etc)
+  const re = new RegExp(labelSrc + `[^\\d０-９]{0,${maxGap}}([\\d０-９][\\d，、．。,.\\uFF0E\\uFF0C０-９]*[\\d０-９])`)
   const m = re.exec(text)
   return m ? jpAmount(m[1]) : null
 }
@@ -86,23 +90,50 @@ export function extractSdgNotice(text: string, fileName = ''): ParsedFundNotice 
   // ── Capital call amount ────────────────────────────────────────────────────
   // 払込み頂く金額 is the gross call wired OUT (Excel column B).
   // RE_HARAIKOMI_KIN handles OCR variants where 込→达 頂→顶 額→额.
-  const callAmount = amountAfter(text, RE_HARAIKOMI_KIN)
+  // Try multiple patterns with increasing maxGap for table layouts, OCR issues, etc.
+  let callAmount = amountAfter(text, RE_HARAIKOMI_KIN, 500)  // Primary: with gap tolerance
+  if (!callAmount) {
+    // Fallback 1: Try harder with even larger gap (some tables have very wide cells)
+    callAmount = amountAfter(text, RE_HARAIKOMI_KIN, 1000)
+  }
+  if (!callAmount) {
+    // Fallback 2: Try line-by-line in case OCR split the label across lines
+    // Look for label fragments and amount on same or next few lines
+    const lines = text.split(/\n/)
+    for (let i = 0; i < lines.length - 1; i++) {
+      if (/払[込达]み/.test(lines[i]) && /金[額额]/.test(lines[i])) {
+        // Label is on this line, check next lines for amount
+        const m = /([０-９\d][０-９\d,.．，]*[０-９\d])/.exec(lines[i] + '\n' + lines[i + 1])
+        if (m) {
+          callAmount = jpAmount(m[1])
+          break
+        }
+      }
+    }
+  }
   const isCall = callAmount != null && callAmount > 0
 
   // ── Distribution amount ────────────────────────────────────────────────────
   // Distribution notices use "貴社への分配金額" or a shorter "分配金額" label.
-  // When the label is not found directly, fall back to the largest yen amount
-  // that appears near the word 分配 in the document (mirrors the Python module's
-  // fallback pattern for scanned notices where PaddleOCR may split the label).
+  // Also look for "貴社に帰属する金額" (amount attributable to you) which shows the net distribution.
+  // When the label is not found directly, look for amounts outside parentheses (net) before inside.
   let distAmount: number | null = null
   if (!isCall) {
     distAmount =
-      amountAfter(text, '貴社への分配金額') ??
-      amountAfter(text, '分配金額') ??
+      // Try "amount attributable to you" first (net amount after deductions)
+      amountAfter(text, '貴社に帰属する金額', 500) ??
+      // Try standard distribution labels
+      amountAfter(text, '貴社への分配金額', 500) ??
+      amountAfter(text, '分配金額', 500) ??
       (() => {
-        // Fallback: "分配" anywhere within 300 chars before a yen amount.
-        const m = /分配[\s\S]{0,300}?([0-9][0-9,.．，]*[0-9])\s*円/.exec(text)
-        return m ? jpAmount(m[1]) : null
+        // Fallback 1: Look for amount OUTSIDE parentheses (net amount, not gross)
+        // Pattern: number(larger_number-deduction)円 — the first number is the net amount
+        const m = /([０-９\d][０-９\d,.．，]*[０-９\d])\s*\([０-９\d０-９\d,.．，−−\-\s]*\)\s*円/.exec(text)
+        if (m) return jpAmount(m[1])
+
+        // Fallback 2: "分配" anywhere within 300 chars before a yen amount.
+        const m2 = /分配[\s\S]{0,300}?([０-９\d][０-９\d,.．，]*[０-９\d])\s*円/.exec(text)
+        return m2 ? jpAmount(m2[1]) : null
       })()
   }
   const isDist = distAmount != null && distAmount > 0

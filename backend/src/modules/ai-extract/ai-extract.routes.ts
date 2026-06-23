@@ -8,6 +8,11 @@ import {
 import { applyCalcEngine, runCrossChecks } from './calc'
 import type { PrevState } from './calc'
 import { extractSdgNotice } from '../../services/fundParsers/sdgExtractor'
+import { parseNbRealEstate } from '../../services/fundParsers/nb-real-estate/index'
+import { parseHamiltonLane } from '../../services/fundParsers/hamilton-lane/index'
+import { parseHamiltonStrategic } from '../../services/fundParsers/hamilton-strategic/index'
+import { parseDoverStreet } from '../../services/fundParsers/dover-street/index'
+import { detectViewingDocument } from '../../services/fundParsers/viewingDocumentDetector'
 
 const router = new Hono<HonoEnv>()
 
@@ -46,6 +51,32 @@ router.post('/test', async (c) => {
       return c.json({
         detail: 'Could not extract text from this PDF even after OCR. The file may be corrupt or in an unsupported format.',
       }, 422)
+    }
+
+    // ── Check if this is a viewing-only document (contract, audit, etc.) ────
+    // Return early with COMMITMENT_NOTICE classification so frontend doesn't
+    // try to extract amounts or add to ledger as transaction
+    const viewingDocCheck = detectViewingDocument(pdfText, file.name)
+    if (viewingDocCheck.isViewingDoc) {
+      return c.json({
+        pdf_characters: pdfText.length,
+        pdf_preview:    pdfText.slice(0, 500),
+        classification: {
+          fund_key:         'UNKNOWN',
+          fund_display_name: 'Viewing Document',
+          report_type:      'COMMITMENT_NOTICE', // Mark as viewing-only
+          currency:         'USD',
+          confidence_score: 95,
+        },
+        extraction:    null,
+        calculation:   null,
+        cross_checks:  null,
+        confidence_gate: {
+          pass: false,
+          reason: `This is a ${viewingDocCheck.docType || 'viewing'} document (${viewingDocCheck.reason}). Storage only, no extraction.`,
+        },
+        model_used: 'viewing-document-detector',
+      })
     }
 
     // ── Previous state for calc engine ────────────────────────────────────
@@ -132,6 +163,34 @@ router.post('/test', async (c) => {
         classification,
         raw_response: stage2Raw,
       }, 502)
+    }
+
+    // ── Rich Extraction (override AI for known fund types) ─────────────────
+    // For funds with dedicated parsers (NB Real Estate, Hamilton, Dover), use the
+    // rich extractor instead of AI to get more accurate values for the preview
+    const RICH_FUNDS = ['NB_REAL_ESTATE', 'HAMILTON_SEC', 'HAMILTON_STRAT', 'DOVER']
+    if (RICH_FUNDS.includes(fund_key) && pdfText) {
+      try {
+        let richNotice = null
+        if (fund_key === 'NB_REAL_ESTATE') richNotice = parseNbRealEstate(pdfText)
+        else if (fund_key === 'HAMILTON_SEC') richNotice = parseHamiltonLane(pdfText)
+        else if (fund_key === 'HAMILTON_STRAT') richNotice = parseHamiltonStrategic(pdfText)
+        else if (fund_key === 'DOVER') richNotice = parseDoverStreet(pdfText, null, '')
+
+        // Override AI extraction with rich extraction values
+        if (richNotice) {
+          extraction.B_capital_contribution = richNotice.grossCallUsd ?? extraction.B_capital_contribution
+          extraction.C_distribution_received = richNotice.distributionUsd ?? extraction.C_distribution_received
+          extraction.D_reinvestable = richNotice.reinvestableUsd ?? extraction.D_reinvestable
+          extraction.return_of_capital = richNotice.returnOfCapitalUsd ?? extraction.return_of_capital
+          extraction.gain = richNotice.gainUsd ?? extraction.gain
+          extraction.interest = richNotice.interestUsd ?? extraction.interest
+          extraction.transaction_date = richNotice.dueDate ?? extraction.transaction_date
+        }
+      } catch (richErr) {
+        // Rich extraction failed, continue with AI values
+        console.warn('[ai-extract] Rich extraction failed, using AI values:', richErr)
+      }
     }
 
     // ── Stage 3: Deterministic calc (AI never does this) ──────────────────

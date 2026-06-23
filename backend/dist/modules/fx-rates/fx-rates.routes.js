@@ -1,0 +1,203 @@
+"use strict";
+// FX Rates module — /api/v1/fx-rates
+Object.defineProperty(exports, "__esModule", { value: true });
+const hono_1 = require("hono");
+const auth_1 = require("../../middleware/auth");
+const prisma_1 = require("../../lib/prisma");
+const router = new hono_1.Hono();
+router.use('*', auth_1.auth);
+function rateDict(r) {
+    return {
+        id: r.id,
+        date: r.rateDate?.toISOString().slice(0, 10),
+        usd_jpy: parseFloat(r.usdJpy.toString()),
+        source: r.source,
+    };
+}
+// GET /
+router.get('/', async (c) => {
+    const rates = await prisma_1.prisma.fxRate.findMany({ orderBy: { rateDate: 'desc' } });
+    return c.json(rates.map(rateDict));
+});
+// GET /latest
+router.get('/latest', async (c) => {
+    const rate = await prisma_1.prisma.fxRate.findFirst({ orderBy: { rateDate: 'desc' } });
+    if (!rate)
+        return c.json({ usd_jpy: null, date: null });
+    return c.json({ usd_jpy: parseFloat(rate.usdJpy.toString()), date: rate.rateDate.toISOString().slice(0, 10) });
+});
+// GET /live
+router.get('/live', async (c) => {
+    try {
+        const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=JPY');
+        const data = await res.json();
+        const rate = data?.rates?.JPY;
+        if (!rate)
+            return c.json({ detail: 'Live rate unavailable' }, 503);
+        return c.json({ usd_jpy: rate, date: data.date });
+    }
+    catch {
+        return c.json({ detail: 'Live rate fetch failed' }, 503);
+    }
+});
+// GET /cross?from=USD&to=JPY,EUR,GBP,AUD  — proxies Frankfurter for multi-currency panel
+router.get('/cross', async (c) => {
+    const from = c.req.query('from') || 'USD';
+    const to = c.req.query('to') || 'JPY,EUR,GBP,AUD';
+    try {
+        const res = await fetch(`https://api.frankfurter.app/latest?from=${from}&to=${to}`);
+        if (!res.ok)
+            return c.json({ detail: 'Cross rate unavailable' }, 503);
+        const data = await res.json();
+        return c.json(data);
+    }
+    catch {
+        return c.json({ detail: 'Cross rate fetch failed' }, 503);
+    }
+});
+// ── MURC scraper: fetches TTS+TTB for USD/JPY on a given date, returns TTM ──
+async function fetchMurcUsdJpy(date) {
+    try {
+        const [yyyy, mm, dd] = date.split('-');
+        if (!yyyy || !mm || !dd)
+            return null;
+        const id = yyyy.slice(2) + mm + dd; // YYMMDD e.g. "240610"
+        const res = await fetch(`https://www.murc-kawasesouba.jp/fx/past/index.php?id=${id}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IMS/1.0)' }
+        });
+        if (!res.ok)
+            return null;
+        // MURC pages are Shift-JIS; decode the bytes explicitly (res.text() defaults to
+        // UTF-8 and corrupts the markup, so the USD-row regex would never match).
+        const buf = await res.arrayBuffer();
+        const html = new TextDecoder('shift_jis').decode(new Uint8Array(buf));
+        // Row: <td>US Dollar</td><td>米ドル</td><td class="t_center">USD</td>
+        //      <td class="t_right">158.01 </td><td class="t_right">156.01 </td>
+        const m = html.match(/USD<\/td>\s*<td[^>]*>([\d.]+)\s*<\/td>\s*<td[^>]*>([\d.]+)\s*<\/td>/);
+        if (!m)
+            return null;
+        const tts = parseFloat(m[1]);
+        const ttb = parseFloat(m[2]);
+        if (isNaN(tts) || isNaN(ttb))
+            return null;
+        const ttm = Math.round((tts + ttb) / 2 * 100) / 100;
+        return { tts, ttb, ttm };
+    }
+    catch {
+        return null;
+    }
+}
+// GET /historical?date=2024-06-10&from=USD&to=JPY
+// 1. Checks DB for stored MUFG TTM rate.
+// 2. If not found, scrapes MURC website to compute TTM = (TTS+TTB)/2.
+// 3. Returns rate + source so frontend can offer "Save to DB".
+router.get('/historical', async (c) => {
+    const date = c.req.query('date');
+    const from = c.req.query('from') || 'USD';
+    const to = c.req.query('to') || 'JPY';
+    if (!date)
+        return c.json({ detail: 'date required' }, 400);
+    const isUsdJpy = (from === 'USD' && to === 'JPY') || (from === 'JPY' && to === 'USD');
+    if (!isUsdJpy)
+        return c.json({ detail: 'MUFG TTM is only available for USD/JPY' }, 404);
+    // ── 1. DB lookup ──────────────────────────────────────────────────────────
+    const stored = await prisma_1.prisma.fxRate.findFirst({
+        where: { rateDate: { gte: new Date(date + 'T00:00:00Z'), lte: new Date(date + 'T23:59:59Z') } },
+    });
+    if (stored) {
+        const usdJpy = parseFloat(stored.usdJpy.toString());
+        const mufgRate = from === 'USD' ? usdJpy : Math.round((1 / usdJpy) * 1e8) / 1e8;
+        return c.json({ date, from, to, mufg_rate: mufgRate, usd_jpy: usdJpy, source: 'db' });
+    }
+    // ── 2. MURC scrape (auto-saved to DB so we only scrape once per date) ──────
+    const murc = await fetchMurcUsdJpy(date);
+    if (murc) {
+        try {
+            await prisma_1.prisma.fxRate.create({
+                data: { rateDate: new Date(date + 'T00:00:00Z'), usdJpy: murc.ttm, source: 'murc' },
+            });
+        }
+        catch { /* duplicate / non-fatal */ }
+        const mufgRate = from === 'USD' ? murc.ttm : Math.round((1 / murc.ttm) * 1e8) / 1e8;
+        return c.json({ date, from, to, mufg_rate: mufgRate, usd_jpy: murc.ttm, tts: murc.tts, ttb: murc.ttb, source: 'murc' });
+    }
+    // ── 3. Fallback: today's rate may not be published yet (or it's a future date).
+    // With ?fallback=latest, return the most recent stored rate instead of 404 so
+    // the dashboard/funds don't error. The lookup page omits the flag → strict 404.
+    if (c.req.query('fallback') === 'latest') {
+        const latest = await prisma_1.prisma.fxRate.findFirst({ orderBy: { rateDate: 'desc' } });
+        if (latest) {
+            const usdJpy = parseFloat(latest.usdJpy.toString());
+            const mufgRate = from === 'USD' ? usdJpy : Math.round((1 / usdJpy) * 1e8) / 1e8;
+            return c.json({
+                date, from, to, mufg_rate: mufgRate, usd_jpy: usdJpy, source: 'fallback_latest',
+                fallback_date: latest.rateDate.toISOString().slice(0, 10),
+            });
+        }
+    }
+    return c.json({ detail: 'No MUFG TTM rate found for this date (not a trading day or not yet published)' }, 404);
+});
+// GET /monthly?year=YYYY
+// Returns one MUFG TTM rate per month (last trading day) for the given year.
+// Checks DB first; falls back to MURC scrape.
+router.get('/monthly', async (c) => {
+    const now = new Date();
+    const year = parseInt(c.req.query('year') ?? String(now.getFullYear()));
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const lastMonth = year === currentYear ? currentMonth : 12;
+    async function rateForMonth(month) {
+        const isCurrentMonth = year === currentYear && month === currentMonth;
+        const lastDay = isCurrentMonth
+            ? now.getDate()
+            : new Date(year, month, 0).getDate();
+        for (let day = lastDay; day >= Math.max(lastDay - 7, 1); day--) {
+            const d = new Date(year, month - 1, day);
+            if (d > now)
+                continue;
+            if (d.getDay() === 0 || d.getDay() === 6)
+                continue;
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const stored = await prisma_1.prisma.fxRate.findFirst({
+                where: { rateDate: { gte: new Date(dateStr + 'T00:00:00Z'), lte: new Date(dateStr + 'T23:59:59Z') } },
+            });
+            if (stored)
+                return { month, date: dateStr, usd_jpy: parseFloat(stored.usdJpy.toString()), source: 'db' };
+            const murc = await fetchMurcUsdJpy(dateStr);
+            if (murc)
+                return { month, date: dateStr, usd_jpy: murc.ttm, source: 'murc' };
+        }
+        return null;
+    }
+    const results = [];
+    for (let m = 1; m <= lastMonth; m++) {
+        results.push(await rateForMonth(m));
+    }
+    return c.json({ year, rates: results.filter(Boolean) });
+});
+// GET /history
+router.get('/history', async (c) => {
+    const days = parseInt(c.req.query('days') ?? '90');
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const rates = await prisma_1.prisma.fxRate.findMany({
+        where: { rateDate: { gte: cutoff } },
+        orderBy: { rateDate: 'asc' },
+    });
+    return c.json(rates.map(rateDict));
+});
+// POST /
+router.post('/', async (c) => {
+    const { rate_date, usd_jpy, source = 'manual' } = await c.req.json().catch(() => ({}));
+    if (!rate_date || !usd_jpy)
+        return c.json({ detail: 'rate_date and usd_jpy required' }, 400);
+    const existing = await prisma_1.prisma.fxRate.findFirst({ where: { rateDate: new Date(rate_date) } });
+    if (existing) {
+        const updated = await prisma_1.prisma.fxRate.update({ where: { id: existing.id }, data: { usdJpy: usd_jpy, source } });
+        return c.json(rateDict(updated));
+    }
+    const rate = await prisma_1.prisma.fxRate.create({ data: { rateDate: new Date(rate_date), usdJpy: usd_jpy, source } });
+    return c.json(rateDict(rate));
+});
+exports.default = router;
+//# sourceMappingURL=fx-rates.routes.js.map

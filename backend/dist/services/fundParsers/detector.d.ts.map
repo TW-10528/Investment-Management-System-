@@ -1,0 +1,1 @@
+{"version":3,"file":"detector.d.ts","sourceRoot":"","sources":["../../../src/services/fundParsers/detector.ts"],"names":[],"mappings":"AAEA,MAAM,MAAM,OAAO,GACf,gBAAgB,GAChB,eAAe,GACf,oBAAoB,GACpB,cAAc,GACd,SAAS,GACT,eAAe,GACf,cAAc,GACd,YAAY,GAEZ,SAAS,CAAA;AAyEb,wBAAgB,aAAa,CAAC,IAAI,EAAE,MAAM,GAAG,OAAO,CAOnD"}

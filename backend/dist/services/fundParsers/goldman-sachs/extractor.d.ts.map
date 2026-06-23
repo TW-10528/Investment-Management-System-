@@ -1,0 +1,1 @@
+{"version":3,"file":"extractor.d.ts","sourceRoot":"","sources":["../../../../src/services/fundParsers/goldman-sachs/extractor.ts"],"names":[],"mappings":"AAGA,OAAO,KAAK,EAOV,oBAAoB,EACpB,aAAa,EAEd,MAAM,SAAS,CAAA;AA+DhB,wBAAgB,aAAa,CAAC,IAAI,EAAE,MAAM,GAAG,MAAM,CAKlD;AAgVD,wBAAgB,4BAA4B,CAC1C,OAAO,EAAE,MAAM,EACf,QAAQ,SAAK,EACb,aAAa,GAAE,oBAAoB,GAAG,IAAW,GAChD,aAAa,CAmCf"}

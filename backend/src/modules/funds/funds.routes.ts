@@ -61,8 +61,6 @@ router.get('/:id/ledger', async (c) => {
     prisma.distribution.findMany({ where: { fundId: fund.id }, orderBy: { distributionDate: 'asc' } }),
   ])
 
-  const commitment = new Decimal(fund.commitmentUsd.toString())
-
   // Fetch commitment history for funds that use it (e.g. SDG).
   const histRecords = await prisma.fundCommitmentHistory.findMany({
     where: { fundId: fund.id }, orderBy: { effectiveDate: 'asc' },
@@ -71,6 +69,10 @@ router.get('/:id/ledger', async (c) => {
     commitmentAmount: new Decimal(h.commitmentAmount.toString()),
     effectiveDate:    h.effectiveDate as Date,
   }))
+
+  // Use the current commitment from the fund record. The CalculationEngine will
+  // apply commitment history to adjust F (investment capacity) at specific dates.
+  const commitment = new Decimal(fund.commitmentUsd.toString())
 
   const txns = [
     ...paidCalls.map((cc: any) => ({
@@ -473,9 +475,27 @@ router.put('/:id', async (c) => {
             data: { fundId: fund.id, commitmentAmount: oldAmt, effectiveDate: anchorDate, notes: 'Initial commitment (auto-anchored)' },
           })
         }
-        // New commitment takes effect from today — only future transactions use it.
+        // New commitment takes effect from the day AFTER the latest transaction,
+        // so existing transactions keep using the old commitment, and future uploads use the new one.
+        // If no transactions yet, use today.
+        const [latestCall, latestDist] = await Promise.all([
+          prisma.capitalCall.findFirst({
+            where: { fundId: fund.id, status: { in: ['approved', 'paid'] } },
+            orderBy: { executionDate: 'desc' },
+          }),
+          prisma.distribution.findFirst({
+            where: { fundId: fund.id },
+            orderBy: { distributionDate: 'desc' },
+          }),
+        ])
+        const dates = [latestCall?.executionDate, latestDist?.distributionDate].filter(Boolean) as Date[]
+        let effectiveDate = new Date()
+        if (dates.length > 0) {
+          const maxDate = new Date(Math.max(...dates.map(d => d.getTime())))
+          effectiveDate = new Date(maxDate.getTime() + 86400000)  // Add 1 day
+        }
         await prisma.fundCommitmentHistory.create({
-          data: { fundId: fund.id, commitmentAmount: newAmt, effectiveDate: new Date(), notes: 'Updated via Fund Details' },
+          data: { fundId: fund.id, commitmentAmount: newAmt, effectiveDate, notes: 'Updated via Fund Details' },
         })
       }
     }

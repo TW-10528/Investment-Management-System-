@@ -161,7 +161,20 @@ function extractAllFields(text: string): NbAllFields {
   const annualFeeRate = findAmountByLabel(text, ['Annual Fee Rate @'], true)
 
   const fundDistributableProceeds = findAmountByLabel(text, ["Fund's Distributable Proceeds from Investments"], true)
-  const lpShareDistributableProceeds = findAmountByLabel(text, ["Limited Partner's Share of Distributable Proceeds*"], true)
+  // Try multiple label variations for LP's distributable proceeds (may have asterisk, or be split across lines)
+  let lpShareDistributableProceeds = findAmountByLabel(text, [
+    "Limited Partner's Share of Distributable Proceeds*",
+    "Limited Partner's Share of Distributable Proceeds",
+    "Limited Partner's Share of",  // fallback if split across lines
+  ], true)
+  // If still not found, look for the "LESS: DEEMED DISTRIBUTION" section and extract the amount there
+  if (lpShareDistributableProceeds == null) {
+    const deemedDistMatch = text.match(/LESS:\s*DEEMED DISTRIBUTION[\s\S]{0,500}?Limited Partner[^$]*?(\(\$?[\d,]+\.?\d*\)|\$?[\d,]+\.?\d*)/i)
+    if (deemedDistMatch) {
+      const amountStr = deemedDistMatch[1].replace(/[($)]/g, '').replace(/,/g, '')
+      lpShareDistributableProceeds = parseFloat(amountStr) || null
+    }
+  }
 
   const taxExpense = findAmountByLabel(text, ['Tax Expense'], true) ?? 0
   const originalCommitment = findAmountByLabel(text, ['Original Commitment'], true)

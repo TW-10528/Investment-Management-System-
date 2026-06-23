@@ -151,9 +151,24 @@ function extractAllFields(text: string): HamiltonAllFields {
   const transactionTotalAbs = transactionTotalSigned != null ? Math.abs(transactionTotalSigned) : null
 
   // Capital-call components (included in Excel B).
-  const capitalCallForInvestments = findAmountByLabel(text, ['Capital call for investments'], true)
-  const capitalCallForManagementFees = findAmountByLabel(text, ['Capital call for management fees'], true)
-  const capitalCallForExpenses = findAmountByLabel(text, ['Capital call for expenses'], true)
+  let capitalCallForInvestments = findAmountByLabel(text, ['Capital call for investments'], true)
+  // Fallback: search for "Investments" section with capital call amount
+  if (capitalCallForInvestments == null) {
+    const investMatch = text.match(/Capital\s+call\s+for\s+investments\s*:?\s*\$?\s*([\d,]+(?:\.\d+)?)/i)
+    if (investMatch) capitalCallForInvestments = cleanAmount(investMatch[1], true) ?? null
+  }
+
+  let capitalCallForManagementFees = findAmountByLabel(text, ['Capital call for management fees'], true)
+  if (capitalCallForManagementFees == null) {
+    const feeMatch = text.match(/Capital\s+call\s+for\s+management\s+fees\s*:?\s*\$?\s*([\d,]+(?:\.\d+)?)/i)
+    if (feeMatch) capitalCallForManagementFees = cleanAmount(feeMatch[1], true) ?? null
+  }
+
+  let capitalCallForExpenses = findAmountByLabel(text, ['Capital call for expenses'], true)
+  if (capitalCallForExpenses == null) {
+    const expMatch = text.match(/Capital\s+call\s+for\s+expenses\s*:?\s*\$?\s*([\d,]+(?:\.\d+)?)/i)
+    if (expMatch) capitalCallForExpenses = cleanAmount(expMatch[1], true) ?? null
+  }
 
   // Interest true-up items (extracted but excluded from Excel B/C).
   const subsequentCloseInterestPayable = findAmountByLabel(text, ['Subsequent close interest payable'], true)
@@ -186,8 +201,11 @@ function extractAllFields(text: string): HamiltonAllFields {
   const capitalComponentValues = [capitalCallForInvestments, capitalCallForManagementFees, capitalCallForExpenses]
   let capitalContributionAmount = round2(capitalComponentValues.reduce((s: number, v) => s + (v ?? 0), 0))
   // Fallback to transaction/header amount if component lines are absent on a capital call.
-  if (capitalContributionAmount === 0 && documentType === 'capital_call_notice')
-    capitalContributionAmount = transactionTotalAbs ?? capitalCallAmountHeader ?? 0
+  if (capitalContributionAmount === 0 && documentType === 'capital_call_notice') {
+    // Try to subtract interest from transaction total to get just the capital call amount
+    const capitalFromTransaction = (transactionTotalAbs ?? 0) - (subsequentCloseInterestPayable ?? 0) - (subsequentCloseInterestReceivable ?? 0)
+    capitalContributionAmount = capitalFromTransaction > 0 ? round2(capitalFromTransaction) : (capitalCallAmountHeader ?? transactionTotalAbs ?? 0)
+  }
 
   // Excel C: distribution received = total distribution amount.
   let distributionAmountReceived = 0

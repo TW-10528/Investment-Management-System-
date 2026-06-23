@@ -195,6 +195,12 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
     try {
       const form = new FormData()
       form.append('file', file)
+      // Send the AI-extracted data to the backend so it doesn't have to re-extract
+      // This ensures the correct values from the AI extraction are used, especially
+      // for SDG funds where re-extraction may fail for scanned PDFs
+      if (detection.extraction) {
+        form.append('extraction_data', JSON.stringify(detection.extraction))
+      }
       await fundReportsAPI.upload(overrideFund, form, docType)
       const fundName = funds.find(f => f.fund_id === overrideFund)?.fund_name ?? ''
       toast.success(`Added to ${fundName} ledger.`)

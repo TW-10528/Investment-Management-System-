@@ -18,6 +18,7 @@ import { parseNbRealEstate } from '../../services/fundParsers/nb-real-estate/ind
 import { parseHamiltonLane } from '../../services/fundParsers/hamilton-lane/index'
 import { parseHamiltonStrategic } from '../../services/fundParsers/hamilton-strategic/index'
 import { parseDoverStreet } from '../../services/fundParsers/dover-street/index'
+import { detectViewingDocument } from '../../services/fundParsers/viewingDocumentDetector'
 import { resolveFund } from '../../services/fundParsers/fund-resolver'
 import { CalculationEngine } from '../../services/calculationEngine'
 import { notifyAllAdmins, notifyUser } from '../../services/notificationService'
@@ -66,10 +67,12 @@ function reportDict(n: any) {
 router.post('/upload', async (c) => {
   const user = c.get('user')
   let file: File | null = null
+  let extractionDataStr: string | null = null
 
   try {
     const body = await c.req.parseBody()
     file = body['file'] as File
+    extractionDataStr = (body['extraction_data'] as string) ?? null
   } catch {
     return c.json({ detail: 'Failed to parse upload' }, 400)
   }
@@ -162,9 +165,75 @@ router.post('/upload', async (c) => {
     }, 201)
   }
 
+  // ── Check if this is a viewing-only document (contract, audit, etc.) ──────
+  // These should be stored without extraction/processing
+  let pdfText = ''
+  try {
+    const { extractPdfText } = await import('../../modules/ai-extract/ocr')
+    const result = await extractPdfText(buffer)
+    pdfText = result.text
+  } catch (e) {
+    // If text extraction fails, proceed with normal parsing
+    pdfText = ''
+  }
+
+  const viewingDocCheck = detectViewingDocument(pdfText, originalName)
+  if (viewingDocCheck.isViewingDoc) {
+    // This is a viewing document - store it without extraction/processing
+    const resolvedFund = await resolveFund('sdg-lps') // Use SDG as default for storage
+    if (!resolvedFund) {
+      return c.json({
+        detail: 'Fund database error',
+      }, 500)
+    }
+
+    // Store viewing document directly without extraction
+    const fundFolder = 'sdg-lps' // Default folder for viewing docs
+    const folderPath = path.join(config.uploadDir, fundFolder)
+    if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true })
+    const relPath = path.join(fundFolder, `${Date.now()}_${safe}`)
+    const filepath = path.join(config.uploadDir, relPath)
+    fs.writeFileSync(filepath, buffer)
+
+    // Log for audit purposes
+    console.log(`[fund-reports] Stored viewing document: ${viewingDocCheck.docType} - ${originalName}`)
+
+    return c.json({
+      message: `${viewingDocCheck.docType || 'Viewing'} document stored successfully (no extraction performed)`,
+      fundName: resolvedFund.fundName,
+      docType: viewingDocCheck.docType,
+      reason: viewingDocCheck.reason,
+      fileName: originalName,
+    }, 201)
+  }
+
+  // ── Normal transaction document detection ────────────────────────────────
   // Detect + resolve the fund BEFORE touching disk, so unrecognised PDFs leave
   // no artifacts and each file lands in its own fund's folder.
-  const parsed = await parseFundPdf(buffer, originalName)
+  let parsed = await parseFundPdf(buffer, originalName)
+
+  // If the frontend provided AI-extracted data, use it instead of re-extracting
+  // This ensures the correct values are used, especially for SDG funds where
+  // re-extraction may fail on scanned PDFs
+  if (extractionDataStr) {
+    try {
+      const aiExtracted = JSON.parse(extractionDataStr) as any
+      // Map AI extraction field names to parsed field names
+      // AI returns B_capital_contribution, C_distribution_received, D_reinvestable, etc.
+      parsed = {
+        ...parsed,
+        grossCallUsd:     aiExtracted.B_capital_contribution ?? parsed.grossCallUsd,
+        distributionUsd:  aiExtracted.C_distribution_received ?? parsed.distributionUsd,
+        reinvestableUsd:  aiExtracted.D_reinvestable ?? parsed.reinvestableUsd,
+        currentUnfundedUsd: aiExtracted.report_provided_unfunded_before ?? parsed.currentUnfundedUsd,
+        unfundedUsd:      aiExtracted.report_provided_remaining_after ?? parsed.unfundedUsd,
+        interestUsd:      aiExtracted.interest ?? parsed.interestUsd,
+      }
+    } catch (e) {
+      // If extraction data parsing fails, just use the re-extracted data
+      console.warn('[fund-reports] Failed to parse extraction_data:', e)
+    }
+  }
 
   if (parsed.fundKey === 'unknown') {
     return c.json({
@@ -215,15 +284,15 @@ router.post('/upload', async (c) => {
     // Chain within the same commitment when one is selected, so each commitment's
     // cumulative totals run independently.
     const previousState = await latestFundPreviousState(resolvedFund.id, commitmentId)
-    if (previousState) {
-      const reparsed =
-        parsed.fundKey === 'nb-real-estate'    ? parseNbRealEstate(parsed.rawText, previousState)
-        : parsed.fundKey === 'hamilton-lane'   ? parseHamiltonLane(parsed.rawText, previousState)
-        : parsed.fundKey === 'hamilton-strategic' ? parseHamiltonStrategic(parsed.rawText, previousState)
-        : parseDoverStreet(parsed.rawText, previousState, originalName)
-      reparsed.rawText = parsed.rawText
-      Object.assign(parsed, reparsed)
-    }
+    // Rich extractors run ALWAYS (not just when previousState exists) to override AI extraction
+    // previousState is optional and used for cumulative calculations when available
+    const reparsed =
+      parsed.fundKey === 'nb-real-estate'    ? parseNbRealEstate(parsed.rawText, previousState)
+      : parsed.fundKey === 'hamilton-lane'   ? parseHamiltonLane(parsed.rawText, previousState)
+      : parsed.fundKey === 'hamilton-strategic' ? parseHamiltonStrategic(parsed.rawText, previousState)
+      : parseDoverStreet(parsed.rawText, previousState, originalName)
+    reparsed.rawText = parsed.rawText
+    Object.assign(parsed, reparsed)
   }
 
   // ── Write the file into the fund's own folder (e.g. uploads/nb real estate/) ──

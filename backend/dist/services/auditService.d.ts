@@ -1,0 +1,2 @@
+export declare function logAction(action: string, tableName: string, userEmail: string, userId: string, recordId?: string, oldValues?: Record<string, unknown>, newValues?: Record<string, unknown>): Promise<void>;
+//# sourceMappingURL=auditService.d.ts.map

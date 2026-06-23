@@ -1,0 +1,1 @@
+{"version":3,"file":"extractor.d.ts","sourceRoot":"","sources":["../../../../src/services/fundParsers/siguler-guff/extractor.ts"],"names":[],"mappings":"AAGA,OAAO,KAAK,EAOV,oBAAoB,EACpB,aAAa,EAEd,MAAM,SAAS,CAAA;AA8ChB,wBAAgB,aAAa,CAAC,IAAI,EAAE,MAAM,GAAG,MAAM,CAKlD;AA2UD,wBAAgB,wBAAwB,CACtC,OAAO,EAAE,MAAM,EACf,QAAQ,SAAK,EACb,aAAa,GAAE,oBAAoB,GAAG,IAAW,GAChD,aAAa,CAmCf"}
