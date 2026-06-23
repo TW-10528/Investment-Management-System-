@@ -79,6 +79,7 @@ async function main() {
   // ── Fund — NB Real Estate Secondary Opportunities Offshore Fund II LP ────────
   // Neuberger Berman / NB Alternatives Advisers LLC. Drawdown notices are
   // combined capital call + deemed distribution; commitment from the LP notice.
+  // Commitment value will be extracted from uploaded PDFs or manually entered
   await prisma.fund.create({
     data: {
       fundName:      'NB Real Estate Secondary Opportunities Offshore Fund II LP',
@@ -87,7 +88,7 @@ async function main() {
       strategy:      'Real Estate Secondaries',
       vintageYear:   2025,
       currency:      'USD',
-      commitmentUsd: 5_000_000,
+      commitmentUsd: 0,  // Populate from PDF uploads
       wireBank:      'Bank of America, N.A.',
       wireAba:       '026-009-593',
       wireSwift:     'BOFAUS3N',
@@ -100,7 +101,7 @@ async function main() {
   console.log('  ✔ Fund created: NB Real Estate Secondary Opportunities Offshore Fund II LP (Neuberger Berman)')
 
   // ── Fund — Siguler Guff (sourced from PDF keyword "Complex Name") ──────────
-  // commitmentUsd derived via formula: C = NetCallUsd / CallPct = $49,000 / 0.049
+  // Commitment will be extracted from uploaded PDFs or manually entered
   await prisma.fund.create({
     data: {
       fundName:            'Siguler Guff Small Buyout Opportunities Fund VI (F), LP',
@@ -110,8 +111,7 @@ async function main() {
       strategy:            'Small Buyout',
       vintageYear:         2025,
       currency:            'USD',
-      // LP commitment = netCallUsd / callPct = $49,000 / 0.049
-      commitmentUsd:       1_000_000,
+      commitmentUsd:       0,  // Populate from PDF uploads or manual entry
       entryFxRate:         154.20,   // Jan 2026 MUFG TTM rate
       contractDate:        new Date('2025-12-01'),
       wireBank:            'JPMORGAN CHASE BANK, N.A.',
@@ -135,7 +135,7 @@ async function main() {
       strategy:      'Secondaries',
       vintageYear:   2024,
       currency:      'USD',
-      commitmentUsd: 20_000_000,
+      commitmentUsd: 0,  // Populate from PDF uploads
       entryFxRate:   154.20,
       wireBank:      'State Street Bank & Trust co. Boston',
       wireAba:       '011000028',
@@ -156,7 +156,7 @@ async function main() {
       strategy:      'Global Relative Value',
       vintageYear:   2025,
       currency:      'USD',
-      commitmentUsd: 5_000_000,
+      commitmentUsd: 0,  // Populate from PDF uploads or manual entry
       isActive:      true,
     },
   })
@@ -172,7 +172,7 @@ async function main() {
       strategy:      'Secondaries',
       vintageYear:   2024,
       currency:      'USD',
-      commitmentUsd: 5_000_000,
+      commitmentUsd: 0,  // Populate from PDF uploads or manual entry
       isActive:      true,
     },
   })
@@ -189,7 +189,7 @@ async function main() {
       strategy:      'Secondaries',
       vintageYear:   2024,
       currency:      'USD',
-      commitmentUsd: 3_000_000,
+      commitmentUsd: 0,  // Populate from PDF uploads or manual entry
       isActive:      true,
     },
   })
@@ -206,32 +206,32 @@ async function main() {
       strategy:      'Secondaries',
       vintageYear:   2024,
       currency:      'USD',
-      commitmentUsd: 20_000_000,
+      commitmentUsd: 0,  // Populate from PDF uploads
       isActive:      true,
     },
   })
   console.log('  ✔ Fund created: Dover Street XI Feeder Fund L.P. (HarbourVest)')
 
-  // ── Fund — SDG (Siguler Guff Development Fund) ──────────────────────────────
+  // ── Fund — SDG Fund ────────────────────────────────────────────────────────
   // SDG fund has both contract_commitment_usd (fixed) and commitment_usd (dynamic tranches)
   // Contract commitment is the base/standard value shown on dashboard
   // Commitment value changes as tranches are added in the Commitments page
   await prisma.fund.create({
     data: {
-      fundName:              'Siguler Guff Development Fund',
-      fundNameJp:            'シグラー・ガフ デベロップメント ファンド',
+      fundName:              'SDG Fund',
+      fundNameJp:            'SDG ファンド',
       manager:               'Siguler Guff & Company, LP',
       administrator:         'Siguler Guff & Company, LP',
       strategy:              'Development',
       vintageYear:           2024,
       currency:              'USD',
-      commitmentUsd:         10_000_000,  // Dynamic total (includes tranches)
-      contractCommitmentUsd: 10_000_000,  // Fixed/standard base commitment
+      commitmentUsd:         0,  // Will be populated from PDF uploads
+      contractCommitmentUsd: 0,  // Will be manually set
       entryFxRate:           154.20,
       isActive:              true,
     },
   })
-  console.log('  ✔ Fund created: Siguler Guff Development Fund (SDG)')
+  console.log('  ✔ Fund created: SDG Fund')
 
   console.log('\n✅  Database seeded successfully!')
   console.log('\n   Funds: NB Real Estate, Siguler Guff, Goldman Vintage X, Capula, Hamilton Lane Secondary, Hamilton Lane Strategic, Dover Street XI, SDG')
