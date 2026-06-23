@@ -1704,7 +1704,8 @@ function FundSection({
   useEffect(() => { refreshHistCommitment(); }, [refreshHistCommitment]);
 
   // For commitments page: show ONLY permanent contract commitment (never show temporary commitment history)
-  const displayCommitment = Number(detail.contract_commitment_usd ?? 0);
+  // Fall back to regular commitment if contract commitment is not set (except for SDG funds)
+  const displayCommitment = Number(detail.contract_commitment_usd ?? detail.commitment_usd ?? 0);
 
   async function toggleActive() {
     if (!confirm(isActive ? 'Deactivate this fund?' : 'Reactivate this fund?')) return;
