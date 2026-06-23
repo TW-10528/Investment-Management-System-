@@ -1534,6 +1534,9 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
   const [saving, setSaving]   = useState(false);
   const sf = (k:string, v:any) => setForm((f:any)=>({...f,[k]:v}));
 
+  // Detect if this is an SDG fund
+  const isSdg = /sdg/i.test(detail.fund_name ?? '');
+
   function startEdit() {
     setForm({
       fund_name:               detail.fund_name,
@@ -1544,6 +1547,7 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
       vintage_year:            detail.vintage_year??'',
       currency:                detail.currency??'USD',
       commitment_usd:          detail.commitment_usd??'',
+      contract_commitment_usd: isSdg ? (detail.contract_commitment_usd??'') : undefined,
       entry_fx_rate:           detail.entry_fx_rate??'',
       contract_date:           detail.contract_date??'',
       investment_period_start: detail.investment_period_start??'',
@@ -1599,7 +1603,7 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
             ['Vintage Year',        detail.vintage_year],
             ['Currency',            detail.currency],
             ['Commitment (USD)',         detail.commitment_usd ? fmt.usd(Number(detail.commitment_usd)) : '—'],
-            ['Contract Commitment (USD)', detail.contract_commitment_usd ? fmt.usd(Number(detail.contract_commitment_usd)) : '—'],
+            ...(isSdg ? [['Contract Commitment (USD)', detail.contract_commitment_usd ? fmt.usd(Number(detail.contract_commitment_usd)) : '—']] : []),
             ['Entry FX Rate',            detail.entry_fx_rate ? Number(detail.entry_fx_rate).toFixed(4) : '—'],
             ['Contract Date',       detail.contract_date],
             ['Inv. Period Start',   detail.investment_period_start],
@@ -1645,6 +1649,9 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
           </select>
         </Field>
         <Field label="Commitment (USD)"><input type="number" className={inp} value={form.commitment_usd??''} onChange={e=>sf('commitment_usd',e.target.value)} /></Field>
+        {isSdg && (
+          <Field label="Contract Commitment (USD)"><input type="number" className={inp} value={form.contract_commitment_usd??''} onChange={e=>sf('contract_commitment_usd',e.target.value)} /></Field>
+        )}
         <Field label="Entry FX Rate"><input type="number" step="0.0001" className={inp} value={form.entry_fx_rate??''} onChange={e=>sf('entry_fx_rate',e.target.value)} /></Field>
         <Field label="Contract Date"><input type="date" className={inp} value={form.contract_date??''} onChange={e=>sf('contract_date',e.target.value)} /></Field>
         <Field label="Inv. Period Start"><input type="date" className={inp} value={form.investment_period_start??''} onChange={e=>sf('investment_period_start',e.target.value)} /></Field>
@@ -1703,9 +1710,12 @@ function FundSection({
   }, [fundId, isSdg]);
   useEffect(() => { refreshHistCommitment(); }, [refreshHistCommitment]);
 
-  // For commitments page: show ONLY permanent contract commitment (never show temporary commitment history)
-  // Fall back to regular commitment if contract commitment is not set (except for SDG funds)
-  const displayCommitment = Number(detail.contract_commitment_usd ?? detail.commitment_usd ?? 0);
+  // For commitments page: show permanent contract commitment for SDG, regular commitment for others
+  // SDG: displayCommitment = contract_commitment_usd (fixed/standard base)
+  // Others: displayCommitment = commitment_usd (regular commitment value)
+  const displayCommitment = isSdg
+    ? Number(detail.contract_commitment_usd ?? detail.commitment_usd ?? 0)
+    : Number(detail.commitment_usd ?? 0);
 
   async function toggleActive() {
     if (!confirm(isActive ? 'Deactivate this fund?' : 'Reactivate this fund?')) return;

@@ -212,8 +212,29 @@ async function main() {
   })
   console.log('  ✔ Fund created: Dover Street XI Feeder Fund L.P. (HarbourVest)')
 
+  // ── Fund — SDG (Siguler Guff Development Fund) ──────────────────────────────
+  // SDG fund has both contract_commitment_usd (fixed) and commitment_usd (dynamic tranches)
+  // Contract commitment is the base/standard value shown on dashboard
+  // Commitment value changes as tranches are added in the Commitments page
+  await prisma.fund.create({
+    data: {
+      fundName:              'Siguler Guff Development Fund',
+      fundNameJp:            'シグラー・ガフ デベロップメント ファンド',
+      manager:               'Siguler Guff & Company, LP',
+      administrator:         'Siguler Guff & Company, LP',
+      strategy:              'Development',
+      vintageYear:           2024,
+      currency:              'USD',
+      commitmentUsd:         10_000_000,  // Dynamic total (includes tranches)
+      contractCommitmentUsd: 10_000_000,  // Fixed/standard base commitment
+      entryFxRate:           154.20,
+      isActive:              true,
+    },
+  })
+  console.log('  ✔ Fund created: Siguler Guff Development Fund (SDG)')
+
   console.log('\n✅  Database seeded successfully!')
-  console.log('\n   Funds: NB Real Estate, Siguler Guff, Goldman Vintage X, Capula, Hamilton Lane Secondary, Hamilton Lane Strategic, Dover Street XI')
+  console.log('\n   Funds: NB Real Estate, Siguler Guff, Goldman Vintage X, Capula, Hamilton Lane Secondary, Hamilton Lane Strategic, Dover Street XI, SDG')
   console.log('   (ledger empty — upload PDFs via UI to populate)')
   console.log('\n   Credentials:')
   console.log('   Admin:   admin@thirdwave.co.jp  /  Admin123!')
