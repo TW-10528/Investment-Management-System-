@@ -71,14 +71,14 @@ router.post('/test', async (c) => {
       const detReportType = sdgDet.noticeType === 'distribution' ? 'DISTRIBUTION' : 'CAPITAL_CALL'
       const detExtraction = {
         transaction_date:                sdgDet.dueDate,
-        B_capital_contribution:          sdgDet.grossCallUsd  || null,
-        C_distribution_received:         sdgDet.distributionUsd || null,
-        D_reinvestable:                  sdgDet.reinvestableUsd || null,
+        B_capital_contribution:          sdgDet.grossCallUsd ?? null,  // Preserve 0 values (capital calls can be 0)
+        C_distribution_received:         sdgDet.distributionUsd ?? null,  // Preserve 0 values
+        D_reinvestable:                  sdgDet.reinvestableUsd ?? null,  // Preserve 0 values
         return_of_capital:               null,
         gain:                            null,
         interest:                        sdgDet.interestUsd ?? null,
-        report_provided_unfunded_before: sdgDet.currentUnfundedUsd || null,
-        report_provided_remaining_after: sdgDet.unfundedUsd || null,
+        report_provided_unfunded_before: sdgDet.currentUnfundedUsd ?? null,  // Preserve 0 values
+        report_provided_remaining_after: sdgDet.unfundedUsd ?? null,  // Preserve 0 values
         subsequent_close_interest:       null,
         notes:                           (sdgDet.extractionLog ?? []).join(' | '),
         extraction_confidence:           Math.round(sdgDet.confidence * 100),
