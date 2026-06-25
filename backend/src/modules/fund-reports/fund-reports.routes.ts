@@ -373,7 +373,7 @@ router.post('/upload', async (c) => {
     'capital_call', 'distribution', 'capital_and_distribution',
     'financial_statement', 'nav_report', 'quarterly_report',
     'annual_report', 'tax_document', 'audit_report', 'other_document',
-    'commitment_notice',
+    'commitment_notice', 'viewing_document',
   ]
   const noticeType =
     parsed.noticeType === 'capital_and_distribution' ? parsed.noticeType
