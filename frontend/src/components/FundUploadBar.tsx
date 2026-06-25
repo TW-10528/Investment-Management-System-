@@ -196,7 +196,24 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   async function upload() {
     if (!file || !detection || !overrideFund) return
     // Use user-edited document type if available, otherwise use AI-detected type
-    const docType = selectedDocType ? REPORT_TYPE_MAP[selectedDocType] : (REPORT_TYPE_MAP[detection.classification?.report_type] ?? 'capital_call')
+    let docType: string
+    let customDocTypeName: string | null = null
+
+    if (selectedDocType) {
+      // Check if it's a predefined type or a custom type
+      if (REPORT_TYPE_MAP[selectedDocType]) {
+        docType = REPORT_TYPE_MAP[selectedDocType]
+      } else if (customDocTypes.includes(selectedDocType)) {
+        // Custom type - use 'viewing_document' as docType and send the custom name
+        docType = 'viewing_document'
+        customDocTypeName = selectedDocType
+      } else {
+        docType = REPORT_TYPE_MAP[detection.classification?.report_type] ?? 'capital_call'
+      }
+    } else {
+      docType = REPORT_TYPE_MAP[detection.classification?.report_type] ?? 'capital_call'
+    }
+
     setUploading(true)
     try {
       const form = new FormData()
@@ -206,6 +223,10 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
       // for SDG funds where re-extraction may fail for scanned PDFs
       if (detection.extraction) {
         form.append('extraction_data', JSON.stringify(detection.extraction))
+      }
+      // Send custom document type name if it was created by user
+      if (customDocTypeName) {
+        form.append('custom_doc_type', customDocTypeName)
       }
       await fundReportsAPI.upload(overrideFund, form, docType)
       const fundName = funds.find(f => f.fund_id === overrideFund)?.fund_name ?? ''

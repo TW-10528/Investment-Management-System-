@@ -158,6 +158,11 @@ export default function FundDocuments({ fundId, canEdit, onChanged, currency }: 
                 const amount = doc.notice_type === 'distribution' ? doc.distribution_usd
                              : doc.notice_type === 'financial_statement' ? null
                              : doc.gross_call_usd;
+                // Check if document has a custom type name (from user creation)
+                const customTypeName = (doc as any)?.extractedData?.customDocTypeName
+                const displayType = customTypeName || t.label
+                const displayBadge = customTypeName ? 'text-blue-400 bg-blue-500/10 border-blue-500/25' : t.badge
+                const displayColor = customTypeName ? '#3b82f6' : t.color
                 return (
                   <tr key={doc.id} className="theme-row-hover">
                     <td className="px-4 py-3 theme-text max-w-[18rem]">
@@ -202,8 +207,8 @@ export default function FundDocuments({ fundId, canEdit, onChanged, currency }: 
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${t.badge}`}>
-                        {t.label}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${displayBadge}`}>
+                        {displayType}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right theme-text-muted whitespace-nowrap">{doc.notice_date ?? '—'}</td>

@@ -68,11 +68,13 @@ router.post('/upload', async (c) => {
   const user = c.get('user')
   let file: File | null = null
   let extractionDataStr: string | null = null
+  let customDocType: string | null = null
 
   try {
     const body = await c.req.parseBody()
     file = body['file'] as File
     extractionDataStr = (body['extraction_data'] as string) ?? null
+    customDocType = (body['custom_doc_type'] as string) ?? null
   } catch {
     return c.json({ detail: 'Failed to parse upload' }, 400)
   }
@@ -349,6 +351,11 @@ router.post('/upload', async (c) => {
 
   // Strip rawText before storing
   const { rawText: _, ...storedData } = parsed
+
+  // Add custom document type if provided by user
+  if (customDocType) {
+    (storedData as any).customDocTypeName = customDocType
+  }
 
   // Step 1 of the two-step flow: the user (or the AI classifier upstream of this
   // call) picks the document type; the parser's guess is normally only a fallback.
