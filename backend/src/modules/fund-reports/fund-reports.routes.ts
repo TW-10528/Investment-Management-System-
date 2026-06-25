@@ -60,6 +60,7 @@ function reportDict(n: any) {
     created_at:       n.createdAt?.toISOString(),
     approved_at:      n.approvedAt?.toISOString() ?? null,
     admin_notes:      n.adminNotes ?? null,
+    extractedData:    d,  // Include full extractedData so frontend can access customDocTypeName
   }
 }
 

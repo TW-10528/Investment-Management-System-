@@ -231,7 +231,9 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
       await fundReportsAPI.upload(overrideFund, form, docType)
       const fundName = funds.find(f => f.fund_id === overrideFund)?.fund_name ?? ''
       toast.success(`Added to ${fundName} ledger.`)
-      setDone({ fundId: overrideFund, docType, fundName })
+      // For done state, use the display name (custom type or predefined label)
+      const displayType = customDocTypeName || DOC_TYPE_LABELS[selectedDocType]?.label || DOC_TYPE_LABELS[cls?.report_type]?.label || 'Document'
+      setDone({ fundId: overrideFund, docType: displayType, fundName })
       setFile(null); setDetection(null); setMatched(null)
       onUploaded(overrideFund, docType)
     } catch (err: any) {
