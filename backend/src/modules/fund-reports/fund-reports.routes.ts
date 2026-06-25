@@ -169,13 +169,14 @@ router.post('/upload', async (c) => {
   }
 
   // ── Get frontend's explicit document type (if provided) ─────────────────
-  // The frontend's AI classification takes priority over auto-detection
+  // The frontend's user selection takes priority over auto-detection
   const reqType = c.req.query('notice_type')
+  const hasExplicitType = !!reqType  // User explicitly selected a type
   const isExplicitTransaction = reqType && ['capital_call', 'distribution', 'capital_and_distribution'].includes(reqType)
 
   // ── Check if this is a viewing-only document (contract, audit, etc.) ──────
-  // ONLY auto-detect if the frontend didn't explicitly classify it as a transaction
-  if (!isExplicitTransaction) {
+  // ONLY auto-detect if the frontend didn't explicitly select ANY document type
+  if (!hasExplicitType) {
     let pdfText = ''
     try {
       const { extractPdfText } = await import('../../modules/ai-extract/ocr')
