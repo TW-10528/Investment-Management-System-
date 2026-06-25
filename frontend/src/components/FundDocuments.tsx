@@ -64,6 +64,12 @@ const TYPE_META: Record<string, { label: string; badge: string; color: string }>
   distribution:             { label: 'Distribution',          badge: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25', color: C.emerald },
   capital_and_distribution: { label: 'Capital & Distribution', badge: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25',       color: '#06b6d4' },
   financial_statement:      { label: 'Financial Statement',   badge: 'text-violet-400 bg-violet-500/10 border-violet-500/25',  color: C.violet  },
+  nav_report:               { label: 'NAV Report',            badge: 'text-teal-400 bg-teal-500/10 border-teal-500/25',        color: '#14b8a6' },
+  quarterly_report:         { label: 'Quarterly Report',      badge: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25',        color: '#06b6d4' },
+  annual_report:            { label: 'Annual Report',         badge: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/25',  color: '#6366f1' },
+  tax_document:             { label: 'Tax Document',          badge: 'text-orange-400 bg-orange-500/10 border-orange-500/25',  color: '#f97316' },
+  audit_report:             { label: 'Audit Report',          badge: 'text-rose-400 bg-rose-500/10 border-rose-500/25',        color: '#f43f5e' },
+  other_document:           { label: 'Other Document',        badge: 'text-slate-400 bg-slate-500/10 border-slate-500/25',     color: '#64748b' },
   viewing_document:         { label: 'Viewing Document',      badge: 'text-amber-400 bg-amber-500/10 border-amber-500/25',     color: '#f59e0b' },
   commitment_notice:        { label: 'Commitment Document',   badge: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25', color: '#10b981' },
 };
