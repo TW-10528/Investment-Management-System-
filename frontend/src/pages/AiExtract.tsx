@@ -32,9 +32,14 @@ interface ApiResult {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const fmt = (n: number | null | undefined, currency = 'USD') =>
-  n == null ? '—' :
-  new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n)
+const fmt = (n: number | null | undefined, currency = 'USD') => {
+  if (n == null) return '—';
+  if (currency === 'JPY') {
+    return `¥${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(n)}`;
+  }
+  const formatted = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n);
+  return n < 0 ? `-$${formatted.slice(1)}` : `$${formatted}`;
+}
 
 const confColor = (s: number) =>
   s >= 95 ? 'text-green-600' : s >= 90 ? 'text-yellow-600' : s >= 75 ? 'text-orange-500' : 'text-red-600'

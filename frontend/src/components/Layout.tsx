@@ -99,16 +99,11 @@ export default function Layout() {
           borderBottom: '1px solid var(--color-card-border)',
         }}>
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-800 to-teal-700 flex items-center justify-center font-bold text-white text-xs flex-shrink-0 shadow-sm">
+            <div className="w-10 h-8 flex-shrink-0">
               <img
-                src="/thirdwave-logo.png"
-                alt="TW"
-                className="h-5 w-auto"
-                onError={e => {
-                  const img = e.target as HTMLImageElement;
-                  img.style.display = 'none';
-                  (img.parentElement as HTMLElement).textContent = 'TW';
-                }}
+                src="/chevron-logo.svg"
+                alt="Thirdwave"
+                className="w-full h-full object-contain"
               />
             </div>
             <div>

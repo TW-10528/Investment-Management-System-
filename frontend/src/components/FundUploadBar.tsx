@@ -229,11 +229,15 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   const ext = detection?.extraction
   const cal = detection?.calculation
   const typeMeta = DOC_TYPE_LABELS[cls?.report_type] ?? DOC_TYPE_LABELS.UNKNOWN
-  const isTransaction  = typeMeta.isTransaction
 
   const B = cal?.B ?? ext?.B_capital_contribution
   const C = cal?.C ?? ext?.C_distribution_received
   const amount = B || C
+
+  // Trust the AI's document type classification as the source of truth
+  // If AI says it's CAPITAL_CALL, DISTRIBUTION, or CAPITAL_AND_DISTRIBUTION → show transaction UI
+  // Otherwise (AUDIT, FINANCIAL_STATEMENT, etc.) → show viewing UI
+  const isTransaction = typeMeta.isTransaction
 
   return (
     <>
@@ -389,7 +393,15 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                     {B ? 'Capital Called' : 'Distribution'}
                   </span>
                   <p className="text-lg font-bold tabular-nums" style={{ color: B ? '#1e40af' : '#047857' }}>
-                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: cls.currency || 'USD', maximumFractionDigits: 0 }).format(amount)}
+                    {(() => {
+                      const curr = cls.currency || 'USD';
+                      if (curr === 'JPY') {
+                        return `¥${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(amount)}`;
+                      } else {
+                        const formatted = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount);
+                        return `$${formatted}`;
+                      }
+                    })()}
                   </p>
                 </div>
               )}
