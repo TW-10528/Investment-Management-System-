@@ -446,7 +446,13 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                       <option value="__ADD_NEW__" className="font-bold">+ Add new document type</option>
                     </select>
                     <button
-                      onClick={() => setEditingDocType(false)}
+                      onClick={() => {
+                        setEditingDocType(false)
+                        // Ensure selectedDocType is properly set
+                        if (!selectedDocType) {
+                          setSelectedDocType(cls?.report_type || '')
+                        }
+                      }}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
                     >
                       Done
@@ -454,9 +460,16 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${typeMeta.badge}`}>
-                      {typeMeta.label}
-                    </span>
+                    {selectedDocType && (
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${customDocTypes.includes(selectedDocType) ? 'text-blue-400 bg-blue-500/10 border border-blue-500/25' : typeMeta.badge}`}>
+                        {customDocTypes.includes(selectedDocType) ? selectedDocType : typeMeta.label}
+                      </span>
+                    )}
+                    {!selectedDocType && (
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${typeMeta.badge}`}>
+                        {typeMeta.label}
+                      </span>
+                    )}
                     <button
                       onClick={() => setEditingDocType(true)}
                       className="px-2 py-0.5 rounded text-xs font-medium text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 transition-all"
