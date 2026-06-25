@@ -116,6 +116,9 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   const [manualDocType,  setManualDocType]  = useState('OTHER')
   const [editingDocType, setEditingDocType] = useState(false)
   const [selectedDocType, setSelectedDocType] = useState('')
+  const [customDocTypes, setCustomDocTypes] = useState<string[]>([])
+  const [showAddDocType, setShowAddDocType] = useState(false)
+  const [newDocTypeName, setNewDocTypeName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function detect(f: File) {
@@ -227,6 +230,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
     setFile(null); setDetection(null); setMatched(null); setDone(null); setOverrideFund('')
     setDetectFailed(false); setManualFundId(''); setManualDocType('OTHER')
     setEditingDocType(false); setSelectedDocType('')
+    setShowAddDocType(false); setNewDocTypeName('')
   }
 
   function uploadNext() {
@@ -235,6 +239,17 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
     if (inputRef.current) {
       inputRef.current.click()
     }
+  }
+
+  function addNewDocType() {
+    if (!newDocTypeName.trim()) return
+    const newType = newDocTypeName.trim()
+    if (!customDocTypes.includes(newType)) {
+      setCustomDocTypes([...customDocTypes, newType])
+      setSelectedDocType(newType)
+    }
+    setShowAddDocType(false)
+    setNewDocTypeName('')
   }
 
   const cls = detection?.classification
@@ -389,13 +404,23 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                   <div className="flex items-center gap-2 flex-1">
                     <select
                       value={selectedDocType || cls?.report_type || ''}
-                      onChange={(e) => setSelectedDocType(e.target.value)}
+                      onChange={(e) => {
+                        if (e.target.value === '__ADD_NEW__') {
+                          setShowAddDocType(true)
+                        } else {
+                          setSelectedDocType(e.target.value)
+                        }
+                      }}
                       className="theme-input rounded-lg px-3 py-1.5 text-sm border theme-border flex-1"
                     >
                       <option value="">— auto-detect —</option>
                       {Object.entries(DOC_TYPE_LABELS).map(([key, meta]) => (
                         <option key={key} value={key}>{meta.label}</option>
                       ))}
+                      {customDocTypes.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                      <option value="__ADD_NEW__" className="font-bold">+ Add new document type</option>
                     </select>
                     <button
                       onClick={() => setEditingDocType(false)}
@@ -405,13 +430,13 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 group">
+                  <div className="flex items-center gap-2">
                     <span className={`text-xs font-bold px-3 py-1 rounded-full ${typeMeta.badge}`}>
                       {typeMeta.label}
                     </span>
                     <button
                       onClick={() => setEditingDocType(true)}
-                      className="opacity-0 group-hover:opacity-100 px-2 py-0.5 rounded text-xs font-medium text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 transition-all"
+                      className="px-2 py-0.5 rounded text-xs font-medium text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 transition-all"
                       title="Edit document type"
                     >
                       ✏️
@@ -490,6 +515,41 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
             </div>
           )
         })()}
+
+        {/* ── Add New Document Type Modal ── */}
+        {showAddDocType && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowAddDocType(false)}>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6" onClick={e => e.stopPropagation()}>
+              <h3 className="text-lg font-bold theme-text mb-4">Add New Document Type</h3>
+              <input
+                type="text"
+                value={newDocTypeName}
+                onChange={(e) => setNewDocTypeName(e.target.value)}
+                placeholder="E.g., Annual Report, Tax Document..."
+                className="w-full px-4 py-2 rounded-lg border theme-border bg-transparent theme-text text-sm mb-4"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') addNewDocType()
+                }}
+                autoFocus
+              />
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowAddDocType(false)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium theme-text-muted hover:theme-text transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={addNewDocType}
+                  disabled={!newDocTypeName.trim()}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add Type
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
     </>
