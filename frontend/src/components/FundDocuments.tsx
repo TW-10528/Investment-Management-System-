@@ -65,6 +65,7 @@ const TYPE_META: Record<string, { label: string; badge: string; color: string }>
   capital_and_distribution: { label: 'Capital & Distribution', badge: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25',       color: '#06b6d4' },
   financial_statement:      { label: 'Financial Statement',   badge: 'text-violet-400 bg-violet-500/10 border-violet-500/25',  color: C.violet  },
   viewing_document:         { label: 'Viewing Document',      badge: 'text-amber-400 bg-amber-500/10 border-amber-500/25',     color: '#f59e0b' },
+  commitment_notice:        { label: 'Commitment Document',   badge: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25', color: '#10b981' },
 };
 
 function gradeStyle(grade: string) {
