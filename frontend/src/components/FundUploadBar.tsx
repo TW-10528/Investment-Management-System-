@@ -114,6 +114,8 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   const [detectFailed,   setDetectFailed]   = useState(false)
   const [manualFundId,   setManualFundId]   = useState('')
   const [manualDocType,  setManualDocType]  = useState('OTHER')
+  const [editingDocType, setEditingDocType] = useState(false)
+  const [selectedDocType, setSelectedDocType] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function detect(f: File) {
@@ -190,7 +192,8 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   // ── Normal upload (capital calls, distributions, reference docs) ──────────────
   async function upload() {
     if (!file || !detection || !overrideFund) return
-    const docType = REPORT_TYPE_MAP[detection.classification?.report_type] ?? 'capital_call'
+    // Use user-edited document type if available, otherwise use AI-detected type
+    const docType = selectedDocType ? REPORT_TYPE_MAP[selectedDocType] : (REPORT_TYPE_MAP[detection.classification?.report_type] ?? 'capital_call')
     setUploading(true)
     try {
       const form = new FormData()
@@ -223,6 +226,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   function reset() {
     setFile(null); setDetection(null); setMatched(null); setDone(null); setOverrideFund('')
     setDetectFailed(false); setManualFundId(''); setManualDocType('OTHER')
+    setEditingDocType(false); setSelectedDocType('')
   }
 
   function uploadNext() {
@@ -381,9 +385,39 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
               {/* Document type */}
               <div className="flex items-center px-5 py-3 gap-4">
                 <span className="text-[10px] font-bold uppercase tracking-widest theme-text-muted w-28 shrink-0">Document Type</span>
-                <span className={`text-xs font-bold px-3 py-1 rounded-full ${typeMeta.badge}`}>
-                  {typeMeta.label}
-                </span>
+                {editingDocType ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <select
+                      value={selectedDocType || cls?.report_type || ''}
+                      onChange={(e) => setSelectedDocType(e.target.value)}
+                      className="theme-input rounded-lg px-3 py-1.5 text-sm border theme-border flex-1"
+                    >
+                      <option value="">— auto-detect —</option>
+                      {Object.entries(DOC_TYPE_LABELS).map(([key, meta]) => (
+                        <option key={key} value={key}>{meta.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setEditingDocType(false)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                    >
+                      Done
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 group">
+                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${typeMeta.badge}`}>
+                      {typeMeta.label}
+                    </span>
+                    <button
+                      onClick={() => setEditingDocType(true)}
+                      className="opacity-0 group-hover:opacity-100 px-2 py-0.5 rounded text-xs font-medium text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 transition-all"
+                      title="Edit document type"
+                    >
+                      ✏️
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Date */}
