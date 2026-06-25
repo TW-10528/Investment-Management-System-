@@ -156,6 +156,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   async function uploadManual() {
     if (!file || !manualFundId) return
     const docType = REPORT_TYPE_MAP[manualDocType] ?? 'other_document'
+    const displayType = DOC_TYPE_LABELS[manualDocType]?.label || 'Document'
     setUploading(true)
     try {
       const form = new FormData()
@@ -163,7 +164,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
       await fundReportsAPI.upload(manualFundId, form, docType)
       const fundName = funds.find(f => f.fund_id === manualFundId)?.fund_name ?? ''
       toast.success(`Saved to ${fundName}.`)
-      setDone({ fundId: manualFundId, docType, fundName })
+      setDone({ fundId: manualFundId, docType, displayType, fundName })
       setFile(null); setDetectFailed(false); setManualFundId(''); setManualDocType('OTHER')
       onUploaded(manualFundId, docType)
     } catch (err: any) {
