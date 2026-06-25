@@ -225,6 +225,14 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
     setDetectFailed(false); setManualFundId(''); setManualDocType('OTHER')
   }
 
+  function uploadNext() {
+    reset()
+    // Trigger file input to open file browser
+    if (inputRef.current) {
+      inputRef.current.click()
+    }
+  }
+
   const cls = detection?.classification
   const ext = detection?.extraction
   const cal = detection?.calculation
@@ -440,7 +448,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                 <p className="text-xs mt-0.5 text-green-700">{done.fundName}</p>
               </div>
               <button
-                onClick={reset}
+                onClick={uploadNext}
                 className="text-xs px-4 py-2 rounded-lg text-white font-semibold transition-colors bg-green-600 hover:bg-green-700"
               >
                 Upload next

@@ -165,46 +165,87 @@ router.post('/upload', async (c) => {
     }, 201)
   }
 
-  // ── Check if this is a viewing-only document (contract, audit, etc.) ──────
-  // These should be stored without extraction/processing
-  let pdfText = ''
-  try {
-    const { extractPdfText } = await import('../../modules/ai-extract/ocr')
-    const result = await extractPdfText(buffer)
-    pdfText = result.text
-  } catch (e) {
-    // If text extraction fails, proceed with normal parsing
-    pdfText = ''
-  }
+  // ── Get frontend's explicit document type (if provided) ─────────────────
+  // The frontend's AI classification takes priority over auto-detection
+  const reqType = c.req.query('notice_type')
+  const isExplicitTransaction = reqType && ['capital_call', 'distribution', 'capital_and_distribution'].includes(reqType)
 
-  const viewingDocCheck = detectViewingDocument(pdfText, originalName)
-  if (viewingDocCheck.isViewingDoc) {
-    // This is a viewing document - store it without extraction/processing
-    const resolvedFund = await resolveFund('sdg-lps') // Use SDG as default for storage
-    if (!resolvedFund) {
-      return c.json({
-        detail: 'Fund database error',
-      }, 500)
+  // ── Check if this is a viewing-only document (contract, audit, etc.) ──────
+  // ONLY auto-detect if the frontend didn't explicitly classify it as a transaction
+  if (!isExplicitTransaction) {
+    let pdfText = ''
+    try {
+      const { extractPdfText } = await import('../../modules/ai-extract/ocr')
+      const result = await extractPdfText(buffer)
+      pdfText = result.text
+    } catch (e) {
+      // If text extraction fails, proceed with normal parsing
+      pdfText = ''
     }
 
-    // Store viewing document directly without extraction
-    const fundFolder = 'sdg-lps' // Default folder for viewing docs
-    const folderPath = path.join(config.uploadDir, fundFolder)
-    if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true })
-    const relPath = path.join(fundFolder, `${Date.now()}_${safe}`)
-    const filepath = path.join(config.uploadDir, relPath)
-    fs.writeFileSync(filepath, buffer)
+    const viewingDocCheck = detectViewingDocument(pdfText, originalName)
+    if (viewingDocCheck.isViewingDoc) {
+      // This is a viewing document - store it without extraction/processing
+      // Use the fund provided by the frontend, or fall back to a default
+      let resolvedFund = null
+      if (scopedFundIdPre) {
+        resolvedFund = await prisma.fund.findUnique({ where: { id: scopedFundIdPre } })
+      }
 
-    // Log for audit purposes
-    console.log(`[fund-reports] Stored viewing document: ${viewingDocCheck.docType} - ${originalName}`)
+      if (!resolvedFund) {
+        // Fallback: try to resolve by auto-detection or use SDG
+        resolvedFund = await resolveFund('sdg-lps')
+      }
 
-    return c.json({
-      message: `${viewingDocCheck.docType || 'Viewing'} document stored successfully (no extraction performed)`,
-      fundName: resolvedFund.fundName,
-      docType: viewingDocCheck.docType,
-      reason: viewingDocCheck.reason,
-      fileName: originalName,
-    }, 201)
+      if (!resolvedFund) {
+        return c.json({
+          detail: 'Fund database error',
+        }, 500)
+      }
+
+      // Store viewing document directly without extraction
+      const fundFolder = FUND_FOLDER_NAMES[resolvedFund.fundName.toLowerCase().replace(/\s+/g, '-')] ??
+        resolvedFund.fundName.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      const folderPath = path.join(config.uploadDir, fundFolder)
+      if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true })
+      const relPath = path.join(fundFolder, `${Date.now()}_${safe}`)
+      const filepath = path.join(config.uploadDir, relPath)
+      fs.writeFileSync(filepath, buffer)
+
+      // Create database record for viewing document
+      const n = await prisma.notice.create({
+        data: {
+          filename:      relPath,
+          originalName,
+          fileHash,
+          noticeType:    'viewing_document',
+          status:        'approved',
+          approvedAt:    new Date(),
+          fundId:        resolvedFund.id,
+          extractedData: {
+            noticeType: 'viewing_document',
+            fundName:   resolvedFund.fundName,
+            docType:    viewingDocCheck.docType,
+            reason:     viewingDocCheck.reason,
+          } as any,
+          confidence:    1,
+          uploadedBy:    user.email,
+        },
+      })
+
+      // Log for audit purposes
+      console.log(`[fund-reports] Stored viewing document: ${viewingDocCheck.docType} - ${originalName}`)
+
+      return c.json({
+        id:        n.id,
+        message:   `${viewingDocCheck.docType || 'Viewing'} document stored successfully (no extraction performed)`,
+        fundName:  resolvedFund.fundName,
+        fund_id:   resolvedFund.id,
+        docType:   viewingDocCheck.docType,
+        reason:    viewingDocCheck.reason,
+        fileName:  originalName,
+      }, 201)
+    }
   }
 
   // ── Normal transaction document detection ────────────────────────────────
@@ -228,6 +269,7 @@ router.post('/upload', async (c) => {
         currentUnfundedUsd: aiExtracted.report_provided_unfunded_before ?? parsed.currentUnfundedUsd,
         unfundedUsd:      aiExtracted.report_provided_remaining_after ?? parsed.unfundedUsd,
         interestUsd:      aiExtracted.interest ?? parsed.interestUsd,
+        commitmentUsd:    aiExtracted.total_commitment_amount ?? parsed.commitmentUsd,
       }
     } catch (e) {
       // If extraction data parsing fails, just use the re-extracted data
@@ -324,7 +366,6 @@ router.post('/upload', async (c) => {
     'annual_report', 'tax_document', 'audit_report', 'other_document',
     'commitment_notice',
   ]
-  const reqType    = c.req.query('notice_type')
   const noticeType =
     parsed.noticeType === 'capital_and_distribution' ? parsed.noticeType
     : reqType && ALLOWED_TYPES.includes(reqType) ? reqType
@@ -834,6 +875,33 @@ router.post('/:id/reject', async (c) => {
   })
 
   return c.json({ message: 'Report rejected.', ...reportDict(updated) })
+})
+
+// ── PATCH /:id — update document metadata (e.g., rename) ─────────────────────────
+router.patch('/:id', async (c) => {
+  const user = c.get('user')
+  if (!canEdit(user.role)) return c.json({ detail: 'Edit access required.' }, 403)
+
+  const notice = await prisma.notice.findUnique({ where: { id: c.req.param('id') } })
+  if (!notice) return c.json({ detail: 'Report not found' }, 404)
+
+  const body = await c.req.json()
+  const updateData: any = {}
+
+  if (body.originalName) {
+    updateData.originalName = body.originalName.trim()
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return c.json({ detail: 'No fields to update' }, 400)
+  }
+
+  const updated = await prisma.notice.update({
+    where: { id: notice.id },
+    data: updateData,
+  })
+
+  return c.json(reportDict(updated))
 })
 
 // ── DELETE /:id — remove the document AND the ledger record it created ─────────

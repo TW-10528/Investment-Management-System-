@@ -64,6 +64,7 @@ const TYPE_META: Record<string, { label: string; badge: string; color: string }>
   distribution:             { label: 'Distribution',          badge: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25', color: C.emerald },
   capital_and_distribution: { label: 'Capital & Distribution', badge: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25',       color: '#06b6d4' },
   financial_statement:      { label: 'Financial Statement',   badge: 'text-violet-400 bg-violet-500/10 border-violet-500/25',  color: C.violet  },
+  viewing_document:         { label: 'Viewing Document',      badge: 'text-amber-400 bg-amber-500/10 border-amber-500/25',     color: '#f59e0b' },
 };
 
 function gradeStyle(grade: string) {
@@ -81,6 +82,8 @@ export default function FundDocuments({ fundId, canEdit, onChanged, currency }: 
   const [docs, setDocs]       = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewDoc, setViewDoc] = useState<{ id: string; name: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string>('');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -101,6 +104,22 @@ export default function FundDocuments({ fundId, canEdit, onChanged, currency }: 
       onChanged();
     } catch (err: any) {
       toast.error(err?.response?.data?.detail ?? 'Failed to delete');
+    }
+  }
+
+  async function rename(docId: string, newName: string) {
+    if (!newName.trim()) {
+      toast.error('Document name cannot be empty');
+      return;
+    }
+    try {
+      await fundReportsAPI.update(docId, { originalName: newName.trim() });
+      toast.success('Document renamed');
+      setEditingId(null);
+      setEditingName('');
+      load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? 'Failed to rename document');
     }
   }
 
@@ -141,8 +160,46 @@ export default function FundDocuments({ fundId, canEdit, onChanged, currency }: 
                              : doc.gross_call_usd;
                 return (
                   <tr key={doc.id} className="theme-row-hover">
-                    <td className="px-4 py-3 theme-text max-w-[18rem] truncate" title={doc.file_name}>
-                      📄 {doc.file_name}
+                    <td className="px-4 py-3 theme-text max-w-[18rem]">
+                      {editingId === doc.id ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            className="flex-1 px-2 py-1 rounded text-sm border theme-border bg-transparent theme-text"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => rename(doc.id, editingName)}
+                            className="px-2 py-1 rounded text-xs font-medium text-green-400 hover:bg-green-500/10 transition-colors"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            className="px-2 py-1 rounded text-xs font-medium text-slate-400 hover:bg-slate-500/10 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 group">
+                          <span className="truncate" title={doc.file_name}>📄 {doc.file_name}</span>
+                          {canEdit && (
+                            <button
+                              onClick={() => {
+                                setEditingId(doc.id);
+                                setEditingName(doc.file_name);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 rounded text-xs font-medium text-slate-400 hover:text-slate-300 hover:bg-slate-500/10 transition-all"
+                              title="Rename document"
+                            >
+                              ✏️
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${t.badge}`}>

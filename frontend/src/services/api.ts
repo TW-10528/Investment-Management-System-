@@ -190,6 +190,7 @@ export const fundReportsAPI = {
       params:  { fund_id: fundId, ...(noticeType ? { notice_type: noticeType } : {}), ...(commitmentId ? { commitment_id: commitmentId } : {}) },
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  update: (id: string, data: any)           => api.patch(`/fund-reports/${id}`, data),
   delete: (id: string)                      => api.delete(`/fund-reports/${id}`),
 };
 
