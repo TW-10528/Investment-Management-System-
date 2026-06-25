@@ -108,7 +108,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   const [matched,   setMatched]   = useState<FundOption | null>(null)
   const [overrideFund, setOverrideFund] = useState('')
   const [uploading, setUploading] = useState(false)
-  const [done,      setDone]      = useState<{ fundId: string; docType: string; fundName: string } | null>(null)
+  const [done,      setDone]      = useState<{ fundId: string; docType: string; displayType: string; fundName: string } | null>(null)
   const [dragging,  setDragging]  = useState(false)
   const [duplicate, setDuplicate] = useState<{ fileName: string; uploadedAt: string } | null>(null)
   const [detectFailed,   setDetectFailed]   = useState(false)
@@ -233,7 +233,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
       toast.success(`Added to ${fundName} ledger.`)
       // For done state, use the display name (custom type or predefined label)
       const displayType = customDocTypeName || DOC_TYPE_LABELS[selectedDocType]?.label || DOC_TYPE_LABELS[cls?.report_type]?.label || 'Document'
-      setDone({ fundId: overrideFund, docType: displayType, fundName })
+      setDone({ fundId: overrideFund, docType, displayType, fundName })
       setFile(null); setDetection(null); setMatched(null)
       onUploaded(overrideFund, docType)
     } catch (err: any) {
@@ -528,6 +528,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                   {isTransactionDoc ? 'Saved to ledger' : 'Saved for viewing'}
                 </p>
                 <p className="text-xs mt-0.5 text-green-700">{done.fundName}</p>
+                <p className="text-xs mt-0.5 text-green-700">Type: {done.displayType}</p>
               </div>
               <button
                 onClick={uploadNext}
