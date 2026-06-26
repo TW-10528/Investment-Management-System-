@@ -11,22 +11,17 @@ export const LANGUAGES = [
 
 export type LangCode = typeof LANGUAGES[number]['code'];
 
-const SUPPORTED = LANGUAGES.map(l => l.code) as string[];
-
-/** Detects best language: saved preference → browser language → 'en' */
-function detectLang(): LangCode {
-  const saved = localStorage.getItem('ims_language');
-  if (saved && SUPPORTED.includes(saved)) return saved as LangCode;
-
-  const browserLangs: readonly string[] = navigator.languages?.length
-    ? navigator.languages
-    : [navigator.language ?? 'en'];
-
-  for (const lang of browserLangs) {
-    const l = lang.toLowerCase();
-    if (l.startsWith('ja')) return 'ja';
-    if (l.startsWith('en')) return 'en';
-  }
+// Read saved language from localStorage to avoid flicker on page load
+function getSavedLanguage(): LangCode {
+  try {
+    const raw = localStorage.getItem('ims_prefs');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.language === 'en' || parsed.language === 'ja') {
+        return parsed.language;
+      }
+    }
+  } catch { /* ignore */ }
   return 'en';
 }
 
@@ -37,9 +32,15 @@ i18n
       en: { translation: en },
       ja: { translation: ja },
     },
-    lng:          detectLang(),
+    lng:          getSavedLanguage(), // Load saved language to avoid flicker
     fallbackLng:  'en',
     interpolation: { escapeValue: false },
+    react: {
+      useSuspense: false, // Prevent suspense issues during language change
+    },
   });
+
+// Make i18n globally accessible for debugging
+(window as any).i18n = i18n;
 
 export default i18n;

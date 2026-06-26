@@ -1,1 +1,1 @@
-{"version":3,"file":"funds.routes.d.ts","sourceRoot":"","sources":["../../../src/modules/funds/funds.routes.ts"],"names":[],"mappings":"AAEA,OAAO,EAAE,IAAI,EAAE,MAAM,MAAM,CAAA;AAE3B,OAAO,KAAK,EAAE,OAAO,EAAE,MAAM,mBAAmB,CAAA;AAOhD,QAAA,MAAM,MAAM,sDAAsB,CAAA;AAusBlC,eAAe,MAAM,CAAA"}
+{"version":3,"file":"funds.routes.d.ts","sourceRoot":"","sources":["../../../src/modules/funds/funds.routes.ts"],"names":[],"mappings":"AAEA,OAAO,EAAE,IAAI,EAAE,MAAM,MAAM,CAAA;AAE3B,OAAO,KAAK,EAAE,OAAO,EAAE,MAAM,mBAAmB,CAAA;AAOhD,QAAA,MAAM,MAAM,sDAAsB,CAAA;AAixBlC,eAAe,MAAM,CAAA"}

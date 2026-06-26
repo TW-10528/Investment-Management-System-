@@ -20,6 +20,7 @@ import notificationsRoutes from './modules/notifications/notifications.routes'
 import rulesRoutes        from './modules/rules/rules.routes'
 import fundReportsRoutes  from './modules/fund-reports/fund-reports.routes'
 import aiExtractRoutes   from './modules/ai-extract/ai-extract.routes'
+import fundOnboardingRoutes from './modules/fund-onboarding/fund-onboarding.routes'
 
 export function createApp() {
   const app = new Hono()
@@ -76,6 +77,7 @@ export function createApp() {
   app.route('/api/v1/rules',          rulesRoutes)
   app.route('/api/v1/fund-reports',   fundReportsRoutes)
   app.route('/api/v1/ai-extract',    aiExtractRoutes)
+  app.route('/api/v1/fund-onboarding', fundOnboardingRoutes)
 
   // ── 404 ────────────────────────────────────────────────────────────────────
   app.notFound((c) => c.json({ detail: `Route ${c.req.method} ${c.req.path} not found` }, 404))

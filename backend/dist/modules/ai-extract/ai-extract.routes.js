@@ -10,7 +10,6 @@ const index_2 = require("../../services/fundParsers/nb-real-estate/index");
 const index_3 = require("../../services/fundParsers/hamilton-lane/index");
 const index_4 = require("../../services/fundParsers/hamilton-strategic/index");
 const index_5 = require("../../services/fundParsers/dover-street/index");
-const viewingDocumentDetector_1 = require("../../services/fundParsers/viewingDocumentDetector");
 const router = new hono_1.Hono();
 // ── POST /api/v1/ai-extract/test ──────────────────────────────────────────────
 // Accepts: multipart form with:
@@ -45,31 +44,10 @@ router.post('/test', async (c) => {
                 detail: 'Could not extract text from this PDF even after OCR. The file may be corrupt or in an unsupported format.',
             }, 422);
         }
-        // ── Check if this is a viewing-only document (contract, audit, etc.) ────
-        // Return early with COMMITMENT_NOTICE classification so frontend doesn't
-        // try to extract amounts or add to ledger as transaction
-        const viewingDocCheck = (0, viewingDocumentDetector_1.detectViewingDocument)(pdfText, file.name);
-        if (viewingDocCheck.isViewingDoc) {
-            return c.json({
-                pdf_characters: pdfText.length,
-                pdf_preview: pdfText.slice(0, 500),
-                classification: {
-                    fund_key: 'UNKNOWN',
-                    fund_display_name: 'Viewing Document',
-                    report_type: 'COMMITMENT_NOTICE', // Mark as viewing-only
-                    currency: 'USD',
-                    confidence_score: 95,
-                },
-                extraction: null,
-                calculation: null,
-                cross_checks: null,
-                confidence_gate: {
-                    pass: false,
-                    reason: `This is a ${viewingDocCheck.docType || 'viewing'} document (${viewingDocCheck.reason}). Storage only, no extraction.`,
-                },
-                model_used: 'viewing-document-detector',
-            });
-        }
+        // ── Let AI model classify the document ────────────────────────────────────
+        // Do NOT do early viewing document detection here - the Qwen AI model should
+        // be the source of truth for document classification. It will distinguish between
+        // capital calls, distributions, and viewing documents (audit, financial, etc.).
         // ── Previous state for calc engine ────────────────────────────────────
         const prev = {
             E: parseFloat(String(body['prev_e'] ?? '0')) || 0,
@@ -149,9 +127,9 @@ router.post('/test', async (c) => {
             }, 502);
         }
         // ── Rich Extraction (override AI for known fund types) ─────────────────
-        // For funds with dedicated parsers (NB Real Estate, Hamilton, Dover), use the
+        // For funds with dedicated parsers (NB Real Estate, Hamilton, Dover, SDG), use the
         // rich extractor instead of AI to get more accurate values for the preview
-        const RICH_FUNDS = ['NB_REAL_ESTATE', 'HAMILTON_SEC', 'HAMILTON_STRAT', 'DOVER'];
+        const RICH_FUNDS = ['NB_REAL_ESTATE', 'HAMILTON_SEC', 'HAMILTON_STRAT', 'DOVER', 'SDG'];
         if (RICH_FUNDS.includes(fund_key) && pdfText) {
             try {
                 let richNotice = null;
@@ -163,6 +141,8 @@ router.post('/test', async (c) => {
                     richNotice = (0, index_4.parseHamiltonStrategic)(pdfText);
                 else if (fund_key === 'DOVER')
                     richNotice = (0, index_5.parseDoverStreet)(pdfText, null, '');
+                else if (fund_key === 'SDG')
+                    richNotice = (0, sdgExtractor_1.extractSdgNotice)(pdfText, file.name);
                 // Override AI extraction with rich extraction values
                 if (richNotice) {
                     extraction.B_capital_contribution = richNotice.grossCallUsd ?? extraction.B_capital_contribution;
@@ -172,6 +152,7 @@ router.post('/test', async (c) => {
                     extraction.gain = richNotice.gainUsd ?? extraction.gain;
                     extraction.interest = richNotice.interestUsd ?? extraction.interest;
                     extraction.transaction_date = richNotice.dueDate ?? extraction.transaction_date;
+                    extraction.total_commitment_amount = richNotice.commitmentUsd ?? extraction.total_commitment_amount;
                 }
             }
             catch (richErr) {

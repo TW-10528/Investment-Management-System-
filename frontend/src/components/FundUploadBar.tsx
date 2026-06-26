@@ -3,10 +3,14 @@
  * Drop a fund PDF → Qwen auto-detects fund + document type → confirm → upload to ledger.
  * Commitment (contract) documents are stored for viewing only — the commitment amount
  * is entered manually in fund settings.
+ *
+ * NEW: If fund is unknown, user can create a new fund from extracted data.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api, { fundReportsAPI } from '../services/api';
+import { fundExtractionAPI } from '../services/fundExtractionAPI';
 import toast from 'react-hot-toast';
+import ExtractedDataReviewForm from './ExtractedDataReviewForm';
 
 function DuplicateModal({ fileName, uploadedAt, onClose }: { fileName: string; uploadedAt: string; onClose: () => void }) {
   return (
@@ -43,17 +47,6 @@ interface Props {
   onUploaded: (fundId: string, docType: string) => void;
 }
 
-// Map AI fund_key → keywords to fuzzy-match against fund names in the DB
-const FUND_KEY_KEYWORDS: Record<string, string[]> = {
-  NB_REAL_ESTATE:  ['NB Real Estate', 'Neuberger'],
-  HAMILTON_SEC:    ['Hamilton Lane Secondary', 'Hamilton Secondary'],
-  HAMILTON_STRAT:  ['Hamilton Lane Strategic', 'Hamilton Strategic'],
-  SDG:             ['SDG'],
-  DOVER:           ['Dover Street', 'HarbourVest'],
-  GOLDMAN:         ['Vintage', 'Goldman'],
-  SIGULER_GUFF:    ['Siguler Guff', 'Siguler'],
-  CAPULA:          ['Capula'],
-};
 
 const DOC_TYPE_LABELS: Record<string, { label: string; badge: string; isTransaction: boolean; isCommitment?: boolean }> = {
   CAPITAL_CALL:         { label: 'Capital Call',           badge: 'bg-blue-100 text-blue-800',    isTransaction: true  },
@@ -87,12 +80,28 @@ const REPORT_TYPE_MAP: Record<string, string> = {
   OTHER:                'other_document',
 };
 
-function matchFund(fundKey: string, displayName: string, funds: FundOption[]): FundOption | null {
-  const keywords = FUND_KEY_KEYWORDS[fundKey] ?? [displayName];
-  for (const fund of funds) {
-    const name = fund.fund_name.toLowerCase();
-    if (keywords.some(k => name.includes(k.toLowerCase()))) return fund;
+function matchFund(_fundKey: string, displayName: string, funds: FundOption[]): FundOption | null {
+  // STRICT MATCHING: Match exact extracted name or exact AI-detected name
+  // First, try exact match with extracted display name
+  const normalizedDisplay = displayName?.toLowerCase().trim();
+  if (normalizedDisplay) {
+    const exactMatch = funds.find(f =>
+      f.fund_name.toLowerCase().trim() === normalizedDisplay
+    );
+    if (exactMatch) return exactMatch;
   }
+
+  // Then try partial match if fund name contains extracted name or vice versa
+  // but only if it's a clear match (not just a keyword)
+  if (normalizedDisplay && normalizedDisplay.length > 5) {
+    const partialMatch = funds.find(f => {
+      const dbName = f.fund_name.toLowerCase();
+      return dbName.includes(normalizedDisplay) || normalizedDisplay.includes(dbName);
+    });
+    if (partialMatch) return partialMatch;
+  }
+
+  // No match found
   return null;
 }
 
@@ -108,6 +117,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   const [matched,   setMatched]   = useState<FundOption | null>(null)
   const [overrideFund, setOverrideFund] = useState('')
   const [uploading, setUploading] = useState(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
   const [done,      setDone]      = useState<{ fundId: string; docType: string; displayType: string; fundName: string } | null>(null)
   const [dragging,  setDragging]  = useState(false)
   const [duplicate, setDuplicate] = useState<{ fileName: string; uploadedAt: string } | null>(null)
@@ -119,11 +129,29 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   const [customDocTypes, setCustomDocTypes] = useState<string[]>([])
   const [showAddDocType, setShowAddDocType] = useState(false)
   const [newDocTypeName, setNewDocTypeName] = useState('')
+
+  // Unknown fund creation states
+  const [showCreateFundForm, setShowCreateFundForm] = useState(false)
+  const [creatingFund, setCreatingFund] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Load custom document types from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('customDocTypes')
+      if (saved) {
+        setCustomDocTypes(JSON.parse(saved))
+      }
+    } catch (err) {
+      console.error('Failed to load custom doc types from localStorage:', err)
+    }
+  }, [])
 
   async function detect(f: File) {
     setFile(f); setDetection(null); setMatched(null); setDone(null); setOverrideFund('')
     setDetecting(true)
+    // Create a new abort controller for this detection
+    abortControllerRef.current = new AbortController()
     try {
       const form = new FormData()
       form.append('file', f)
@@ -132,6 +160,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
         // PaddleOCR on CPU: 5s model load + 60s/page for heavily scanned PDFs.
         // Large contracts (20+ pages) may need 600s+ on CPU-only systems.
         timeout: 600_000,
+        signal: abortControllerRef.current.signal,
       })
       const d = res.data
       setDetection(d)
@@ -139,17 +168,74 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
       setMatched(m)
       if (m) setOverrideFund(m.fund_id)
     } catch (err: any) {
-      const status = err?.response?.status
-      if (status === 422 || status === 408 || status === 504 || !status) {
-        // OCR timed out or AI couldn't parse the document — offer manual save instead
-        setDetectFailed(true)
+      // Check if the error is from cancellation
+      if (err.name === 'AbortError' || err.code === 'ECONNABORTED') {
+        toast.error('Upload cancelled')
       } else {
-        toast.error(err?.response?.data?.detail ?? err.message ?? 'AI detection failed')
-        setFile(null)
+        const status = err?.response?.status
+        if (status === 422 || status === 408 || status === 504 || !status) {
+          // OCR timed out or AI couldn't parse the document — offer manual save instead
+          setDetectFailed(true)
+        } else {
+          toast.error(err?.response?.data?.detail ?? err.message ?? 'AI detection failed')
+          setFile(null)
+        }
+        setDetection(null)
       }
-      setDetection(null)
     } finally {
       setDetecting(false)
+      abortControllerRef.current = null
+    }
+  }
+
+  // Handle creating a new fund from extracted data
+  async function handleCreateFund(
+    fundData: any,
+    documentData: any,
+    correctedFields: string[]
+  ) {
+    if (!file || !detection) return
+
+    setCreatingFund(true)
+    try {
+      // Extract unknown fund data from PDF
+      const extracted = await fundExtractionAPI.extractUnknownFund(file)
+
+      // Create fund from extracted data
+      const result = await fundExtractionAPI.createFromExtraction({
+        extractedData: extracted.extractedData,
+        userEditedFundData: fundData,
+        userEditedDocumentData: documentData,
+        pdfData: {
+          fileName: file.name,
+          fileHash: '', // Will be generated on backend
+          filePath: `uploads/fund-onboarding/${Date.now()}_${file.name}`,
+        },
+        userCorrectedFields: correctedFields,
+      })
+
+      toast.success(`New fund "${fundData.fundName}" created!`)
+      const newFundName = fundData.fundName
+      const docType = documentData.documentType
+
+      setDone({
+        fundId: result.fund.id,
+        docType,
+        displayType: documentData.documentType,
+        fundName: newFundName,
+      })
+
+      setShowCreateFundForm(false)
+      setFile(null)
+      setDetection(null)
+      setMatched(null)
+
+      // Refresh funds list (parent will handle this)
+      onUploaded(result.fund.id, docType)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || err.message || 'Fund creation failed')
+    } finally {
+      setCreatingFund(false)
     }
   }
 
@@ -251,10 +337,16 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   }
 
   function reset() {
+    // Abort any ongoing detection/upload request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
     setFile(null); setDetection(null); setMatched(null); setDone(null); setOverrideFund('')
     setDetectFailed(false); setManualFundId(''); setManualDocType('OTHER')
     setEditingDocType(false); setSelectedDocType('')
     setShowAddDocType(false); setNewDocTypeName('')
+    setShowCreateFundForm(false); setCreatingFund(false)
   }
 
   function uploadNext() {
@@ -269,7 +361,14 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
     if (!newDocTypeName.trim()) return
     const newType = newDocTypeName.trim()
     if (!customDocTypes.includes(newType)) {
-      setCustomDocTypes([...customDocTypes, newType])
+      const updatedTypes = [...customDocTypes, newType]
+      setCustomDocTypes(updatedTypes)
+      // Save to localStorage for persistence across sessions
+      try {
+        localStorage.setItem('customDocTypes', JSON.stringify(updatedTypes))
+      } catch (err) {
+        console.error('Failed to save custom doc types to localStorage:', err)
+      }
       setSelectedDocType(newType)
     }
     setShowAddDocType(false)
@@ -337,6 +436,12 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
             {!uploading && (
               <p className="text-xs theme-text-muted">Large scanned PDFs may take 2–10 minutes. Please be patient.</p>
             )}
+            <button
+              onClick={reset}
+              className="mt-3 px-4 py-2 rounded-lg text-sm font-medium text-red-600 border border-red-300/50 hover:bg-red-500/10 transition-colors"
+            >
+              Cancel Upload
+            </button>
           </div>
         )}
 
@@ -402,16 +507,25 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                   {matched ? (
                     <p className="font-semibold theme-text">{cls.fund_display_name || cls.fund_key}</p>
                   ) : (
-                    <select
-                      value={overrideFund}
-                      onChange={e => setOverrideFund(e.target.value)}
-                      className="theme-input rounded-lg px-3 py-1.5 text-sm w-full border theme-border"
-                    >
-                      <option value="">— select fund —</option>
-                      {funds.map(f => (
-                        <option key={f.fund_id} value={f.fund_id}>{f.fund_name}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={overrideFund}
+                        onChange={e => setOverrideFund(e.target.value)}
+                        className="theme-input rounded-lg px-3 py-1.5 text-sm flex-1 border theme-border"
+                      >
+                        <option value="">— select fund —</option>
+                        {funds.map(f => (
+                          <option key={f.fund_id} value={f.fund_id}>{f.fund_name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => setShowCreateFundForm(true)}
+                        title="Create new fund from this PDF"
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors border border-indigo-500/30"
+                      >
+                        + New
+                      </button>
+                    </div>
                   )}
                 </div>
                 {matched && (
@@ -587,6 +701,39 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
               </div>
             </div>
           </div>
+        )}
+
+        {/* ── Create New Fund Form ── */}
+        {showCreateFundForm && detection && file && (
+          <ExtractedDataReviewForm
+            extractedData={{
+              fundData: {
+                fundName: detection.classification?.fund_display_name || 'New Fund',
+                manager: undefined,
+                strategy: undefined,
+                vintageYear: undefined,
+                currency: 'USD',
+                commitmentUsd: detection.extraction?.total_commitment_amount,
+                entryFxRate: undefined,
+                managementFeePct: undefined,
+                carryPct: undefined,
+                hurdleRatePct: undefined,
+              },
+              documentData: {
+                documentType: detection.classification?.report_type || 'OTHER',
+                amount: detection.extraction?.C_distribution_received || detection.extraction?.B_capital_contribution,
+                noticeDate: detection.extraction?.transaction_date,
+                dueDate: undefined,
+                transactionDate: detection.extraction?.transaction_date,
+              },
+              extractionConfidence: detection.classification?.confidence_score || 75,
+              rawExtraction: detection.extraction || {},
+            }}
+            pdfFileName={file.name}
+            onCancel={() => setShowCreateFundForm(false)}
+            onSave={handleCreateFund}
+            isLoading={creatingFund}
+          />
         )}
       </div>
     </div>

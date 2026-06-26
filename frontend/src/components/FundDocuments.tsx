@@ -5,6 +5,7 @@
  * Deleting a document reverses the capital call / distribution it created.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fundReportsAPI } from '../services/api';
 import { fmt } from '../lib/format';
 import toast from 'react-hot-toast';
@@ -59,19 +60,19 @@ interface Props {
 
 const C = { indigo: '#4f46e5', emerald: '#10b981', red: '#ef4444', violet: '#8b5cf6' };
 
-const TYPE_META: Record<string, { label: string; badge: string; color: string }> = {
-  capital_call:             { label: 'Capital Call',          badge: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/25',  color: C.indigo  },
-  distribution:             { label: 'Distribution',          badge: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25', color: C.emerald },
-  capital_and_distribution: { label: 'Capital & Distribution', badge: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25',       color: '#06b6d4' },
-  financial_statement:      { label: 'Financial Statement',   badge: 'text-violet-400 bg-violet-500/10 border-violet-500/25',  color: C.violet  },
-  nav_report:               { label: 'NAV Report',            badge: 'text-teal-400 bg-teal-500/10 border-teal-500/25',        color: '#14b8a6' },
-  quarterly_report:         { label: 'Quarterly Report',      badge: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25',        color: '#06b6d4' },
-  annual_report:            { label: 'Annual Report',         badge: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/25',  color: '#6366f1' },
-  tax_document:             { label: 'Tax Document',          badge: 'text-orange-400 bg-orange-500/10 border-orange-500/25',  color: '#f97316' },
-  audit_report:             { label: 'Audit Report',          badge: 'text-rose-400 bg-rose-500/10 border-rose-500/25',        color: '#f43f5e' },
-  other_document:           { label: 'Other Document',        badge: 'text-slate-400 bg-slate-500/10 border-slate-500/25',     color: '#64748b' },
-  viewing_document:         { label: 'Viewing Document',      badge: 'text-amber-400 bg-amber-500/10 border-amber-500/25',     color: '#f59e0b' },
-  commitment_notice:        { label: 'Commitment Document',   badge: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25', color: '#10b981' },
+const TYPE_COLORS: Record<string, { badge: string; color: string }> = {
+  capital_call:             { badge: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/25',  color: C.indigo  },
+  distribution:             { badge: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25', color: C.emerald },
+  capital_and_distribution: { badge: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25',       color: '#06b6d4' },
+  financial_statement:      { badge: 'text-violet-400 bg-violet-500/10 border-violet-500/25',  color: C.violet  },
+  nav_report:               { badge: 'text-teal-400 bg-teal-500/10 border-teal-500/25',        color: '#14b8a6' },
+  quarterly_report:         { badge: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25',        color: '#06b6d4' },
+  annual_report:            { badge: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/25',  color: '#6366f1' },
+  tax_document:             { badge: 'text-orange-400 bg-orange-500/10 border-orange-500/25',  color: '#f97316' },
+  audit_report:             { badge: 'text-rose-400 bg-rose-500/10 border-rose-500/25',        color: '#f43f5e' },
+  other_document:           { badge: 'text-slate-400 bg-slate-500/10 border-slate-500/25',     color: '#64748b' },
+  viewing_document:         { badge: 'text-amber-400 bg-amber-500/10 border-amber-500/25',     color: '#f59e0b' },
+  commitment_notice:        { badge: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25', color: '#10b981' },
 };
 
 function gradeStyle(grade: string) {
@@ -86,6 +87,7 @@ function docTime(d: any): number {
 }
 
 export default function FundDocuments({ fundId, canEdit, onChanged, currency }: Props) {
+  const { t } = useTranslation();
   const [docs, setDocs]       = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewDoc, setViewDoc] = useState<{ id: string; name: string } | null>(null);
@@ -103,7 +105,7 @@ export default function FundDocuments({ fundId, canEdit, onChanged, currency }: 
   useEffect(() => { load(); }, [load]);
 
   async function del(doc: any) {
-    if (!confirm('Delete this document? The capital call / distribution it created will also be removed and the ledger recalculated.')) return;
+    if (!confirm(t('fundDocuments.deleteConfirm'))) return;
     try {
       await fundReportsAPI.delete(doc.id);
       toast.success('Document deleted — ledger updated.');
@@ -136,40 +138,50 @@ export default function FundDocuments({ fundId, canEdit, onChanged, currency }: 
       <div className="px-5 py-3 flex items-center justify-between border-b theme-border"
            style={{ background: 'rgba(99,102,241,0.06)' }}>
         <p className="text-sm font-semibold theme-text">
-          Documents
+          {t('fundDocuments.title')}
           <span className="ml-2 text-xs font-normal theme-text-muted">{docs.length} uploaded · oldest first</span>
         </p>
       </div>
 
       {/* Document list */}
       {loading ? (
-        <p className="px-5 py-8 text-sm theme-text-muted text-center">Loading documents…</p>
+        <p className="px-5 py-8 text-sm theme-text-muted text-center">{t('common.loading')}</p>
       ) : docs.length === 0 ? (
         <div className="px-5 py-8 text-center">
-          <p className="text-sm theme-text-muted">No documents uploaded yet.</p>
-          {canEdit && <p className="text-xs theme-text-muted mt-1">Use "Upload a fund document" at the top of the page to add one.</p>}
+          <p className="text-sm theme-text-muted">{t('fundDocuments.noDocuments')}</p>
+          {canEdit && <p className="text-xs theme-text-muted mt-1">{t('fundDocuments.uploadFirst')}</p>}
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead style={{ background: 'var(--color-header-bg)' }}>
               <tr className="border-b theme-border text-xs">
-                {['File', 'Type', 'Notice Date', 'Due Date', currency === 'JPY' ? 'Amount (JPY)' : 'Amount (USD)', 'Confidence', ''].map(h => (
-                  <th key={h} className={`px-4 py-2.5 font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h === 'File' || h === '' ? 'text-left' : 'text-right'}`}>{h}</th>
-                ))}
+                {['file', 'type', 'noticeDate', 'dueDate', currency === 'JPY' ? 'amountJpy' : 'amountUsd', 'confidence', 'actions'].map(h => {
+                  const headerLabel = h === 'amountJpy' ? t('distributions.amountJpy') :
+                                     h === 'amountUsd' ? t('distributions.amountUsd') :
+                                     h === 'noticeDate' ? t('capitalCalls.noticeDate') :
+                                     h === 'dueDate' ? t('capitalCalls.dueDate') :
+                                     h === 'file' ? t('notices.file') :
+                                     h === 'type' ? t('notices.type') :
+                                     h === 'confidence' ? t('notices.confidence') :
+                                     t('common.actions');
+                  return (
+                    <th key={h} className={`px-4 py-2.5 font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h === 'file' || h === 'actions' ? 'text-left' : 'text-right'}`}>{headerLabel}</th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y theme-border">
               {docs.map(doc => {
-                const t = TYPE_META[doc.notice_type] ?? TYPE_META.capital_call;
+                const colors = TYPE_COLORS[doc.notice_type] ?? TYPE_COLORS.capital_call;
+                const typeLabel = t(`documentTypes.${doc.notice_type}`) || t('documentTypes.capital_call');
                 const amount = doc.notice_type === 'distribution' ? doc.distribution_usd
                              : doc.notice_type === 'financial_statement' ? null
                              : doc.gross_call_usd;
-                // Check if document has a custom type name (from user creation)
-                const customTypeName = (doc as any)?.extractedData?.customDocTypeName
-                const displayType = customTypeName || t.label
-                const displayBadge = customTypeName ? 'text-blue-400 bg-blue-500/10 border-blue-500/25' : t.badge
-                const displayColor = customTypeName ? '#3b82f6' : t.color
+                // Check if document has a custom type name (from user upload or creation)
+                const customTypeName = (doc as any)?.extractedData?.customType || (doc as any)?.extractedData?.customDocTypeName
+                const displayType = customTypeName || typeLabel
+                const displayBadge = customTypeName ? 'text-blue-400 bg-blue-500/10 border-blue-500/25' : colors.badge
                 return (
                   <tr key={doc.id} className="theme-row-hover">
                     <td className="px-4 py-3 theme-text max-w-[18rem]">
@@ -186,13 +198,13 @@ export default function FundDocuments({ fundId, canEdit, onChanged, currency }: 
                             onClick={() => rename(doc.id, editingName)}
                             className="px-2 py-1 rounded text-xs font-medium text-green-400 hover:bg-green-500/10 transition-colors"
                           >
-                            Save
+                            {t('common.save')}
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
                             className="px-2 py-1 rounded text-xs font-medium text-slate-400 hover:bg-slate-500/10 transition-colors"
                           >
-                            Cancel
+                            {t('common.cancel')}
                           </button>
                         </div>
                       ) : (
@@ -220,7 +232,7 @@ export default function FundDocuments({ fundId, canEdit, onChanged, currency }: 
                     </td>
                     <td className="px-4 py-3 text-right theme-text-muted whitespace-nowrap">{doc.notice_date ?? '—'}</td>
                     <td className="px-4 py-3 text-right theme-text-muted whitespace-nowrap">{doc.due_date ?? '—'}</td>
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color: t.color }}>
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color: colors.color }}>
                       {amount ? (currency === 'JPY' ? fmt.jpy(Number(amount)) : fmt.usd(Number(amount))) : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -231,12 +243,12 @@ export default function FundDocuments({ fundId, canEdit, onChanged, currency }: 
                     <td className="px-4 py-3 flex items-center gap-2">
                       <button onClick={() => setViewDoc({ id: doc.id, name: doc.file_name })}
                         className="px-2 py-1 rounded text-xs font-medium text-indigo-400 hover:bg-indigo-500/10 transition-colors">
-                        View
+                        {t('fundDocuments.view')}
                       </button>
                       {canEdit && (
                         <button onClick={() => del(doc)}
                           className="px-2 py-1 rounded text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors">
-                          Delete
+                          {t('fundDocuments.delete')}
                         </button>
                       )}
                     </td>

@@ -175,7 +175,10 @@ router.post('/upload', async (c) => {
   const isExplicitTransaction = reqType && ['capital_call', 'distribution', 'capital_and_distribution'].includes(reqType)
 
   // ── Check if this is a viewing-only document (contract, audit, etc.) ──────
-  // ONLY auto-detect if the frontend didn't explicitly select ANY document type
+  // Check for viewing documents, then respect user's explicit type selection if provided
+  let isViewingDoc = false
+  let viewingDocCheck: any = null
+
   if (!hasExplicitType) {
     let pdfText = ''
     try {
@@ -187,69 +190,76 @@ router.post('/upload', async (c) => {
       pdfText = ''
     }
 
-    const viewingDocCheck = detectViewingDocument(pdfText, originalName)
-    if (viewingDocCheck.isViewingDoc) {
-      // This is a viewing document - store it without extraction/processing
-      // Use the fund provided by the frontend, or fall back to a default
-      let resolvedFund = null
-      if (scopedFundIdPre) {
-        resolvedFund = await prisma.fund.findUnique({ where: { id: scopedFundIdPre } })
-      }
+    viewingDocCheck = detectViewingDocument(pdfText, originalName)
+    isViewingDoc = viewingDocCheck.isViewingDoc
+  }
 
-      if (!resolvedFund) {
-        // Fallback: try to resolve by auto-detection or use SDG
-        resolvedFund = await resolveFund('sdg-lps')
-      }
-
-      if (!resolvedFund) {
-        return c.json({
-          detail: 'Fund database error',
-        }, 500)
-      }
-
-      // Store viewing document directly without extraction
-      const fundFolder = FUND_FOLDER_NAMES[resolvedFund.fundName.toLowerCase().replace(/\s+/g, '-')] ??
-        resolvedFund.fundName.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-      const folderPath = path.join(config.uploadDir, fundFolder)
-      if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true })
-      const relPath = path.join(fundFolder, `${Date.now()}_${safe}`)
-      const filepath = path.join(config.uploadDir, relPath)
-      fs.writeFileSync(filepath, buffer)
-
-      // Create database record for viewing document
-      const n = await prisma.notice.create({
-        data: {
-          filename:      relPath,
-          originalName,
-          fileHash,
-          noticeType:    'viewing_document',
-          status:        'approved',
-          approvedAt:    new Date(),
-          fundId:        resolvedFund.id,
-          extractedData: {
-            noticeType: 'viewing_document',
-            fundName:   resolvedFund.fundName,
-            docType:    viewingDocCheck.docType,
-            reason:     viewingDocCheck.reason,
-          } as any,
-          confidence:    1,
-          uploadedBy:    user.email,
-        },
-      })
-
-      // Log for audit purposes
-      console.log(`[fund-reports] Stored viewing document: ${viewingDocCheck.docType} - ${originalName}`)
-
-      return c.json({
-        id:        n.id,
-        message:   `${viewingDocCheck.docType || 'Viewing'} document stored successfully (no extraction performed)`,
-        fundName:  resolvedFund.fundName,
-        fund_id:   resolvedFund.id,
-        docType:   viewingDocCheck.docType,
-        reason:    viewingDocCheck.reason,
-        fileName:  originalName,
-      }, 201)
+  if (isViewingDoc || (hasExplicitType && ['financial_statement', 'nav_report', 'quarterly_report', 'annual_report', 'tax_document', 'audit_report', 'other_document', 'viewing_document', 'commitment_notice'].includes(reqType))) {
+    // This is a viewing/non-transaction document - store it without extraction/processing
+    // Use the fund provided by the frontend, or fall back to a default
+    let resolvedFund = null
+    if (scopedFundIdPre) {
+      resolvedFund = await prisma.fund.findUnique({ where: { id: scopedFundIdPre } })
     }
+
+    if (!resolvedFund) {
+      // Fallback: try to resolve by auto-detection or use SDG
+      resolvedFund = await resolveFund('sdg-lps')
+    }
+
+    if (!resolvedFund) {
+      return c.json({
+        detail: 'Fund database error',
+      }, 500)
+    }
+
+    // Store document directly without extraction
+    const fundFolder = FUND_FOLDER_NAMES[resolvedFund.fundName.toLowerCase().replace(/\s+/g, '-')] ??
+      resolvedFund.fundName.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const folderPath = path.join(config.uploadDir, fundFolder)
+    if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true })
+    const relPath = path.join(fundFolder, `${Date.now()}_${safe}`)
+    const filepath = path.join(config.uploadDir, relPath)
+    fs.writeFileSync(filepath, buffer)
+
+    // Use user-selected type if provided, otherwise use detected type
+    const finalNoticeType = reqType || 'viewing_document'
+    const displayType = customDocType || reqType || viewingDocCheck?.docType || 'Document'
+
+    // Create database record
+    const n = await prisma.notice.create({
+      data: {
+        filename:      relPath,
+        originalName,
+        fileHash,
+        noticeType:    finalNoticeType,
+        status:        'approved',
+        approvedAt:    new Date(),
+        fundId:        resolvedFund.id,
+        extractedData: {
+          noticeType: finalNoticeType,
+          fundName:   resolvedFund.fundName,
+          docType:    displayType,
+          customType: customDocType,
+          reason:     viewingDocCheck?.reason,
+        } as any,
+        confidence:    1,
+        uploadedBy:    user.email,
+      },
+    })
+
+    // Log for audit purposes
+    console.log(`[fund-reports] Stored document: ${displayType} - ${originalName}`)
+
+    return c.json({
+      id:        n.id,
+      message:   `${displayType} stored successfully (no extraction performed)`,
+      fundName:  resolvedFund.fundName,
+      fund_id:   resolvedFund.id,
+      docType:   finalNoticeType,
+      displayType,
+      fileName:  originalName,
+    }, 201)
   }
 
   // ── Normal transaction document detection ────────────────────────────────
@@ -375,6 +385,46 @@ router.post('/upload', async (c) => {
     'annual_report', 'tax_document', 'audit_report', 'other_document',
     'commitment_notice', 'viewing_document',
   ]
+
+  // Support custom document types: if customDocType is provided, store without PDF parsing
+  if (customDocType) {
+    // Custom types (e.g., "Subscription Agreement") skip PDF parsing and store directly
+    const fundFolder = FUND_FOLDER_NAMES[resolvedFund.fundName.toLowerCase().replace(/\s+/g, '-')] ??
+      resolvedFund.fundName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+    const folderPath = path.join(config.uploadDir, fundFolder)
+    if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true })
+    const relPath = path.join(fundFolder, `${Date.now()}_${safe}`)
+    const filepath = path.join(config.uploadDir, relPath)
+    fs.writeFileSync(filepath, buffer)
+
+    const n = await prisma.notice.create({
+      data: {
+        filename:      relPath,
+        originalName,
+        fileHash,
+        noticeType:    customDocType,
+        status:        'approved',
+        approvedAt:    new Date(),
+        fundId:        resolvedFund.id,
+        extractedData: {
+          noticeType:    customDocType,
+          fundName:      resolvedFund.fundName,
+        } as any,
+        confidence:    1,
+        uploadedBy:    user.email,
+      },
+    })
+
+    return c.json({
+      id:        n.id,
+      message:   `${customDocType} stored successfully`,
+      fundName:  resolvedFund.fundName,
+      fund_id:   resolvedFund.id,
+      docType:   customDocType,
+    }, 201)
+  }
+
+  // Standard flow: use explicit type if valid, otherwise fall back to parsed type
   const noticeType =
     parsed.noticeType === 'capital_and_distribution' ? parsed.noticeType
     : reqType && ALLOWED_TYPES.includes(reqType) ? reqType

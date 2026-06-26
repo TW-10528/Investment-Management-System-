@@ -53,31 +53,10 @@ router.post('/test', async (c) => {
       }, 422)
     }
 
-    // ── Check if this is a viewing-only document (contract, audit, etc.) ────
-    // Return early with COMMITMENT_NOTICE classification so frontend doesn't
-    // try to extract amounts or add to ledger as transaction
-    const viewingDocCheck = detectViewingDocument(pdfText, file.name)
-    if (viewingDocCheck.isViewingDoc) {
-      return c.json({
-        pdf_characters: pdfText.length,
-        pdf_preview:    pdfText.slice(0, 500),
-        classification: {
-          fund_key:         'UNKNOWN',
-          fund_display_name: 'Viewing Document',
-          report_type:      'COMMITMENT_NOTICE', // Mark as viewing-only
-          currency:         'USD',
-          confidence_score: 95,
-        },
-        extraction:    null,
-        calculation:   null,
-        cross_checks:  null,
-        confidence_gate: {
-          pass: false,
-          reason: `This is a ${viewingDocCheck.docType || 'viewing'} document (${viewingDocCheck.reason}). Storage only, no extraction.`,
-        },
-        model_used: 'viewing-document-detector',
-      })
-    }
+    // ── Let AI model classify the document ────────────────────────────────────
+    // Do NOT do early viewing document detection here - the Qwen AI model should
+    // be the source of truth for document classification. It will distinguish between
+    // capital calls, distributions, and viewing documents (audit, financial, etc.).
 
     // ── Previous state for calc engine ────────────────────────────────────
     const prev: PrevState = {
@@ -166,9 +145,9 @@ router.post('/test', async (c) => {
     }
 
     // ── Rich Extraction (override AI for known fund types) ─────────────────
-    // For funds with dedicated parsers (NB Real Estate, Hamilton, Dover), use the
+    // For funds with dedicated parsers (NB Real Estate, Hamilton, Dover, SDG), use the
     // rich extractor instead of AI to get more accurate values for the preview
-    const RICH_FUNDS = ['NB_REAL_ESTATE', 'HAMILTON_SEC', 'HAMILTON_STRAT', 'DOVER']
+    const RICH_FUNDS = ['NB_REAL_ESTATE', 'HAMILTON_SEC', 'HAMILTON_STRAT', 'DOVER', 'SDG']
     if (RICH_FUNDS.includes(fund_key) && pdfText) {
       try {
         let richNotice = null
@@ -176,6 +155,7 @@ router.post('/test', async (c) => {
         else if (fund_key === 'HAMILTON_SEC') richNotice = parseHamiltonLane(pdfText)
         else if (fund_key === 'HAMILTON_STRAT') richNotice = parseHamiltonStrategic(pdfText)
         else if (fund_key === 'DOVER') richNotice = parseDoverStreet(pdfText, null, '')
+        else if (fund_key === 'SDG') richNotice = extractSdgNotice(pdfText, file.name)
 
         // Override AI extraction with rich extraction values
         if (richNotice) {
@@ -186,6 +166,7 @@ router.post('/test', async (c) => {
           extraction.gain = richNotice.gainUsd ?? extraction.gain
           extraction.interest = richNotice.interestUsd ?? extraction.interest
           extraction.transaction_date = richNotice.dueDate ?? extraction.transaction_date
+          extraction.total_commitment_amount = richNotice.commitmentUsd ?? extraction.total_commitment_amount
         }
       } catch (richErr) {
         // Rich extraction failed, continue with AI values

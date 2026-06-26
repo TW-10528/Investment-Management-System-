@@ -720,4 +720,78 @@ router.delete('/:id/nav-records/:nId', async (c) => {
   return c.json({ ok: true })
 })
 
+// ── Unknown Fund Extraction & Creation ──────────────────────────────────────
+
+// POST /extract-unknown-fund
+// Extract fund data from PDF for unknown fund
+router.post('/extract-unknown-fund', async (c) => {
+  try {
+    const { extractUnknownFundData } = await import('./unknown-fund-extractor');
+    const body = await c.req.parseBody();
+    const fileField = body['file'];
+
+    if (!fileField || typeof fileField === 'string') {
+      return c.json(
+        { detail: 'No PDF file uploaded' },
+        400
+      );
+    }
+
+    const file = fileField as File;
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Extract data
+    const extracted = await extractUnknownFundData(
+      buffer,
+      file.name
+    );
+
+    return c.json({
+      extractedData: extracted,
+      status: 'success',
+    });
+  } catch (err: any) {
+    console.error('[funds] Extraction error:', err);
+    return c.json({ detail: err.message || 'Extraction failed' }, 500);
+  }
+})
+
+// POST /create-from-extraction
+// Create fund from extracted data with auto-processing
+router.post('/create-from-extraction', async (c) => {
+  try {
+    const { createFundFromExtraction } = await import('./fund-creation-service');
+    const reqData = await c.req.json();
+    const userEmail = c.req.header('X-User-Email');
+
+    const result = await createFundFromExtraction({
+      ...reqData,
+      userEmail,
+    });
+
+    // Log audit
+    if (userEmail) {
+      await logAction(
+        'create_fund_from_extraction',
+        'funds',
+        result.fund.id,
+        userEmail,
+        undefined,
+        result.fund as any
+      );
+    }
+
+    return c.json({
+      fund: result.fund,
+      fundReport: result.fundReport,
+      capitalCall: result.capitalCall,
+      distribution: result.distribution,
+      status: 'created',
+    });
+  } catch (err: any) {
+    console.error('[funds] Creation error:', err);
+    return c.json({ detail: err.message || 'Fund creation failed' }, 500);
+  }
+})
+
 export default router

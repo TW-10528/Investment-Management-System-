@@ -91,6 +91,7 @@ Return ONLY this JSON shape (common output schema):
   "report_provided_unfunded_before": null,
   "report_provided_remaining_after": null,
   "subsequent_close_interest": null,
+  "total_commitment_amount": null,
   "notes": "",
   "extraction_confidence": 0
 }`;
@@ -112,6 +113,7 @@ FINANCE DETAIL:
 - return_of_capital = Limited Partner's Share of Distributable Proceeds
 - gain = 0
 - interest = Additional Payment Received ONLY when it is negative/received
+- total_commitment_amount = The LP's total commitment to this fund (often found as "Commitment Amount" or "Initial Commitment" or "Total Commitment"). Extract if visible.
 - If the report is only a capital contribution with no distribution:
     return_of_capital = 0, gain = 0, interest = 0
 ${COMMON_SCHEMA}
@@ -143,6 +145,9 @@ IF DISTRIBUTION report:
        + "Distribution of realized gain (recallable)"
 - interest = "Distribution of investment income"
            + "Distribution of investment income (recallable)"
+
+COMMITMENT DETAIL:
+- total_commitment_amount = LP's total commitment (often shows as "Commitment" or "Your Commitment" in notices). Extract if visible on the report.
 ${COMMON_SCHEMA}
 
 DOCUMENT TEXT:

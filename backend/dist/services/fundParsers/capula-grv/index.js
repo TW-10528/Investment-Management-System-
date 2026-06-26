@@ -24,6 +24,8 @@ function parseCapulaGrv(rawText, previousState = null) {
     const grossCallUsd = f.capital_contribution_amount ?? 0;
     const distributionUsd = f.distribution_amount_received ?? 0;
     const reinvestableUsd = f.reinvestable_amount ?? 0;
+    // Commitment comes from the initial subscription (Net Capital Contribution)
+    // Not from distributions (which show Capital Balance = current NAV-based position value)
     const commitmentUsd = f.commitment_amount ?? 0;
     const totalCalledUsd = f.cumulative_capital_contributions ?? 0;
     const unfundedUsd = f.remaining_commitment ?? 0;

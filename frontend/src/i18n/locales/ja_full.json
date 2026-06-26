@@ -1,0 +1,1388 @@
+{
+  "path": "nav.navigation",
+  "value": "ナビゲーション"
+}
+{
+  "path": "nav.dashboard",
+  "value": "ダッシュボード"
+}
+{
+  "path": "nav.funds",
+  "value": "ファンド"
+}
+{
+  "path": "nav.notices",
+  "value": "通知処理"
+}
+{
+  "path": "nav.capitalCalls",
+  "value": "出資要請"
+}
+{
+  "path": "nav.distributions",
+  "value": "分配"
+}
+{
+  "path": "nav.fxRates",
+  "value": "為替レート"
+}
+{
+  "path": "nav.investments",
+  "value": "投資先"
+}
+{
+  "path": "nav.calculator",
+  "value": "計算ツール"
+}
+{
+  "path": "nav.rulesEngine",
+  "value": "ルールエンジン"
+}
+{
+  "path": "nav.users",
+  "value": "ユーザー管理"
+}
+{
+  "path": "nav.signOut",
+  "value": "サインアウト"
+}
+{
+  "path": "nav.viewOnly",
+  "value": "閲覧のみ"
+}
+{
+  "path": "calculator.title",
+  "value": "高度な財務計算ツール"
+}
+{
+  "path": "calculator.subtitle",
+  "value": "IRR · DPI/TVPI · ライブ為替換算 · ネット出資額 · フィー＆キャリー試算"
+}
+{
+  "path": "calculator.irrTab",
+  "value": "IRR / NPV"
+}
+{
+  "path": "calculator.fxTab",
+  "value": "為替換算"
+}
+{
+  "path": "calculator.multiplesTab",
+  "value": "DPI / TVPI"
+}
+{
+  "path": "calculator.netCallTab",
+  "value": "ネット出資額"
+}
+{
+  "path": "calculator.feeTab",
+  "value": "フィー＆キャリー"
+}
+{
+  "path": "calculator.availableAll",
+  "value": "全ユーザー利用可"
+}
+{
+  "path": "dashboard.title",
+  "value": "ポートフォリオ ダッシュボード"
+}
+{
+  "path": "dashboard.subtitle",
+  "value": "投資概要"
+}
+{
+  "path": "dashboard.asOf",
+  "value": "基準日"
+}
+{
+  "path": "dashboard.activeFunds",
+  "value": "アクティブファンド"
+}
+{
+  "path": "dashboard.totalCommitment",
+  "value": "総コミットメント"
+}
+{
+  "path": "dashboard.paidIn",
+  "value": "払込済"
+}
+{
+  "path": "dashboard.dryPowder",
+  "value": "未出資残高"
+}
+{
+  "path": "dashboard.totalDistributed",
+  "value": "分配合計"
+}
+{
+  "path": "dashboard.netCashPosition",
+  "value": "ネットキャッシュポジション"
+}
+{
+  "path": "dashboard.netOutflow",
+  "value": "ネット出超"
+}
+{
+  "path": "dashboard.netInflow",
+  "value": "ネット入超"
+}
+{
+  "path": "dashboard.drawn",
+  "value": "出資率"
+}
+{
+  "path": "dashboard.ofCommitment",
+  "value": "コミットメント比"
+}
+{
+  "path": "dashboard.commitmentUtilisation",
+  "value": "コミットメント利用状況 — 払込済 vs 未出資残高"
+}
+{
+  "path": "dashboard.strategyAllocation",
+  "value": "戦略別配分"
+}
+{
+  "path": "dashboard.distributionBreakdown",
+  "value": "分配内訳"
+}
+{
+  "path": "dashboard.returnOfPrincipal",
+  "value": "元本返還"
+}
+{
+  "path": "dashboard.profitIncome",
+  "value": "利益 / 収益"
+}
+{
+  "path": "dashboard.totalDistributions",
+  "value": "分配合計"
+}
+{
+  "path": "dashboard.ofTotal",
+  "value": "合計比"
+}
+{
+  "path": "dashboard.fundNAV",
+  "value": "ファンド純資産価値"
+}
+{
+  "path": "dashboard.noNavData",
+  "value": "NAVデータなし — 財務諸表PDFをアップロードしてください"
+}
+{
+  "path": "dashboard.recentInvestments",
+  "value": "最近の投資先"
+}
+{
+  "path": "dashboard.noInvestments",
+  "value": "投資データなし — 出資要請通知を承認して表示"
+}
+{
+  "path": "dashboard.fundPortfolio",
+  "value": "ファンドポートフォリオ"
+}
+{
+  "path": "dashboard.strategy",
+  "value": "戦略"
+}
+{
+  "path": "dashboard.commitment",
+  "value": "コミットメント"
+}
+{
+  "path": "dashboard.capacity",
+  "value": "投資余力"
+}
+{
+  "path": "dashboard.dpi",
+  "value": "DPI"
+}
+{
+  "path": "dashboard.tvpi",
+  "value": "TVPI"
+}
+{
+  "path": "dashboard.totalNav",
+  "value": "純資産価値合計"
+}
+{
+  "path": "dashboard.performanceMultiples",
+  "value": "パフォーマンス指数"
+}
+{
+  "path": "dashboard.portfolioHealth",
+  "value": "ポートフォリオ健全性"
+}
+{
+  "path": "dashboard.deploymentByFund",
+  "value": "ファンド別デプロイ状況"
+}
+{
+  "path": "dashboard.overdueCalls",
+  "value": "期限超過 出資要請"
+}
+{
+  "path": "dashboard.overdueCallsPlural",
+  "value": "期限超過 出資要請"
+}
+{
+  "path": "dashboard.refreshLiveRate",
+  "value": "レートを更新"
+}
+{
+  "path": "dashboard.pendingCalls",
+  "value": "承認待ち"
+}
+{
+  "path": "dashboard.overdue",
+  "value": "期限超過"
+}
+{
+  "path": "dashboard.usdJpy",
+  "value": "$ / ¥ レート"
+}
+{
+  "path": "dashboard.liveRate",
+  "value": "市場レート"
+}
+{
+  "path": "dashboard.stored",
+  "value": "保存済"
+}
+{
+  "path": "dashboard.noStrategyData",
+  "value": "戦略データなし"
+}
+{
+  "path": "dashboard.underManagement",
+  "value": "運用中"
+}
+{
+  "path": "dashboard.portfolioTotal",
+  "value": "ポートフォリオ合計"
+}
+{
+  "path": "dashboard.available",
+  "value": "利用可能"
+}
+{
+  "path": "dashboard.grossCommitment",
+  "value": "総コミットメント額"
+}
+{
+  "path": "notices.title",
+  "value": "通知処理"
+}
+{
+  "path": "notices.subtitle",
+  "value": "GPからの通知をアップロードすると自動的にデータが抽出され、管理者の承認を待ちます"
+}
+{
+  "path": "notices.pending",
+  "value": "承認待ち"
+}
+{
+  "path": "notices.uploadPDF",
+  "value": "PDFアップロード"
+}
+{
+  "path": "notices.all",
+  "value": "すべて"
+}
+{
+  "path": "notices.approved",
+  "value": "承認済"
+}
+{
+  "path": "notices.rejected",
+  "value": "却下"
+}
+{
+  "path": "notices.uploadFirst",
+  "value": "最初の通知をアップロード"
+}
+{
+  "path": "notices.uploadSubtitle",
+  "value": "出資要請、分配、財務諸表のPDFをアップロードしてください。主要データが自動的に抽出されます。"
+}
+{
+  "path": "notices.capitalCalls",
+  "value": "出資要請 → CF記録"
+}
+{
+  "path": "notices.distributions",
+  "value": "分配 → CF記録"
+}
+{
+  "path": "notices.financials",
+  "value": "財務諸表 → NAV記録"
+}
+{
+  "path": "notices.file",
+  "value": "ファイル"
+}
+{
+  "path": "notices.type",
+  "value": "種類"
+}
+{
+  "path": "notices.fund",
+  "value": "ファンド"
+}
+{
+  "path": "notices.status",
+  "value": "ステータス"
+}
+{
+  "path": "notices.confidence",
+  "value": "信頼度"
+}
+{
+  "path": "notices.uploaded",
+  "value": "アップロード日"
+}
+{
+  "path": "notices.review",
+  "value": "確認 →"
+}
+{
+  "path": "notices.view",
+  "value": "表示 →"
+}
+{
+  "path": "notices.uploadTitle",
+  "value": "通知PDFのアップロード"
+}
+{
+  "path": "notices.selectPDF",
+  "value": "クリックしてPDFを選択"
+}
+{
+  "path": "notices.maxSize",
+  "value": "最大20MB"
+}
+{
+  "path": "notices.noticeType",
+  "value": "通知種類"
+}
+{
+  "path": "notices.capitalCallNotice",
+  "value": "出資要請通知"
+}
+{
+  "path": "notices.distributionNotice",
+  "value": "分配通知"
+}
+{
+  "path": "notices.financialStatement",
+  "value": "財務諸表"
+}
+{
+  "path": "notices.assignFund",
+  "value": "ファンドを割り当て"
+}
+{
+  "path": "notices.fundOptional",
+  "value": "（承認時に割り当て可能）"
+}
+{
+  "path": "notices.cancel",
+  "value": "キャンセル"
+}
+{
+  "path": "notices.uploadAndParse",
+  "value": "アップロード＆解析"
+}
+{
+  "path": "notices.uploading",
+  "value": "アップロード中…"
+}
+{
+  "path": "notices.extractedData",
+  "value": "抽出データ"
+}
+{
+  "path": "notices.investmentTargets",
+  "value": "投資先候補（検出）"
+}
+{
+  "path": "notices.distributionBreakdown",
+  "value": "分配内訳"
+}
+{
+  "path": "notices.assignFundRequired",
+  "value": "ファンドの割り当て"
+}
+{
+  "path": "notices.adminNotes",
+  "value": "管理者メモ"
+}
+{
+  "path": "notices.adminNotesPlaceholder",
+  "value": "任意のメモ…"
+}
+{
+  "path": "notices.reject",
+  "value": "却下"
+}
+{
+  "path": "notices.approve",
+  "value": "承認＆記録作成"
+}
+{
+  "path": "notices.selectFundFirst",
+  "value": "承認前にファンドを選択してください。"
+}
+{
+  "path": "notices.approved_msg",
+  "value": "通知承認 — CF記録が作成されました！"
+}
+{
+  "path": "notices.rejected_msg",
+  "value": "通知が却下されました。"
+}
+{
+  "path": "notices.keywords",
+  "value": "抽出キーワード"
+}
+{
+  "path": "notices.sector",
+  "value": "セクター"
+}
+{
+  "path": "notices.geography",
+  "value": "地域"
+}
+{
+  "path": "notices.dealType",
+  "value": "ディール種類"
+}
+{
+  "path": "investments.title",
+  "value": "投資先一覧"
+}
+{
+  "path": "investments.subtitle",
+  "value": "出資要請通知から抽出されたすべての投資先"
+}
+{
+  "path": "investments.search",
+  "value": "プロジェクト名、企業名、ファンド名で検索…"
+}
+{
+  "path": "investments.allFunds",
+  "value": "全ファンド"
+}
+{
+  "path": "investments.allSectors",
+  "value": "全セクター"
+}
+{
+  "path": "investments.allGeographies",
+  "value": "全地域"
+}
+{
+  "path": "investments.noData",
+  "value": "投資先データなし"
+}
+{
+  "path": "investments.noDataSub",
+  "value": "出資要請通知を承認して投資先を表示してください"
+}
+{
+  "path": "investments.project",
+  "value": "プロジェクト / 企業"
+}
+{
+  "path": "investments.fund",
+  "value": "ファンド"
+}
+{
+  "path": "investments.amount",
+  "value": "金額（$）"
+}
+{
+  "path": "investments.date",
+  "value": "日付"
+}
+{
+  "path": "investments.sector",
+  "value": "セクター"
+}
+{
+  "path": "investments.geography",
+  "value": "地域"
+}
+{
+  "path": "investments.type",
+  "value": "種類"
+}
+{
+  "path": "investments.code",
+  "value": "コード名"
+}
+{
+  "path": "investments.totalInvested",
+  "value": "投資合計"
+}
+{
+  "path": "investments.targets",
+  "value": "件"
+}
+{
+  "path": "auth.login",
+  "value": "サインイン"
+}
+{
+  "path": "auth.email",
+  "value": "メールアドレス"
+}
+{
+  "path": "auth.password",
+  "value": "パスワード"
+}
+{
+  "path": "auth.signIn",
+  "value": "サインイン"
+}
+{
+  "path": "auth.signingIn",
+  "value": "サインイン中…"
+}
+{
+  "path": "auth.noAccount",
+  "value": "アカウントをお持ちでない方"
+}
+{
+  "path": "auth.signUp",
+  "value": "新規登録"
+}
+{
+  "path": "auth.forgotPassword",
+  "value": "パスワードをお忘れの方"
+}
+{
+  "path": "auth.register",
+  "value": "アカウント作成"
+}
+{
+  "path": "auth.fullName",
+  "value": "氏名"
+}
+{
+  "path": "auth.createAccount",
+  "value": "アカウント作成"
+}
+{
+  "path": "auth.registering",
+  "value": "登録中…"
+}
+{
+  "path": "auth.alreadyAccount",
+  "value": "すでにアカウントをお持ちの方"
+}
+{
+  "path": "auth.pendingApproval",
+  "value": "管理者の承認待ち"
+}
+{
+  "path": "auth.pendingSubtitle",
+  "value": "管理者の承認後にアクセスできます。"
+}
+{
+  "path": "common.loading",
+  "value": "読み込み中…"
+}
+{
+  "path": "common.save",
+  "value": "保存"
+}
+{
+  "path": "common.cancel",
+  "value": "キャンセル"
+}
+{
+  "path": "common.delete",
+  "value": "削除"
+}
+{
+  "path": "common.edit",
+  "value": "編集"
+}
+{
+  "path": "common.close",
+  "value": "閉じる"
+}
+{
+  "path": "common.confirm",
+  "value": "確認"
+}
+{
+  "path": "common.search",
+  "value": "検索"
+}
+{
+  "path": "common.filter",
+  "value": "フィルター"
+}
+{
+  "path": "common.noData",
+  "value": "データなし"
+}
+{
+  "path": "common.viewAll",
+  "value": "すべて表示 →"
+}
+{
+  "path": "common.actions",
+  "value": "操作"
+}
+{
+  "path": "common.date",
+  "value": "日付"
+}
+{
+  "path": "common.amount",
+  "value": "金額"
+}
+{
+  "path": "common.notes",
+  "value": "メモ"
+}
+{
+  "path": "common.status",
+  "value": "ステータス"
+}
+{
+  "path": "common.fund",
+  "value": "ファンド"
+}
+{
+  "path": "common.yes",
+  "value": "はい"
+}
+{
+  "path": "common.no",
+  "value": "いいえ"
+}
+{
+  "path": "common.error",
+  "value": "エラーが発生しました"
+}
+{
+  "path": "common.success",
+  "value": "成功"
+}
+{
+  "path": "common.refresh",
+  "value": "更新"
+}
+{
+  "path": "settings.title",
+  "value": "設定＆カスタマイズ"
+}
+{
+  "path": "settings.theme",
+  "value": "テーマ"
+}
+{
+  "path": "settings.light",
+  "value": "ライト"
+}
+{
+  "path": "settings.dark",
+  "value": "ダーク"
+}
+{
+  "path": "settings.language",
+  "value": "言語"
+}
+{
+  "path": "settings.currency",
+  "value": "デフォルト通貨"
+}
+{
+  "path": "settings.usd",
+  "value": "$"
+}
+{
+  "path": "settings.jpy",
+  "value": "¥"
+}
+{
+  "path": "settings.compactNumbers",
+  "value": "数値の省略表示"
+}
+{
+  "path": "settings.compactOn",
+  "value": "オン（例: $1.2M）"
+}
+{
+  "path": "settings.compactOff",
+  "value": "オフ（例: $1,200,000）"
+}
+{
+  "path": "settings.dateFormat",
+  "value": "日付形式"
+}
+{
+  "path": "settings.dateFormatUS",
+  "value": "MM/DD/YYYY"
+}
+{
+  "path": "settings.dateFormatISO",
+  "value": "YYYY-MM-DD"
+}
+{
+  "path": "settings.dateFormatJP",
+  "value": "YYYY年M月D日"
+}
+{
+  "path": "settings.saved",
+  "value": "設定を保存しました！"
+}
+{
+  "path": "settings.reset",
+  "value": "デフォルトに戻す"
+}
+{
+  "path": "users.title",
+  "value": "ユーザー管理"
+}
+{
+  "path": "users.pending",
+  "value": "承認待ち"
+}
+{
+  "path": "users.active",
+  "value": "アクティブ"
+}
+{
+  "path": "users.inactive",
+  "value": "非アクティブ"
+}
+{
+  "path": "users.approve",
+  "value": "承認"
+}
+{
+  "path": "users.reject",
+  "value": "却下"
+}
+{
+  "path": "users.deactivate",
+  "value": "無効化"
+}
+{
+  "path": "users.createUser",
+  "value": "ユーザー作成"
+}
+{
+  "path": "users.role",
+  "value": "役割"
+}
+{
+  "path": "users.name",
+  "value": "氏名"
+}
+{
+  "path": "users.email",
+  "value": "メール"
+}
+{
+  "path": "users.joined",
+  "value": "登録日"
+}
+{
+  "path": "users.lastLogin",
+  "value": "最終ログイン"
+}
+{
+  "path": "users.awaitingApproval",
+  "value": "件承認待ち"
+}
+{
+  "path": "users.reviewNow",
+  "value": "確認する →"
+}
+{
+  "path": "users.addNewUser",
+  "value": "+ 新規ユーザー追加"
+}
+{
+  "path": "users.addUser",
+  "value": "+ ユーザー追加"
+}
+{
+  "path": "users.activeStatus",
+  "value": "アクティブ"
+}
+{
+  "path": "users.inactiveStatus",
+  "value": "非アクティブ"
+}
+{
+  "path": "users.reactivate",
+  "value": "↺ 再有効化"
+}
+{
+  "path": "users.you",
+  "value": "自分"
+}
+{
+  "path": "users.newRegistration",
+  "value": "新規登録"
+}
+{
+  "path": "users.approveAs",
+  "value": "承認する役割："
+}
+{
+  "path": "users.accessOverview",
+  "value": "アクセスレベル概要"
+}
+{
+  "path": "users.pendingWord",
+  "value": "承認待ち"
+}
+{
+  "path": "users.loadingUsers",
+  "value": "ユーザーを読み込み中…"
+}
+{
+  "path": "users.deactivateAction",
+  "value": "⊘ 無効化"
+}
+{
+  "path": "funds.title",
+  "value": "ファンド管理"
+}
+{
+  "path": "funds.addFund",
+  "value": "ファンド追加"
+}
+{
+  "path": "funds.editFund",
+  "value": "ファンド編集"
+}
+{
+  "path": "funds.newFund",
+  "value": "新規ファンド追加"
+}
+{
+  "path": "funds.search",
+  "value": "ファンドを検索…"
+}
+{
+  "path": "funds.noFunds",
+  "value": "ファンドが見つかりません"
+}
+{
+  "path": "funds.noFundsSub",
+  "value": "検索条件を変更するか、最初のファンドを追加してください"
+}
+{
+  "path": "funds.fundName",
+  "value": "ファンド名 *"
+}
+{
+  "path": "funds.fundNameJp",
+  "value": "ファンド名（日本語）"
+}
+{
+  "path": "funds.manager",
+  "value": "運用会社"
+}
+{
+  "path": "funds.strategy",
+  "value": "戦略 *"
+}
+{
+  "path": "funds.vintageYear",
+  "value": "ビンテージ年"
+}
+{
+  "path": "funds.currency",
+  "value": "通貨"
+}
+{
+  "path": "funds.commitment",
+  "value": "コミットメント（$）"
+}
+{
+  "path": "funds.entryFx",
+  "value": "適用為替レート（$/¥）"
+}
+{
+  "path": "funds.mgmtFee",
+  "value": "管理報酬（%）"
+}
+{
+  "path": "funds.carry",
+  "value": "キャリー（%）"
+}
+{
+  "path": "funds.hurdle",
+  "value": "ハードルレート（%）"
+}
+{
+  "path": "funds.notes",
+  "value": "メモ"
+}
+{
+  "path": "funds.viewLedger",
+  "value": "台帳を表示"
+}
+{
+  "path": "funds.edit",
+  "value": "編集"
+}
+{
+  "path": "funds.deactivate",
+  "value": "無効化"
+}
+{
+  "path": "funds.totalCalled",
+  "value": "累計出資要請額"
+}
+{
+  "path": "funds.invCapacity",
+  "value": "投資余力"
+}
+{
+  "path": "funds.drawn",
+  "value": "出資率"
+}
+{
+  "path": "funds.saving",
+  "value": "保存中…"
+}
+{
+  "path": "funds.created",
+  "value": "ファンドを作成しました"
+}
+{
+  "path": "funds.updated",
+  "value": "ファンドを更新しました"
+}
+{
+  "path": "funds.deactivated",
+  "value": "ファンドを無効化しました"
+}
+{
+  "path": "funds.deactivateConfirm",
+  "value": "「{{name}}」を無効化しますか？アクティブリストから非表示になります。"
+}
+{
+  "path": "funds.createFund",
+  "value": "ファンド作成"
+}
+{
+  "path": "funds.updateFund",
+  "value": "ファンド更新"
+}
+{
+  "path": "funds.viewOnly",
+  "value": "閲覧モード — 変更は財務部門または管理者にお問い合わせください"
+}
+{
+  "path": "funds.backToAll",
+  "value": "← 全ファンド"
+}
+{
+  "path": "funds.selectToView",
+  "value": "ファンドを選択して詳細を表示"
+}
+{
+  "path": "funds.hideInactive",
+  "value": "非アクティブを非表示"
+}
+{
+  "path": "funds.showInactive",
+  "value": "非アクティブを表示（{{count}}件）"
+}
+{
+  "path": "funds.noFundsCreate",
+  "value": "「+ ファンド追加」をクリックして最初のファンドを作成してください。"
+}
+{
+  "path": "funds.viewOnlyMode",
+  "value": "閲覧のみモードです。編集するには管理者または財務担当者としてログインしてください。"
+}
+{
+  "path": "fundUpload.title",
+  "value": "ファンド書類をアップロード"
+}
+{
+  "path": "fundUpload.subtitle",
+  "value": "ファンドを選択してPDFをドロップすると、自動的に解析されてファンドに登録されます。"
+}
+{
+  "path": "fundUpload.docTypeLabel",
+  "value": "1 · 書類の種類"
+}
+{
+  "path": "fundUpload.whichFund",
+  "value": "2 · どのファンド？"
+}
+{
+  "path": "fundUpload.dropPdf",
+  "value": "PDFをここにドロップまたはクリックで選択"
+}
+{
+  "path": "fundUpload.processing",
+  "value": "処理中…"
+}
+{
+  "path": "fundUpload.upload",
+  "value": "アップロード"
+}
+{
+  "path": "fundUpload.capitalAndDist",
+  "value": "出資要請＆分配"
+}
+{
+  "path": "capitalCalls.title",
+  "value": "出資要請"
+}
+{
+  "path": "capitalCalls.shown",
+  "value": "件表示"
+}
+{
+  "path": "capitalCalls.gross",
+  "value": "総額"
+}
+{
+  "path": "capitalCalls.netUsd",
+  "value": "純額（$）"
+}
+{
+  "path": "capitalCalls.netJpy",
+  "value": "純額（¥）"
+}
+{
+  "path": "capitalCalls.noticeDate",
+  "value": "通知日"
+}
+{
+  "path": "capitalCalls.dueDate",
+  "value": "期日"
+}
+{
+  "path": "capitalCalls.paidDate",
+  "value": "支払日"
+}
+{
+  "path": "capitalCalls.grossUsd",
+  "value": "総額（$）"
+}
+{
+  "path": "capitalCalls.netUsdCol",
+  "value": "純額（$）"
+}
+{
+  "path": "capitalCalls.netJpyCol",
+  "value": "純額（¥）"
+}
+{
+  "path": "capitalCalls.fx",
+  "value": "為替"
+}
+{
+  "path": "capitalCalls.approve",
+  "value": "承認"
+}
+{
+  "path": "capitalCalls.markPaid",
+  "value": "支払済にする"
+}
+{
+  "path": "capitalCalls.noCalls",
+  "value": "対象の出資要請なし："
+}
+{
+  "path": "capitalCalls.viewOnly",
+  "value": "閲覧モード — 承認・支払い処理は財務部門または管理者にお問い合わせください"
+}
+{
+  "path": "capitalCalls.newCall",
+  "value": "新規出資要請"
+}
+{
+  "path": "capitalCalls.createDesc",
+  "value": "新規出資要請を作成"
+}
+{
+  "path": "capitalCalls.selectFund",
+  "value": "ファンドを選択…"
+}
+{
+  "path": "capitalCalls.grossCallAmt",
+  "value": "総出資要請額（$）"
+}
+{
+  "path": "capitalCalls.callPctLabel",
+  "value": "またはコミットメントの%"
+}
+{
+  "path": "capitalCalls.autoFills",
+  "value": "総額を自動入力"
+}
+{
+  "path": "capitalCalls.distOffset",
+  "value": "分配相殺（$）"
+}
+{
+  "path": "capitalCalls.reinvestableAmt",
+  "value": "再投資可能額（$）"
+}
+{
+  "path": "capitalCalls.reducesNet",
+  "value": "純額を減少"
+}
+{
+  "path": "capitalCalls.addsBack",
+  "value": "純額に加算"
+}
+{
+  "path": "capitalCalls.usdJpyRate",
+  "value": "$ / ¥ レート"
+}
+{
+  "path": "capitalCalls.initialStatus",
+  "value": "初期ステータス"
+}
+{
+  "path": "capitalCalls.pendingNew",
+  "value": "承認待ち（新規）"
+}
+{
+  "path": "capitalCalls.paidHistorical",
+  "value": "支払済（過去データ）"
+}
+{
+  "path": "capitalCalls.calcNetCall",
+  "value": "計算済みネット出資額"
+}
+{
+  "path": "capitalCalls.allAmountsUsd",
+  "value": "特記なき限り$表示"
+}
+{
+  "path": "capitalCalls.creating",
+  "value": "作成中…"
+}
+{
+  "path": "capitalCalls.createCall",
+  "value": "出資要請を作成"
+}
+{
+  "path": "capitalCalls.newButton",
+  "value": "+ 新規出資要請"
+}
+{
+  "path": "capitalCalls.createFirst",
+  "value": "+ 最初の出資要請を作成"
+}
+{
+  "path": "capitalCalls.statusAll",
+  "value": "すべて"
+}
+{
+  "path": "capitalCalls.statusPending",
+  "value": "承認待ち"
+}
+{
+  "path": "capitalCalls.statusApproved",
+  "value": "承認済"
+}
+{
+  "path": "capitalCalls.statusPaid",
+  "value": "支払済"
+}
+{
+  "path": "capitalCalls.statusCancelled",
+  "value": "キャンセル"
+}
+{
+  "path": "distributions.title",
+  "value": "分配"
+}
+{
+  "path": "distributions.subtitle",
+  "value": "ポートフォリオファンドからの資本返還と収益"
+}
+{
+  "path": "distributions.totalUsd",
+  "value": "受取合計（$）"
+}
+{
+  "path": "distributions.totalJpy",
+  "value": "受取合計（¥）"
+}
+{
+  "path": "distributions.reinvestable",
+  "value": "再投資可能額"
+}
+{
+  "path": "distributions.recallable",
+  "value": "リコール可能残高"
+}
+{
+  "path": "distributions.type",
+  "value": "種類"
+}
+{
+  "path": "distributions.amountUsd",
+  "value": "金額（$）"
+}
+{
+  "path": "distributions.amountJpy",
+  "value": "金額（¥）"
+}
+{
+  "path": "distributions.fxRate",
+  "value": "為替レート"
+}
+{
+  "path": "distributions.recallableCol",
+  "value": "リコール可否"
+}
+{
+  "path": "distributions.recallExpiry",
+  "value": "リコール期限"
+}
+{
+  "path": "distributions.recalled",
+  "value": "リコール済"
+}
+{
+  "path": "distributions.noData",
+  "value": "分配データなし"
+}
+{
+  "path": "distributions.deleteConfirm",
+  "value": "この分配を削除しますか？この操作は元に戻せません。"
+}
+{
+  "path": "distributions.viewOnly",
+  "value": "閲覧モード — 変更は財務部門または管理者にお問い合わせください"
+}
+{
+  "path": "fxRates.title",
+  "value": "為替レート"
+}
+{
+  "path": "fxRates.subtitle",
+  "value": "$ / ¥ — MUFGのTTM過去レート"
+}
+{
+  "path": "fxRates.refreshLive",
+  "value": "レート更新"
+}
+{
+  "path": "fxRates.addRate",
+  "value": "+ レート追加"
+}
+{
+  "path": "fxRates.liveMarket",
+  "value": "市場レート（frankfurter.app）"
+}
+{
+  "path": "fxRates.addMufg",
+  "value": "MUFGのTTMレートを追加"
+}
+{
+  "path": "fxRates.rateHistory",
+  "value": "レート履歴（90日間）"
+}
+{
+  "path": "fxRates.entries",
+  "value": "件"
+}
+{
+  "path": "fxRates.livePairs",
+  "value": "ライブ通貨レート"
+}
+{
+  "path": "fxRates.historicalLookup",
+  "value": "過去レート検索"
+}
+{
+  "path": "fxRates.historicalSub",
+  "value": "指定した日付に記録されたMUFG TTMレートを検索"
+}
+{
+  "path": "fxRates.lookupFetch",
+  "value": "レートを取得"
+}
+{
+  "path": "fxRates.lookupFetching",
+  "value": "取得中…"
+}
+{
+  "path": "fxRates.lookupNearestDay",
+  "value": "最近の取引日"
+}
+{
+  "path": "fxRates.lookupNoRate",
+  "value": "この日付のMUFG TTMレートは未登録です — 「+ レート追加」で登録してください"
+}
+{
+  "path": "fxRates.noHistory",
+  "value": "レート履歴なし"
+}
+{
+  "path": "fxRates.saveRate",
+  "value": "保存"
+}
+{
+  "path": "fxRates.saving",
+  "value": "保存中…"
+}
+{
+  "path": "fxRates.saved",
+  "value": "レートを保存しました"
+}
+{
+  "path": "fxRates.dateLabel",
+  "value": "日付"
+}
+{
+  "path": "fxRates.rateLabel",
+  "value": "$/ ¥レート"
+}
+{
+  "path": "fxRates.equalsLabel",
+  "value": "1$ ="
+}
+{
+  "path": "fxRates.sourceLabel",
+  "value": "ソース"
+}
+{
+  "path": "fxRates.viewOnly",
+  "value": "閲覧モード — レートの追加は管理者にお問い合わせください"
+}
+{
+  "path": "fxRates.murcWarningTitle",
+  "value": "本日のMUFG TTMレートはまだ公表されていません"
+}
+{
+  "path": "fxRates.murcWarningBody",
+  "value": "MURCは毎日午前11時（JST）以降に公式レートを公表します。直近の保存済みレートを表示中"
+}
+{
+  "path": "fxRates.fetchToday",
+  "value": "本日のレートを取得"
+}
+{
+  "path": "fxRates.latestRate",
+  "value": "最新の保存済みレート"
+}
+{
+  "path": "fxRates.autoLoaded",
+  "value": "DBから自動読み込み"
+}

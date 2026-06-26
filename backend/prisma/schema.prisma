@@ -79,6 +79,7 @@ model Fund {
   wireSwift             String?   @map("wire_swift")
   wireReference         String?   @map("wire_reference")
   notes                 String?
+  aiExtractionTemplate  Json?     @map("ai_extraction_template")
   isActive              Boolean   @default(true) @map("is_active")
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
@@ -416,4 +417,106 @@ model Notification {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("notifications")
+}
+
+// ── Fund Onboarding: AI-driven fund discovery & template creation ────────────
+
+model FundTemplate {
+  id              String    @id @default(uuid())
+  templateName    String    // Display name: "Goldman Sachs Vintage XXII"
+  fundKey         String    @unique // Machine key: "goldman-sachs-vintage-22"
+  manager         String?
+  fundNameJp      String?   @map("fund_name_jp")
+  strategy        String?
+  extractionSchema Json    // { B_label: string, C_label: string, D_label: string, ... }
+
+  sampleCount     Int       @default(1) @map("sample_count")
+  lastUpdated     DateTime  @updatedAt @map("last_updated")
+  confidence      Float     @default(0.75) // 0-1 confidence score
+
+  pdfLabels       PdfLabel[]
+
+  createdBy       String?   @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@map("fund_templates")
+}
+
+model PdfLabel {
+  id              String    @id @default(uuid())
+  templateId      String    @map("template_id")
+  template        FundTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  fileName        String    @map("file_name")
+  fileHash        String    // SHA256 of PDF content
+
+  // Extracted values on this specific PDF
+  values          Json      // { B: 1000000, C: 500000, D: 250000, ... }
+  extractionDate  DateTime  @map("extraction_date")
+  extractedBy     String?   @map("extracted_by")
+
+  pdfStoragePath  String?   @map("pdf_storage_path")
+  validationLog   Json?     @map("validation_log")
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([templateId])
+  @@index([fileHash])
+  @@map("pdf_labels")
+}
+
+model OnboardingSession {
+  id              String    @id @default(uuid())
+
+  fileName        String    @map("file_name")
+  fileHash        String    @unique @map("file_hash")
+
+  currentStep     Int       @default(1) @map("current_step")
+
+  fundKey         String?   @map("fund_key")
+  fundDisplayName String?   @map("fund_display_name")
+  reportType      String?   @map("report_type")
+  aiConfidence    Float?    @map("ai_confidence")
+
+  extractedValues Json?     @map("extracted_values")
+  userEditedValues Json?    @map("user_edited_values")
+
+  calculatedValues Json?    @map("calculated_values")
+
+  validationResults Json?   @map("validation_results")
+
+  templateId      String?   @map("template_id")
+  isNewTemplate   Boolean   @default(false) @map("is_new_template")
+
+  status          String    @default("in_progress")
+  errorMessage    String?   @map("error_message")
+
+  userId          String?   @map("user_id")
+  userEmail       String?   @map("user_email")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([fileHash])
+  @@index([userEmail])
+  @@index([status])
+  @@map("onboarding_sessions")
+}
+
+model CorrectionFeedback {
+  id              String    @id @default(uuid())
+  sessionId       String    @map("session_id")
+
+  correctedFields String[]  @map("corrected_fields")
+  originalValues  Json      @map("original_values")
+  correctedValues Json      @map("corrected_values")
+
+  feedback        String?
+
+  accepted        Boolean   @default(false)
+  aiAnalysis      Json?     @map("ai_analysis")
+
+  createdBy       String?   @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@map("correction_feedback")
 }

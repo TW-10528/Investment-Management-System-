@@ -45,13 +45,18 @@ interface ReportRow {
 /* ── KPI card ─────────────────────────────────────────────────────────────── */
 function KpiCard({ label, value, full, sub, color = C.indigo, bg = C.indigoBg, bdr = C.indigoBdr }:
   { label:string; value:string; full?:string; sub?:string; color?:string; bg?:string; bdr?:string }) {
+  const getValueSize = (val: string) => {
+    if (val.length > 20) return 'text-base';
+    if (val.length > 15) return 'text-lg';
+    return 'text-2xl';
+  };
   return (
-    <div className="theme-card border rounded-xl p-4" style={{ borderColor: bdr, background: bg }}
+    <div className="theme-card border rounded-xl p-4 flex flex-col h-full" style={{ borderColor: bdr, background: bg }}
          title={full ? `${label}: ${full}` : undefined}>
       <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-1.5">{label}</p>
-      <p className="text-xl font-bold tabular-nums leading-none" style={{ color }}>{value}</p>
-      {full && <p className="text-[11px] font-semibold tabular-nums theme-text mt-1">{full}</p>}
-      {sub && <p className="text-[10px] theme-text-muted mt-0.5">{sub}</p>}
+      <p className={`${getValueSize(value)} font-bold tabular-nums leading-tight break-words flex-shrink-0`} style={{ color }}>{value}</p>
+      {full && <p className="text-[11px] font-semibold tabular-nums theme-text mt-2 flex-grow">{full}</p>}
+      {sub && <p className="text-[10px] theme-text-muted mt-auto pt-1">{sub}</p>}
     </div>
   );
 }
@@ -249,7 +254,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
       {/* ── Portfolio summary — metric tiles ── */}
       <div>
         <h2 className="text-sm font-bold theme-text mb-3">Portfolio Summary</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3 auto-rows-fr">
         <KpiCard label="Total Commitments"   value={fmt.usdFull(data.total_commitment_usd)} sub={`${data.total_funds} funds`} />
         <KpiCard label="Total Contributions" value={fmt.usdFull(data.total_called_usd)}     sub={pct(data.drawn_pct) + ' drawn'} />
         <KpiCard label="Total Distributions" value={fmt.usdFull(data.total_received_usd)}   sub={`DPI ${data.dpi.toFixed(2)}×`} color={C.emerald} bg={C.emeraldBg} bdr={C.emeraldBdr} />

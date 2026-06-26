@@ -35,3 +35,5 @@ services:
 
 volumes:
   ims_pgdata3:
+    external: true
+    name: inv_ims_pgdata3

@@ -45,29 +45,22 @@ const DEFAULTS: Prefs = {
 
 const VALID_LANGS: LangCode[] = ['en', 'ja'];
 
-function detectBrowserLang(): LangCode {
-  const langs: readonly string[] = navigator.languages?.length
-    ? navigator.languages
-    : [navigator.language ?? 'en'];
-  for (const lang of langs) {
-    const l = lang.toLowerCase();
-    if (l.startsWith('ja')) return 'ja';
-    if (l.startsWith('en')) return 'en';
-  }
-  return 'en';
-}
-
 function load(): Prefs {
   try {
     const raw = localStorage.getItem('ims_prefs');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (!VALID_LANGS.includes(parsed.language)) parsed.language = detectBrowserLang();
-      return { ...DEFAULTS, ...parsed, theme: 'light' };   // force light — dark removed
+      console.log('🔧 [load] localStorage has language:', parsed.language);
+      // STRICT: Only accept saved language if it's valid. Never override with browser lang.
+      if (VALID_LANGS.includes(parsed.language)) {
+        console.log('✅ [load] using saved language:', parsed.language);
+        return { ...DEFAULTS, ...parsed, theme: 'light' };
+      }
     }
   } catch { /* ignore */ }
-  // No saved prefs → auto-detect from browser
-  return { ...DEFAULTS, language: detectBrowserLang() };
+  // No valid saved prefs → use default English (NOT browser detection)
+  console.log('❌ [load] no valid saved language, defaulting to en');
+  return { ...DEFAULTS, language: 'en' };
 }
 
 function save(p: Prefs) {
@@ -81,40 +74,23 @@ export const PrefsCtx = createContext<PrefsCtx>({} as PrefsCtx);
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<Prefs>(load);
 
-  // Dark theme removed — always keep the app in light mode
+  // Initialize theme
   useEffect(() => {
     document.documentElement.classList.remove('dark');
   }, []);
 
-  // Apply language — i18n for keyed strings + Google Translate for everything else
+  // Sync language to i18n whenever it changes (including mount)
   useEffect(() => {
-    i18n.changeLanguage(prefs.language);
-
-    const langMap: Record<string, string> = {
-      en: 'en', ja: 'ja',
-    };
-    const target = langMap[prefs.language] ?? 'en';
-
-    if (target === 'en') {
-      // Restore original — remove googtrans cookie and reload
-      document.cookie = 'googtrans=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'googtrans=; path=/; domain=' + window.location.hostname + '; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      if (document.documentElement.lang !== 'en') window.location.reload();
-    } else {
-      // Set googtrans cookie so Google Translate activates on next render
-      const val = `/en/${target}`;
-      document.cookie = `googtrans=${val}; path=/`;
-      document.cookie = `googtrans=${val}; path=/; domain=${window.location.hostname}`;
-      // Trigger translation via the hidden widget element
-      const sel = document.querySelector<HTMLSelectElement>('.goog-te-combo');
-      if (sel) {
-        sel.value = target;
-        sel.dispatchEvent(new Event('change'));
-      } else {
-        // Widget not ready yet — reload so it picks up the cookie
-        window.location.reload();
+    const updateLanguage = async () => {
+      try {
+        console.log('🔄 [useEffect] prefs.language is:', prefs.language, '| i18n.language was:', i18n.language);
+        await i18n.changeLanguage(prefs.language);
+        console.log('✅ [useEffect] i18n.language is now:', i18n.language);
+      } catch (err) {
+        console.error('❌ [useEffect] Failed to change language:', err);
       }
-    }
+    };
+    updateLanguage();
   }, [prefs.language]);
 
   function update(patch: Partial<Prefs>) {

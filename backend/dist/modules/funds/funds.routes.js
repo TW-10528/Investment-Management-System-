@@ -1,5 +1,38 @@
 "use strict";
 // Funds module — /api/v1/funds
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -723,6 +756,59 @@ router.patch('/:id/nav-records/:nId', async (c) => {
 router.delete('/:id/nav-records/:nId', async (c) => {
     await prisma_1.prisma.navRecord.delete({ where: { id: c.req.param('nId') } });
     return c.json({ ok: true });
+});
+// ── Unknown Fund Extraction & Creation ──────────────────────────────────────
+// POST /extract-unknown-fund
+// Extract fund data from PDF for unknown fund
+router.post('/extract-unknown-fund', async (c) => {
+    try {
+        const { extractUnknownFundData } = await Promise.resolve().then(() => __importStar(require('./unknown-fund-extractor')));
+        const body = await c.req.parseBody();
+        const fileField = body['file'];
+        if (!fileField || typeof fileField === 'string') {
+            return c.json({ detail: 'No PDF file uploaded' }, 400);
+        }
+        const file = fileField;
+        const buffer = Buffer.from(await file.arrayBuffer());
+        // Extract data
+        const extracted = await extractUnknownFundData(buffer, file.name);
+        return c.json({
+            extractedData: extracted,
+            status: 'success',
+        });
+    }
+    catch (err) {
+        console.error('[funds] Extraction error:', err);
+        return c.json({ detail: err.message || 'Extraction failed' }, 500);
+    }
+});
+// POST /create-from-extraction
+// Create fund from extracted data with auto-processing
+router.post('/create-from-extraction', async (c) => {
+    try {
+        const { createFundFromExtraction } = await Promise.resolve().then(() => __importStar(require('./fund-creation-service')));
+        const reqData = await c.req.json();
+        const userEmail = c.req.header('X-User-Email');
+        const result = await createFundFromExtraction({
+            ...reqData,
+            userEmail,
+        });
+        // Log audit
+        if (userEmail) {
+            await (0, auditService_1.logAction)('create_fund_from_extraction', 'funds', result.fund.id, userEmail, undefined, result.fund);
+        }
+        return c.json({
+            fund: result.fund,
+            fundReport: result.fundReport,
+            capitalCall: result.capitalCall,
+            distribution: result.distribution,
+            status: 'created',
+        });
+    }
+    catch (err) {
+        console.error('[funds] Creation error:', err);
+        return c.json({ detail: err.message || 'Fund creation failed' }, 500);
+    }
 });
 exports.default = router;
 //# sourceMappingURL=funds.routes.js.map
