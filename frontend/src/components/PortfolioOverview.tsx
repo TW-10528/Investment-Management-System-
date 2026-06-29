@@ -38,6 +38,7 @@ interface ReportRow {
   fund_id: string;
   fund_name: string;
   fund_name_jp?: string;
+  manager?: string;
   dueDate?: string;   ttmDue?: number;   contribUsd?: number;
   distDate?: string;  ttmDist?: number;  distUsd?: number;
 }
@@ -204,7 +205,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
         const lastCall = calls[calls.length - 1];
         const lastDist = dists[dists.length - 1];
         return {
-          fund_id: f.fund_id, fund_name: f.fund_name, fund_name_jp: f.fund_name_jp,
+          fund_id: f.fund_id, fund_name: f.fund_name, fund_name_jp: f.fund_name_jp, manager: f.manager,
           dueDate:  lastCall?.date, contribUsd: lastCall?.capital_paid_in,  ttmDue:  lastCall?.fx_rate,
           distDate: lastDist?.date, distUsd:    lastDist?.capital_received,  ttmDist: lastDist?.fx_rate,
         };
@@ -341,7 +342,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
             <thead className="border-b theme-divider" style={{ background: 'var(--color-header-bg)' }}>
               <tr>
                 {[
-                  { label: 'Fund',              left: true  },
+                  { label: 'Fund & Manager',    left: true  },
                   { label: 'Commitment',        left: false },
                   { label: 'Contribution',      left: false },
                   { label: 'Distribution',      left: false },
@@ -366,6 +367,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                         className="font-semibold theme-text hover:text-indigo-600 text-sm transition-colors text-left">
                         {f.fund_name}
                       </button>
+                      {f.manager && <p className="text-[10px] theme-text-muted mt-0.5">{f.manager}</p>}
                       {f.fund_name_jp && <p className="text-[10px] theme-text-muted mt-0.5">{f.fund_name_jp}</p>}
                     </td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{yen(jpy(f.commitment_usd))}</td>
@@ -413,6 +415,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
             <thead className="border-b theme-divider" style={{ background: 'var(--color-header-bg)' }}>
               <tr className="text-[10px] uppercase tracking-wide font-semibold theme-text-muted">
                 <th className="px-5 py-3 text-left whitespace-nowrap min-w-[180px]">Fund</th>
+                <th className="px-4 py-3 text-left whitespace-nowrap">Manager</th>
                 <th className="px-4 py-3 text-left  whitespace-nowrap border-l theme-divider" style={{ color: C.indigo,  background: C.indigoBg }}>Call Due Date</th>
                 <th className="px-4 py-3 text-right whitespace-nowrap" style={{ color: C.indigo,  background: C.indigoBg }}>TTM @ Due</th>
                 <th className="px-4 py-3 text-right whitespace-nowrap" style={{ color: C.indigo,  background: C.indigoBg }}>Call USD</th>
@@ -446,6 +449,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                       </button>
                       {r.fund_name_jp && <p className="text-[10px] theme-text-muted mt-0.5">{r.fund_name_jp}</p>}
                     </td>
+                    <td className="px-4 py-3 text-sm theme-text-muted">{r.manager || '—'}</td>
                     {/* Capital call */}
                     <td className="px-4 py-3 text-left theme-text-muted whitespace-nowrap border-l theme-divider">{r.dueDate ? fmt.date(r.dueDate) : '—'}</td>
                     <td className="px-4 py-3 text-right tabular-nums theme-text-muted">{r.ttmDue ? r.ttmDue.toFixed(2) : '—'}</td>
@@ -478,6 +482,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                 <tfoot className="border-t theme-divider" style={{ background: 'rgba(30,64,175,0.03)' }}>
                   <tr>
                     <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">All Funds · Total</td>
+                    <td className="px-4 py-2.5"></td>
                     <td className="px-4 py-2.5 border-l theme-divider"></td>
                     <td className="px-4 py-2.5"></td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{usd(cUsd)}</td>
