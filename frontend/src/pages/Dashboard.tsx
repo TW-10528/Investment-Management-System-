@@ -236,7 +236,8 @@ export default function Dashboard() {
               <thead className="border-b theme-divider" style={{ background: 'var(--color-header-bg)' }}>
                 <tr>
                   {[
-                    { label: 'Fund & Manager', left: true  },
+                    { label: 'Fund Name',     left: true  },
+                    { label: 'Fund Manager',  left: true  },
                     { label: 'Commitment',    left: false },
                     { label: 'Contributions', left: false },
                     { label: 'Distributions', left: false },
@@ -255,9 +256,9 @@ export default function Dashboard() {
                     <tr key={f.fund_id} className="theme-row-hover transition-colors">
                       <td className="px-5 py-3">
                         <Link to={`/funds?fund=${f.fund_id}`} className="font-semibold theme-text hover:text-indigo-600 text-sm transition-colors">{f.fund_name}</Link>
-                        {f.manager && <p className="text-[10px] theme-text-muted mt-0.5">{f.manager}</p>}
                         {f.fund_name_jp && <p className="text-[10px] theme-text-muted mt-0.5">{f.fund_name_jp}</p>}
                       </td>
+                      <td className="px-4 py-3 text-sm theme-text">{f.manager || '—'}</td>
                       <td className="px-4 py-3 text-right tabular-nums theme-text">{fmt.usdFull(f.contract_commitment_usd ?? f.commitment_usd)}</td>
                       <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.indigo }}>{fmt.usdFull(f.total_called_usd)}</td>
                       <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.emerald }}>{fmt.usdFull(f.total_received_usd)}</td>
@@ -270,6 +271,7 @@ export default function Dashboard() {
               <tfoot className="border-t theme-divider" style={{ background: 'rgba(99,102,241,0.03)' }}>
                 <tr>
                   <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">Total</td>
+                  <td className="px-4 py-2.5"></td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{fmt.usdFull(data.total_commitment_usd)}</td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{fmt.usdFull(data.total_called_usd)}</td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.emerald }}>{fmt.usdFull(data.total_received_usd)}</td>

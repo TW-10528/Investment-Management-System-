@@ -18,8 +18,8 @@ fi
 echo "→ Stopping any previous instances..."
 lsof -ti:8004 | xargs kill -9 2>/dev/null || true
 lsof -ti:8005 | xargs kill -9 2>/dev/null || true
+lsof -ti:5176 | xargs kill -9 2>/dev/null || true
 lsof -ti:5175 | xargs kill -9 2>/dev/null || true
-lsof -ti:5174 | xargs kill -9 2>/dev/null || true
 
 # ── Ensure Postgres is running ────────────────────────────────────────────────
 echo "→ Ensuring PostgreSQL is running..."
@@ -31,13 +31,14 @@ done
 echo "  PostgreSQL ready"
 
 # ── Backend (Hono + Node) ─────────────────────────────────────────────────────
-echo "→ Starting backend (Hono on port 8004)..."
+echo "→ Starting backend (Hono on port 8005)..."
 cd "$ROOT/backend"
 npm run dev > /tmp/ims-backend3.log 2>&1 &
 BACKEND_PID=$!
 
 for i in $(seq 1 15); do
-  if curl -s http://127.0.0.1:8004/health > /dev/null 2>&1; then
+  if curl -s http://127.0.0.1:8005/health > /dev/null 2>&1 || \
+     curl -sk https://127.0.0.1:8005/health > /dev/null 2>&1; then
     echo "  Backend ready (PID $BACKEND_PID)"
     break
   fi
@@ -45,17 +46,21 @@ for i in $(seq 1 15); do
 done
 
 # ── Frontend (Vite) ───────────────────────────────────────────────────────────
-echo "→ Starting frontend (Vite on port 5175)..."
+echo "→ Starting frontend (Vite on port 5176)..."
 cd "$ROOT/frontend"
-npm run dev -- --port 5175 > /tmp/ims-frontend3.log 2>&1 &
+npm run dev > /tmp/ims-frontend3.log 2>&1 &
 FRONTEND_PID=$!
 sleep 3
 
 echo ""
 echo "═══════════════════════════════════════════════════════"
-echo "  App:      http://localhost:5175"
-echo "  API:      http://localhost:8004/api/v1"
-echo "  Health:   http://localhost:8004/health"
+echo "  App:      http://localhost:5176"
+echo "  API:      http://localhost:8005/api/v1"
+echo "  Health:   http://localhost:8005/health"
+echo ""
+echo "  Production:"
+echo "  App:      https://investment-mgmt.twave.co.jp"
+echo "  API:      https://investment-mgmt.twave.co.jp/api/v1"
 echo ""
 echo "  Admin:    admin@thirdwave.co.jp  / Admin123!"
 echo "═══════════════════════════════════════════════════════"

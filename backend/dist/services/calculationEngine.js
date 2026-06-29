@@ -180,7 +180,6 @@ class CalculationEngine {
             })),
         ];
         if (txns.length === 0) {
-            const c = parseFloat(commitment.toString());
             return {
                 fund_id: fund.id,
                 fund_name: fund.fundName,
@@ -189,14 +188,14 @@ class CalculationEngine {
                 strategy: fund.strategy,
                 vintage_year: fund.vintageYear,
                 currency: fund.currency,
-                commitment_usd: c,
+                commitment_usd: 0,
                 total_called_usd: 0,
                 total_received_usd: 0,
                 total_called_jpy: 0,
                 total_received_jpy: 0,
                 drawn_pct: 0,
-                unfunded_usd: c,
-                investment_capacity: c,
+                unfunded_usd: 0,
+                investment_capacity: 0,
                 net_cash_position: 0,
                 nav_usd: navUsd,
                 total_value_usd: navUsd,

@@ -1,5 +1,5 @@
 "use strict";
-// Hamilton Lane Strategic Opportunities Fund IX-B LP — extraction module.
+// Strategic Opportunities Fund IX — extraction module.
 //
 // Faithful TypeScript port of the reference Python module
 // `hamilton_strategic_opportunities_module.py`.
@@ -143,7 +143,7 @@ function findCompanyName(text) {
     const investor = text.match(/Investor:\s*([^\n]+)/i);
     if (investor)
         return investor[1].trim().split(/\s+/).join(' ');
-    const m = text.match(/Hamilton Lane Strategic Opportunities Fund IX-B LP\s*\n\s*([A-Za-z0-9 .,&'-]+?)\s*\n\s*Current Transaction Detail/i);
+    const m = text.match(/Strategic Opportunities Fund IX\s*\n\s*([A-Za-z0-9 .,&'-]+?)\s*\n\s*Current Transaction Detail/i);
     if (m)
         return m[1].trim().split(/\s+/).join(' ');
     return null;
@@ -547,10 +547,10 @@ function extractHamiltonStrategicReport(rawText, fileName = '', previousState = 
     return {
         source_file_name: fileName,
         extraction_status: 'success',
-        module_name: 'hamilton_strategic_opportunities_fund_ix_b',
+        module_name: 'hamilton_strategic_opportunities_fund_ix',
         document_type: documentType,
         company_name: findCompanyName(text),
-        fund_name: 'Hamilton Lane Strategic Opportunities Fund IX-B LP',
+        fund_name: 'Strategic Opportunities Fund IX',
         currency: detectCurrency(text),
         excel_fields: excelFields,
         all_extracted_fields: allFields,

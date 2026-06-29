@@ -1,5 +1,5 @@
 /**
- * Idempotent add — Hamilton Lane Secondary Fund VI-B LP.
+ * Idempotent add — Secondary Fund VI-B.
  *
  * Adds the Hamilton Lane fund record so uploaded Hamilton capital-call /
  * distribution notices can auto-resolve (fundParsers/fund-resolver.ts) and show as
@@ -11,11 +11,11 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-const FUND_NAME = 'Hamilton Lane Secondary Fund VI-B LP'
+const FUND_NAME = 'Hamilton Lane Secondary Fund VI-B'
 
 async function main() {
   const existing = await prisma.fund.findFirst({
-    where: { fundName: { contains: 'Hamilton Lane Secondary Fund', mode: 'insensitive' } },
+    where: { fundName: { contains: 'Secondary Fund VI-B', mode: 'insensitive' } },
   })
 
   if (existing) {
@@ -26,7 +26,7 @@ async function main() {
   const fund = await prisma.fund.create({
     data: {
       fundName:      FUND_NAME,
-      manager:       'Hamilton Lane Advisors, L.L.C.',
+      manager:       'Hamilton Lane',
       administrator: 'Hamilton Lane',
       strategy:      'Secondaries',
       vintageYear:   2024,

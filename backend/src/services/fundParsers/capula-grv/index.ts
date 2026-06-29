@@ -54,7 +54,8 @@ export function parseCapulaGrv(
 
   return {
     fundKey:          'capula-grv',
-    fundName:         report.fund_name,
+    fundName:         'Capula Global Relative Fund',
+    fundManager:      'Capula Investment Management',
     noticeType,
     noticeDate,
     dueDate,

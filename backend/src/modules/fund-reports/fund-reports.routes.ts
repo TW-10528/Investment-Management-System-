@@ -570,7 +570,7 @@ router.post('/upload', async (c) => {
   // SDG and Siguler Guff are excluded: their commitment is entered manually in
   // fund settings — not extracted from any document.
   const FUNDS_WITH_COMMITMENT_IN_REPORT = [
-    'nb-real-estate', 'hamilton-lane', 'hamilton-strategic', 'dover-street', 'capula-grv', 'goldman-sachs',
+    'nb-real-estate', 'hamilton-lane', 'hamilton-strategic', 'dover-street', 'capula-grv', 'goldman-sachs', 'siguler-guff',
   ]
   if (FUNDS_WITH_COMMITMENT_IN_REPORT.includes(parsed.fundKey) && (parsed.commitmentUsd ?? 0) > 0) {
     const currentCommitment = parseFloat(resolvedFund.commitmentUsd.toString())
@@ -595,11 +595,35 @@ router.post('/upload', async (c) => {
     console.error('[fund-reports/upload] notify failed (non-fatal):', e)
   }
 
+  const extracted = (notice.extractedData as any) ?? {}
   return c.json({
     ...reportDict(notice),
-    fund_id:   resolvedFund.id,
-    fund_name: resolvedFund.fundName,
-    created,
+    fund_code:   resolvedFund.fundName.toLowerCase().replace(/\s+/g, '-'),
+    commitment:  parseFloat(resolvedFund.commitmentUsd.toString()) || 0,
+    file_saved:  notice.filename,
+    call_created: !!created.callId || !!created.distId,
+    this_call: created.callId ? {
+      notice_date:    extracted.noticeDate ?? new Date().toISOString(),
+      due_date:       extracted.dueDate ?? new Date().toISOString(),
+      call_pct:       extracted.callPct ?? 0,
+      cumulative_pct: (extracted.cumCallPct || extracted.cumulativeDrawnPct) ?? 0,
+      net_call_usd:   extracted.netCallUsd ?? 0,
+      is_initial:     !!(extracted.isInitialCall ?? false),
+    } : undefined,
+    analysis: {
+      pdf_count: 1,
+      totals: {
+        cumulative_drawn:    extracted.cumulativeDrawnPct ?? 0,
+        investment_capacity: parseFloat(resolvedFund.commitmentUsd.toString()) || 0,
+        net_cash_flow:       (extracted.netCallUsd || 0) - (extracted.distributionUsd || 0),
+        non_recallable_dist: extracted.distributionUsd ?? 0,
+      },
+      calls: created.callId ? [{
+        id: created.callId,
+        notice_date: extracted.noticeDate,
+        due_date: extracted.dueDate,
+      }] : [],
+    },
   }, 201)
 })
 

@@ -160,11 +160,36 @@ router.post('/upload', async (c) => {
 
   if (!file || typeof file === 'string') return c.json({ detail: 'No file uploaded' }, 400)
 
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const fileSize = buffer.length
+
+  // ── Deduplication check: filename + file size (Option C)
+  const existingNotice = await prisma.notice.findFirst({
+    where: {
+      originalName: file.name,
+      filename: { contains: `_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}` },
+    },
+  })
+
+  if (existingNotice) {
+    // Check if file size matches (to avoid false positives on same filename different content)
+    const existingFilepath = path.join(config.uploadDir, existingNotice.filename)
+    if (fs.existsSync(existingFilepath)) {
+      const existingStats = fs.statSync(existingFilepath)
+      if (existingStats.size === fileSize) {
+        return c.json({
+          detail: 'File already uploaded (duplicate detected)',
+          existing_notice_id: existingNotice.id,
+          ...noticeDict(existingNotice),
+        }, 409)
+      }
+    }
+  }
+
   if (!fs.existsSync(config.uploadDir)) fs.mkdirSync(config.uploadDir, { recursive: true })
   const safe     = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
   const filename = `${Date.now()}_${safe}`
   const filepath = path.join(config.uploadDir, filename)
-  const buffer   = Buffer.from(await file.arrayBuffer())
   fs.writeFileSync(filepath, buffer)
 
   // Try fund-specific parser first; fall back to generic parser
@@ -180,7 +205,16 @@ router.post('/upload', async (c) => {
     // Auto-resolve fundId if not manually supplied
     if (!resolvedFundId) {
       const resolved = await resolveFund(fundParsed.fundKey)
-      if (resolved) resolvedFundId = resolved.id
+      if (resolved) {
+        resolvedFundId = resolved.id
+        // Update fund with manager info from PDF if not already set
+        if (fundParsed.fundManager && !resolved.fundName?.includes('Unknown')) {
+          await prisma.fund.update({
+            where: { id: resolved.id },
+            data: { manager: fundParsed.fundManager },
+          }).catch(() => {}) // Silently ignore if update fails
+        }
+      }
     }
   } else {
     // Unknown fund — fall back to generic parser
@@ -215,18 +249,71 @@ router.post('/upload', async (c) => {
       filename,
       originalName:  file.name,
       noticeType:    finalNoticeType,
-      status:        'pending',
+      status:        'approved',
       fundId:        resolvedFundId,
       extractedData: { ...extractedData, _source: 'notice_page' } as any,
       confidence:    extractedData.confidence ?? null,
       uploadedBy:    user.email,
+      approvedAt:    new Date(),
     },
   })
 
+  // Auto-process the notice for capital calls and distributions
+  if (resolvedFundId) {
+    const data = (notice.extractedData as any) ?? {}
+
+    if (notice.noticeType === 'capital_call') {
+      const latestFx = await prisma.fxRate.findFirst({ orderBy: { rateDate: 'desc' } })
+      const fx = data.fxRate ?? (latestFx ? parseFloat(latestFx.usdJpy.toString()) : 150)
+      const grossUsd = parseFloat(String(data.grossCallUsd ?? 0))
+      const netUsd = parseFloat(String(data.netCallUsd ?? grossUsd))
+      const reinvest = parseFloat(String(data.reinvestableUsd ?? 0))
+      const callPct = parseFloat(String(data.callPct ?? 0))
+      const netJpy = Math.round(netUsd * parseFloat(String(fx)))
+      const dueDate = data.dueDate ? new Date(data.dueDate) : new Date()
+      const noticeDate = data.noticeDate ? new Date(data.noticeDate) : new Date()
+
+      const existing = await prisma.capitalCall.findFirst({ where: { fundId: resolvedFundId, dueDate } })
+      if (!existing) {
+        const last = await prisma.capitalCall.findFirst({ where: { fundId: resolvedFundId }, orderBy: { callNumber: 'desc' } })
+        const callNum = (last?.callNumber ?? 0) + 1
+        await prisma.capitalCall.create({
+          data: {
+            fundId: resolvedFundId, noticeDate, dueDate, callNumber: callNum, callPct,
+            grossCallUsd: grossUsd, netCallUsd: netUsd, reinvestableUsd: reinvest,
+            investmentAmountUsd: grossUsd,
+            managementFeeUsd: parseFloat(String(data.managementFeeUsd ?? 0)),
+            expenseUsd: parseFloat(String(data.expenseUsd ?? 0)),
+            netCallJpy: netJpy, fxRate: fx,
+            wireReference: data.wireReference ?? null,
+            status: 'approved',
+          },
+        })
+      }
+    } else if (notice.noticeType === 'distribution') {
+      const latestFx = await prisma.fxRate.findFirst({ orderBy: { rateDate: 'desc' } })
+      const fx = data.fxRate ?? (latestFx ? parseFloat(latestFx.usdJpy.toString()) : 150)
+      const fxNum = parseFloat(String(fx))
+      const distDate = data.distributionDate ? new Date(data.distributionDate) : new Date()
+      const total = data.distributionUsd ?? 0
+      const reinvest = data.reinvestableUsd ?? 0
+
+      if (total > 0) {
+        await prisma.distribution.create({
+          data: {
+            fundId: resolvedFundId, distributionDate: distDate, distType: 'Distribution',
+            amountUsd: total, amountJpy: Math.round(total * fxNum), fxRate: fx,
+            reinvestableUsd: reinvest, isRecallable: false,
+          },
+        })
+      }
+    }
+  }
+
   await notifyAllAdmins({
     type:    'notice_uploaded',
-    title:   'New Notice Pending Review',
-    message: `${user.email} uploaded a ${finalNoticeType.replace('_', ' ')} notice for ${extractedData.fundName ?? 'unknown fund'} (${extractedData.confidenceGrade ?? 'low'} confidence).`,
+    title:   'Notice Uploaded & Auto-Approved',
+    message: `${user.email} uploaded a ${finalNoticeType.replace('_', ' ')} notice for ${extractedData.fundName ?? 'unknown fund'}. Automatically processed.`,
     link:    '/notices',
     metadata: { notice_id: notice.id, fund_key: extractedData.fundKey ?? null },
   })

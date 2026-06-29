@@ -10,6 +10,7 @@ export interface InvestmentTarget {
 export interface ParsedFundNotice {
     fundKey: string;
     fundName: string;
+    fundManager?: string;
     noticeType: 'capital_call' | 'distribution' | 'capital_and_distribution' | 'financial_statement';
     noticeDate: string;
     dueDate: string;

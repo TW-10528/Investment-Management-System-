@@ -59,7 +59,8 @@ export function parseGoldmanSachs(
 
   return {
     fundKey:          'goldman-sachs',
-    fundName:         report.fund_name,
+    fundName:         'Vintage X(Flagship)',
+    fundManager:      'Goldman Sachs',
     noticeType:       'capital_call',
     noticeDate,
     dueDate,

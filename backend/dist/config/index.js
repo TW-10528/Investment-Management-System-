@@ -22,7 +22,7 @@ exports.config = {
     secretKey: get('SECRET_KEY', 'change-this-in-production'),
     accessTokenExpireMinutes: getInt('ACCESS_TOKEN_EXPIRE_MINUTES', 480),
     // CORS
-    allowedOrigins: get('ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:5174,http://localhost:3000').split(',').map(s => s.trim()),
+    allowedOrigins: get('ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:5174,http://localhost:3000,https://investment-mgmt.twave.co.jp').split(',').map(s => s.trim()),
     // Email / OTP
     smtpHost: get('SMTP_HOST', 'smtp.office365.com'),
     smtpPort: getInt('SMTP_PORT', 587),

@@ -1,5 +1,5 @@
 /**
- * Idempotent add — Dover Street XI Feeder Fund L.P.
+ * Idempotent add — Dover Street XI.
  *
  * Adds the fund record so uploaded Dover notices auto-resolve
  * (fundParsers/fund-resolver.ts) and show as their own section on the Funds page —
@@ -11,7 +11,7 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-const FUND_NAME = 'Dover Street XI Feeder Fund L.P.'
+const FUND_NAME = 'Dover Street XI'
 
 async function main() {
   const existing = await prisma.fund.findFirst({
@@ -26,8 +26,8 @@ async function main() {
   const fund = await prisma.fund.create({
     data: {
       fundName:      FUND_NAME,
-      manager:       'HarbourVest Partners',
-      administrator: 'HarbourVest Partners',
+      manager:       'HarbourVest',
+      administrator: 'HarbourVest',
       strategy:      'Secondaries',
       vintageYear:   2024,
       currency:      'USD',

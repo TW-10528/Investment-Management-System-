@@ -1,4 +1,4 @@
-// Dover Street XI Feeder Fund L.P. — extraction module.
+// Dover Street XI — extraction module.
 //
 // Faithful TypeScript port of the reference Python module `dover_street_xi_module.py`.
 //
@@ -457,7 +457,7 @@ function mapToExcelFields(a: DoverAllFields, breakdown: DoverBreakdown): DoverEx
 
   const currentTransactionCashFlow = calculateCurrentTransactionCashFlow(b, c)
 
-  const remarksParts = ['Dover Street XI Feeder Fund transaction notice.']
+  const remarksParts = ['Dover Street XI transaction notice.']
   if (a.is_initial_contribution) remarksParts.push('Initial contribution notice. Total interest is extracted separately and excluded from Excel capital contribution amount.')
   else if (a.is_cash_distribution) remarksParts.push('Cash distribution notice.')
   else if (a.is_capital_call_deemed_distribution) remarksParts.push('Capital call and deemed distribution notice.')
@@ -646,7 +646,7 @@ function buildValidation(
     },
     needs_review: true,
     warnings: [
-      'This module supports Dover Street XI Feeder Fund L.P. reports.',
+      'This module supports Dover Street XI reports.',
       'Initial contribution interest is extracted separately and not included in Excel capital_contribution_amount. Dover_20240610 page-2 extraction fallback is enabled.',
       'Dover provided Excel uses reinvestable_amount as 0 for the uploaded Dover samples. Space-normalization fix and report-confirmed fallback table for all Dover uploaded rows are enabled.',
       'For accurate DB cumulative flow, upload reports in transaction date order.',
@@ -690,7 +690,7 @@ export function extractDoverStreetReport(
     module_name:          'dover_street_xi_feeder_fund',
     document_type:        documentType,
     company_name:         findCompanyName(text),
-    fund_name:            'Dover Street XI Feeder Fund L.P.',
+    fund_name:            'Dover Street XI',
     currency:             detectCurrency(text),
     excel_fields:         excelFields,
     all_extracted_fields: allFields,

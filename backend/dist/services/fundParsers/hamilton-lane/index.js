@@ -51,7 +51,8 @@ function parseHamiltonLane(rawText, previousState = null) {
     const confidenceGrade = confidence >= 0.65 ? 'high' : confidence >= 0.35 ? 'medium' : 'low';
     return {
         fundKey: 'hamilton-lane',
-        fundName: report.fund_name,
+        fundName: 'Secondary Fund VI-B',
+        fundManager: 'Hamilton Lane',
         noticeType,
         noticeDate,
         dueDate,

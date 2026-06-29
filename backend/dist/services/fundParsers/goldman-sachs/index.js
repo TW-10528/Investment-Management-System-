@@ -55,7 +55,8 @@ function parseGoldmanSachs(rawText, previousState = null) {
     const confidenceGrade = confidence >= 0.65 ? 'high' : confidence >= 0.35 ? 'medium' : 'low';
     return {
         fundKey: 'goldman-sachs',
-        fundName: report.fund_name,
+        fundName: 'Vintage X(Flagship)',
+        fundManager: 'Goldman Sachs',
         noticeType: 'capital_call',
         noticeDate,
         dueDate,

@@ -4,16 +4,16 @@
 import { prisma } from '../../lib/prisma'
 
 // ── Fund key → name search patterns ──────────────────────────────────────────
-// Add the remaining 7 funds here when you provide their PDFs.
+// Patterns match against fund names in the database (case-insensitive)
 const FUND_NAME_PATTERNS: Record<string, string[]> = {
-  'nb-real-estate': ['NB Real Estate Secondary Opportunities', 'NB Real Estate'],
-  'hamilton-lane':  ['Hamilton Lane Secondary Fund'],
-  'hamilton-strategic': ['Hamilton Lane Strategic Opportunities', 'Strategic Opportunities Fund IX'],
-  'dover-street':   ['Dover Street XI', 'Dover Street'],
-  'sdg-lps':        ['SDGs 投資事業有限責任組合', 'SDG'],
-  'goldman-sachs':  ['Vintage X', 'Goldman Sachs'],
-  'siguler-guff':   ['Siguler Guff'],
-  'capula-grv':     ['Capula Global Relative Value Trust', 'Capula'],
+  'nb-real-estate': ['Real Estate Secondary Opportunities Fund II', 'NB Real Estate'],
+  'hamilton-lane':  ['Secondary Fund VI-B'],
+  'hamilton-strategic': ['Strategic Opportunities Fund IX'],
+  'dover-street':   ['Dover Street XI', 'Dover Street XII', 'Dover Street'],
+  'sdg-lps':        ['SDGs投資事業有限責任組合', 'SDG'],
+  'goldman-sachs':  ['Vintage X(Flagship)', 'Vintage X'],
+  'siguler-guff':   ['Small Buyout Opportunities Fund VI'],
+  'capula-grv':     ['Capula Global Relative Fund', 'Capula'],
 }
 
 export interface ResolvedFund {

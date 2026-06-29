@@ -342,7 +342,8 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
             <thead className="border-b theme-divider" style={{ background: 'var(--color-header-bg)' }}>
               <tr>
                 {[
-                  { label: 'Fund & Manager',    left: true  },
+                  { label: 'Fund Name',         left: true  },
+                  { label: 'Fund Manager',      left: true  },
                   { label: 'Commitment',        left: false },
                   { label: 'Contribution',      left: false },
                   { label: 'Distribution',      left: false },
@@ -367,9 +368,9 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                         className="font-semibold theme-text hover:text-indigo-600 text-sm transition-colors text-left">
                         {f.fund_name}
                       </button>
-                      {f.manager && <p className="text-[10px] theme-text-muted mt-0.5">{f.manager}</p>}
                       {f.fund_name_jp && <p className="text-[10px] theme-text-muted mt-0.5">{f.fund_name_jp}</p>}
                     </td>
+                    <td className="px-4 py-3 text-sm theme-text">{f.manager || '—'}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{yen(jpy(f.commitment_usd))}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{yen(jpy(f.total_called_usd))}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.emerald }}>{yen(jpy(f.total_received_usd))}</td>
@@ -414,8 +415,8 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
           <table className="w-full text-sm">
             <thead className="border-b theme-divider" style={{ background: 'var(--color-header-bg)' }}>
               <tr className="text-[10px] uppercase tracking-wide font-semibold theme-text-muted">
-                <th className="px-5 py-3 text-left whitespace-nowrap min-w-[180px]">Fund</th>
-                <th className="px-4 py-3 text-left whitespace-nowrap">Manager</th>
+                <th className="px-5 py-3 text-left whitespace-nowrap min-w-[180px]">Fund Name</th>
+                <th className="px-4 py-3 text-left whitespace-nowrap">Fund Manager</th>
                 <th className="px-4 py-3 text-left  whitespace-nowrap border-l theme-divider" style={{ color: C.indigo,  background: C.indigoBg }}>Call Due Date</th>
                 <th className="px-4 py-3 text-right whitespace-nowrap" style={{ color: C.indigo,  background: C.indigoBg }}>TTM @ Due</th>
                 <th className="px-4 py-3 text-right whitespace-nowrap" style={{ color: C.indigo,  background: C.indigoBg }}>Call USD</th>

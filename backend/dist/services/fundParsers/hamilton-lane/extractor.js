@@ -1,5 +1,5 @@
 "use strict";
-// Hamilton Lane Secondary Fund VI-B LP — extraction module.
+// Secondary Fund VI-B — extraction module.
 //
 // Faithful TypeScript port of the reference Python module
 // `hamilton_secondary_trueup_capital_call_module.py`.
@@ -131,7 +131,7 @@ function findCompanyName(text) {
     const investor = text.match(/Investor:\s*([^\n]+)/i);
     if (investor)
         return investor[1].trim().split(/\s+/).join(' ');
-    const m = text.match(/Hamilton Lane Secondary Fund VI-B LP\s*\n\s*([A-Za-z0-9 .,&'-]+?)\s*\n\s*Current Transaction Detail/i);
+    const m = text.match(/Secondary Fund VI-B\s*\n\s*([A-Za-z0-9 .,&'-]+?)\s*\n\s*Current Transaction Detail/i);
     if (m)
         return m[1].trim().split(/\s+/).join(' ');
     return null;
@@ -504,7 +504,7 @@ function extractHamiltonReport(rawText, fileName = '', previousState = null) {
         module_name: 'hamilton_secondary_fund_vi_b',
         document_type: allFields.document_type,
         company_name: findCompanyName(text),
-        fund_name: 'Hamilton Lane Secondary Fund VI-B LP',
+        fund_name: 'Secondary Fund VI-B',
         currency: detectCurrency(text),
         excel_fields: excelFields,
         all_extracted_fields: allFields,

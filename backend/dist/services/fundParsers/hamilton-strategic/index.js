@@ -54,7 +54,8 @@ function parseHamiltonStrategic(rawText, previousState = null) {
     const confidenceGrade = confidence >= 0.65 ? 'high' : confidence >= 0.35 ? 'medium' : 'low';
     return {
         fundKey: 'hamilton-strategic',
-        fundName: report.fund_name,
+        fundName: 'Strategic Opportunities Fund IX',
+        fundManager: 'Hamilton Lane',
         noticeType,
         noticeDate,
         dueDate,

@@ -1,5 +1,5 @@
 /**
- * Idempotent add — Hamilton Lane Strategic Opportunities Fund IX-B LP.
+ * Idempotent add — Strategic Opportunities Fund IX.
  *
  * Adds the fund record so uploaded Hamilton Strategic notices auto-resolve
  * (fundParsers/fund-resolver.ts) and show as their own section on the Funds page —
@@ -11,11 +11,11 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-const FUND_NAME = 'Hamilton Lane Strategic Opportunities Fund IX-B LP'
+const FUND_NAME = 'Hamilton Lane Strategic Opportunities Fund IX'
 
 async function main() {
   const existing = await prisma.fund.findFirst({
-    where: { fundName: { contains: 'Hamilton Lane Strategic Opportunities', mode: 'insensitive' } },
+    where: { fundName: { contains: 'Strategic Opportunities Fund IX', mode: 'insensitive' } },
   })
 
   if (existing) {
@@ -26,7 +26,7 @@ async function main() {
   const fund = await prisma.fund.create({
     data: {
       fundName:      FUND_NAME,
-      manager:       'Hamilton Lane Advisors, L.L.C.',
+      manager:       'Hamilton Lane',
       administrator: 'Hamilton Lane',
       strategy:      'Secondaries',
       vintageYear:   2024,

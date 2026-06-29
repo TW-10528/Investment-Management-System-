@@ -45,7 +45,8 @@ function parseCapulaGrv(rawText, previousState = null) {
     const confidenceGrade = confidence >= 0.65 ? 'high' : confidence >= 0.35 ? 'medium' : 'low';
     return {
         fundKey: 'capula-grv',
-        fundName: report.fund_name,
+        fundName: 'Capula Global Relative Fund',
+        fundManager: 'Capula Investment Management',
         noticeType,
         noticeDate,
         dueDate,

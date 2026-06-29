@@ -51,7 +51,8 @@ export function parseSigulerGuff(
 
   return {
     fundKey:          'siguler-guff',
-    fundName:         report.fund_name,
+    fundName:         'Small Buyout Opportunities Fund VI',
+    fundManager:      'Siguler Guff',
     noticeType:       'capital_call',
     noticeDate,
     dueDate,

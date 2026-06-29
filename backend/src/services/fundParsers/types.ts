@@ -16,6 +16,7 @@ export interface ParsedFundNotice {
   // ── Identity ───────────────────────────────────────────────────────────────
   fundKey:    string     // machine key e.g. 'nb-real-estate', 'hamilton-lane'
   fundName:   string     // full name from PDF
+  fundManager?: string   // fund manager name e.g. 'Hamilton Lane', 'Neuberger Berman'
   noticeType: 'capital_call' | 'distribution' | 'capital_and_distribution' | 'financial_statement'
 
   // ── Dates ──────────────────────────────────────────────────────────────────

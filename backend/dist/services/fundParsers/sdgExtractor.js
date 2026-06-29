@@ -171,6 +171,7 @@ function extractSdgNotice(text, fileName = '') {
     return {
         fundKey: 'sdg-lps',
         fundName: 'SDGs投資事業有限責任組合',
+        fundManager: 'AFM株式会社',
         noticeType,
         noticeDate,
         dueDate,

@@ -52,7 +52,8 @@ export function parseNbRealEstate(rawText: string, previousState: NbPreviousStat
 
   return {
     fundKey:          'nb-real-estate',
-    fundName:         report.fund_name,
+    fundName:         'Real Estate Secondary Opportunities Fund II',
+    fundManager:      'Neuberger Berman',
     noticeType:       'capital_call',   // combined call + distribution ride on one row
     noticeDate,
     dueDate,

@@ -76,14 +76,14 @@ async function main() {
   })
   console.log('  ✔ FX rates created')
 
-  // ── Fund — NB Real Estate Secondary Opportunities Offshore Fund II LP ────────
-  // Neuberger Berman / NB Alternatives Advisers LLC. Drawdown notices are
-  // combined capital call + deemed distribution; commitment from the LP notice.
+  // ── Fund — Real Estate Secondary Opportunities Fund II ────────────────────
+  // Neuberger Berman. Drawdown notices are combined capital call + deemed
+  // distribution; commitment from the LP notice.
   // Commitment value will be extracted from uploaded PDFs or manually entered
   await prisma.fund.create({
     data: {
-      fundName:      'NB Real Estate Secondary Opportunities Offshore Fund II LP',
-      manager:       'NB Alternatives Advisers LLC',
+      fundName:      'Real Estate Secondary Opportunities Fund II',
+      manager:       'Neuberger Berman',
       administrator: 'Neuberger Berman',
       strategy:      'Real Estate Secondaries',
       vintageYear:   2025,
@@ -98,16 +98,16 @@ async function main() {
       isActive:      true,
     },
   })
-  console.log('  ✔ Fund created: NB Real Estate Secondary Opportunities Offshore Fund II LP (Neuberger Berman)')
+  console.log('  ✔ Fund created: Real Estate Secondary Opportunities Fund II (Neuberger Berman)')
 
-  // ── Fund — Siguler Guff (sourced from PDF keyword "Complex Name") ──────────
-  // Commitment will be extracted from uploaded PDFs or manually entered
+  // ── Fund — Small Buyout Opportunities Fund VI ────────────────────────────
+  // Siguler Guff. Commitment will be extracted from uploaded PDFs or manually entered
   await prisma.fund.create({
     data: {
-      fundName:            'Siguler Guff Small Buyout Opportunities Fund VI (F), LP',
-      fundNameJp:          'シグラー・ガフ スモール・バイアウト・オポチュニティーズ ファンドVI(F)',
-      manager:             'Siguler Guff & Company, LP',
-      administrator:       'Siguler Guff & Company, LP',
+      fundName:            'Small Buyout Opportunities Fund VI',
+      fundNameJp:          'シグラー・ガフ スモール・バイアウト・オポチュニティーズ ファンドVI',
+      manager:             'Siguler Guff',
+      administrator:       'Siguler Guff',
       strategy:            'Small Buyout',
       vintageYear:         2025,
       currency:            'USD',
@@ -124,14 +124,14 @@ async function main() {
       isActive:            true,
     },
   })
-  console.log('  ✔ Fund created: Siguler Guff Small Buyout Opportunities Fund VI (F), LP')
+  console.log('  ✔ Fund created: Small Buyout Opportunities Fund VI (Siguler Guff)')
 
-  // ── Fund — Goldman Sachs Vintage X ───────────────────────────────────────────
+  // ── Fund — Vintage X(Flagship) ──────────────────────────────────────────────
   await prisma.fund.create({
     data: {
-      fundName:      'Vintage X (Flagship) Offshore SCSp',
-      manager:       'Goldman Sachs Asset Management',
-      administrator: 'Goldman Sachs Asset Management',
+      fundName:      'Vintage X(Flagship)',
+      manager:       'Goldman Sachs',
+      administrator: 'Goldman Sachs',
       strategy:      'Secondaries',
       vintageYear:   2024,
       currency:      'USD',
@@ -145,14 +145,14 @@ async function main() {
       isActive:      true,
     },
   })
-  console.log('  ✔ Fund created: Vintage X (Flagship) Offshore SCSp (Goldman Sachs)')
+  console.log('  ✔ Fund created: Vintage X(Flagship) (Goldman Sachs)')
 
-  // ── Fund — Capula Global Relative Value Trust ─────────────────────────────────
+  // ── Fund — Capula Global Relative Fund ────────────────────────────────────────
   await prisma.fund.create({
     data: {
-      fundName:      'Capula Global Relative Value Trust',
-      manager:       'Capula Investment Management LLP',
-      administrator: 'Capula Investment Management LLP',
+      fundName:      'Capula Global Relative Fund',
+      manager:       'Capula Investment Management',
+      administrator: 'Capula Investment Management',
       strategy:      'Global Relative Value',
       vintageYear:   2025,
       currency:      'USD',
@@ -160,14 +160,14 @@ async function main() {
       isActive:      true,
     },
   })
-  console.log('  ✔ Fund created: Capula Global Relative Value Trust')
+  console.log('  ✔ Fund created: Capula Global Relative Fund (Capula Investment Management)')
 
-  // ── Fund — Hamilton Lane Secondary Fund VI-B LP ─────────────────────────────
-  // Notices are EITHER a capital call OR a distribution (separate documents).
+  // ── Fund — Hamilton Lane Secondary Fund VI-B ──────────────────────────────────────────────
+  // Hamilton Lane. Notices are EITHER a capital call OR a distribution (separate documents).
   await prisma.fund.create({
     data: {
-      fundName:      'Hamilton Lane Secondary Fund VI-B LP',
-      manager:       'Hamilton Lane Advisors, L.L.C.',
+      fundName:      'Hamilton Lane Secondary Fund VI-B',
+      manager:       'Hamilton Lane',
       administrator: 'Hamilton Lane',
       strategy:      'Secondaries',
       vintageYear:   2024,
@@ -176,15 +176,15 @@ async function main() {
       isActive:      true,
     },
   })
-  console.log('  ✔ Fund created: Hamilton Lane Secondary Fund VI-B LP (Hamilton Lane)')
+  console.log('  ✔ Fund created: Hamilton Lane Secondary Fund VI-B (Hamilton Lane)')
 
-  // ── Fund — Hamilton Lane Strategic Opportunities Fund IX-B LP ───────────────
-  // Notices include capital calls, distributions, net capital calls, and
+  // ── Fund — Hamilton Lane Strategic Opportunities Fund IX ──────────────────────────────────
+  // Hamilton Lane. Notices include capital calls, distributions, net capital calls, and
   // return-of-unused-capital true-ups (B can be negative).
   await prisma.fund.create({
     data: {
-      fundName:      'Hamilton Lane Strategic Opportunities Fund IX-B LP',
-      manager:       'Hamilton Lane Advisors, L.L.C.',
+      fundName:      'Hamilton Lane Strategic Opportunities Fund IX',
+      manager:       'Hamilton Lane',
       administrator: 'Hamilton Lane',
       strategy:      'Secondaries',
       vintageYear:   2024,
@@ -193,16 +193,16 @@ async function main() {
       isActive:      true,
     },
   })
-  console.log('  ✔ Fund created: Hamilton Lane Strategic Opportunities Fund IX-B LP (Hamilton Lane)')
+  console.log('  ✔ Fund created: Hamilton Lane Strategic Opportunities Fund IX (Hamilton Lane)')
 
-  // ── Fund — Dover Street XI Feeder Fund L.P. ─────────────────────────────────
-  // Notices: initial contribution, cash distribution, and capital-call-and-deemed
+  // ── Fund — Dover Street XI ──────────────────────────────────────────────────
+  // HarbourVest. Notices: initial contribution, cash distribution, and capital-call-and-deemed
   // -distribution. D (reinvestable) is 0 for Dover.
   await prisma.fund.create({
     data: {
-      fundName:      'Dover Street XI Feeder Fund L.P.',
-      manager:       'HarbourVest Partners',
-      administrator: 'HarbourVest Partners',
+      fundName:      'Dover Street XI',
+      manager:       'HarbourVest',
+      administrator: 'HarbourVest',
       strategy:      'Secondaries',
       vintageYear:   2024,
       currency:      'USD',
@@ -210,19 +210,19 @@ async function main() {
       isActive:      true,
     },
   })
-  console.log('  ✔ Fund created: Dover Street XI Feeder Fund L.P. (HarbourVest)')
+  console.log('  ✔ Fund created: Dover Street XI (HarbourVest)')
 
-  // ── Fund — SDG Fund ────────────────────────────────────────────────────────
+  // ── Fund — SDGs投資事業有限責任組合 ────────────────────────────────────────────
   // SDG fund has both contract_commitment_usd (fixed) and commitment_usd (dynamic tranches)
   // Contract commitment is the base/standard value shown on dashboard
   // Commitment value changes as tranches are added in the Commitments page
   // Currency is JPY - all amounts (capital calls, commitments) are in Japanese Yen
   await prisma.fund.create({
     data: {
-      fundName:              'SDG Fund',
-      fundNameJp:            'SDG ファンド',
-      manager:               'Siguler Guff & Company, LP',
-      administrator:         'Siguler Guff & Company, LP',
+      fundName:              'SDGs投資事業有限責任組合',
+      fundNameJp:            'SDGs投資事業有限責任組合',
+      manager:               'AFM株式会社',
+      administrator:         'AFM株式会社',
       strategy:              'Development',
       vintageYear:           2024,
       currency:              'JPY',  // All amounts are in Japanese Yen, no FX conversion needed
@@ -232,10 +232,10 @@ async function main() {
       isActive:              true,
     },
   })
-  console.log('  ✔ Fund created: SDG Fund')
+  console.log('  ✔ Fund created: SDGs投資事業有限責任組合 (AFM株式会社)')
 
   console.log('\n✅  Database seeded successfully!')
-  console.log('\n   Funds: NB Real Estate, Siguler Guff, Goldman Vintage X, Capula, Hamilton Lane Secondary, Hamilton Lane Strategic, Dover Street XI, SDG')
+  console.log('\n   Funds: Hamilton Lane Strategic Opportunities Fund IX, Hamilton Lane Secondary Fund VI-B, Capula Global Relative Fund, HarbourVest Dover Street XI, Neuberger Berman Real Estate Secondary Opportunities Fund II, Siguler Guff Small Buyout Opportunities Fund VI, Goldman Sachs Vintage X(Flagship), AFM SDGs投資事業有限責任組合')
   console.log('   (ledger empty — upload PDFs via UI to populate)')
   console.log('\n   Credentials:')
   console.log('   Admin:   admin@thirdwave.co.jp  /  Admin123!')

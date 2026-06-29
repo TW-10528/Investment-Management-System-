@@ -1,4 +1,4 @@
-// NB Real Estate Secondary Opportunities Fund II — extraction module.
+// Real Estate Secondary Opportunities Fund II — extraction module.
 //
 // Faithful TypeScript port of the reference Python module
 // `nb_realestate_module_updated.py`.
@@ -119,9 +119,7 @@ function detectCurrency(text: string): string {
 }
 
 function detectFundName(text: string): string {
-  if (text.includes('NB Real Estate Secondary Opportunities Offshore Fund II LP'))
-    return 'NB Real Estate Secondary Opportunities Offshore Fund II LP'
-  return 'NB Real Estate Secondary Opportunities Fund II LP'
+  return 'Real Estate Secondary Opportunities Fund II'
 }
 
 // ── Extraction ─────────────────────────────────────────────────────────────────

@@ -44,7 +44,8 @@ function parseSigulerGuff(rawText, previousState = null) {
     const confidenceGrade = confidence >= 0.65 ? 'high' : confidence >= 0.35 ? 'medium' : 'low';
     return {
         fundKey: 'siguler-guff',
-        fundName: report.fund_name,
+        fundName: 'Small Buyout Opportunities Fund VI',
+        fundManager: 'Siguler Guff',
         noticeType: 'capital_call',
         noticeDate,
         dueDate,

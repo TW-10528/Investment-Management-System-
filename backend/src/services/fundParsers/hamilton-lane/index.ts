@@ -55,7 +55,8 @@ export function parseHamiltonLane(rawText: string, previousState: HamiltonPrevio
 
   return {
     fundKey:          'hamilton-lane',
-    fundName:         report.fund_name,
+    fundName:         'Secondary Fund VI-B',
+    fundManager:      'Hamilton Lane',
     noticeType,
     noticeDate,
     dueDate,

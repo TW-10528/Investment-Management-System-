@@ -59,7 +59,8 @@ export function parseHamiltonStrategic(rawText: string, previousState: HamStratP
 
   return {
     fundKey:          'hamilton-strategic',
-    fundName:         report.fund_name,
+    fundName:         'Strategic Opportunities Fund IX',
+    fundManager:      'Hamilton Lane',
     noticeType,
     noticeDate,
     dueDate,
