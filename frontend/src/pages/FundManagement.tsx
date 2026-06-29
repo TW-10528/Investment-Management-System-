@@ -2062,7 +2062,7 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
       {/* Upload — pick the document type + select the fund, then drop a PDF */}
       {canEdit && (
         <FundUploadBar
-          funds={funds.map(f => ({ fund_id: f.fund_id, fund_name: f.fund_name }))}
+          funds={funds.map(f => ({ fund_id: f.fund_id, fund_name: f.fund_name, manager: f.manager }))}
           onUploaded={(fundId) => { onChanged(); load(); setOpenFundId(fundId); }}
         />
       )}

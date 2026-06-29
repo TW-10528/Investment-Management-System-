@@ -40,7 +40,7 @@ function DuplicateModal({ fileName, uploadedAt, onClose }: { fileName: string; u
   );
 }
 
-interface FundOption { fund_id: string; fund_name: string }
+interface FundOption { fund_id: string; fund_name: string; manager?: string }
 
 interface Props {
   funds:      FundOption[];
@@ -505,7 +505,12 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                 <span className="text-[10px] font-bold uppercase tracking-widest theme-text-muted w-28 shrink-0">Fund</span>
                 <div className="flex-1">
                   {matched ? (
-                    <p className="font-semibold theme-text">{cls.fund_display_name || cls.fund_key}</p>
+                    <div>
+                      <p className="font-semibold theme-text">{cls.fund_display_name || cls.fund_key}</p>
+                      {matched.manager && (
+                        <p className="text-xs theme-text-muted mt-0.5">{matched.manager}</p>
+                      )}
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <select
@@ -515,7 +520,9 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                       >
                         <option value="">— select fund —</option>
                         {funds.map(f => (
-                          <option key={f.fund_id} value={f.fund_id}>{f.fund_name}</option>
+                          <option key={f.fund_id} value={f.fund_id}>
+                            {f.manager ? `${f.fund_name} (${f.manager})` : f.fund_name}
+                          </option>
                         ))}
                       </select>
                       <button
@@ -649,6 +656,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
         {/* ── Success — quick navigation ── */}
         {done && (() => {
           const isTransactionDoc = ['capital_call', 'distribution', 'capital_and_distribution'].includes(done.docType)
+          const matchedFund = funds.find(f => f.fund_id === done.fundId)
           return (
             <div className="rounded-xl border px-4 py-3 flex items-center justify-between gap-4 border-green-200 bg-green-50/60">
               <div>
@@ -656,6 +664,9 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                   {isTransactionDoc ? 'Saved to ledger' : 'Saved for viewing'}
                 </p>
                 <p className="text-xs mt-0.5 text-green-700">{done.fundName}</p>
+                {matchedFund?.manager && (
+                  <p className="text-xs mt-0.5 text-green-700">Manager: {matchedFund.manager}</p>
+                )}
                 <p className="text-xs mt-0.5 text-green-700">Type: {done.displayType}</p>
               </div>
               <button
