@@ -505,12 +505,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                 <span className="text-[10px] font-bold uppercase tracking-widest theme-text-muted w-28 shrink-0">Fund</span>
                 <div className="flex-1">
                   {matched ? (
-                    <div>
-                      <p className="font-semibold theme-text">{cls.fund_display_name || cls.fund_key}</p>
-                      {matched.manager && (
-                        <p className="text-xs theme-text-muted mt-0.5">{matched.manager}</p>
-                      )}
-                    </div>
+                    <p className="font-semibold theme-text">{cls.fund_display_name || cls.fund_key}</p>
                   ) : (
                     <div className="flex items-center gap-2">
                       <select
@@ -521,7 +516,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                         <option value="">— select fund —</option>
                         {funds.map(f => (
                           <option key={f.fund_id} value={f.fund_id}>
-                            {f.manager ? `${f.fund_name} (${f.manager})` : f.fund_name}
+                            {f.fund_name}
                           </option>
                         ))}
                       </select>
@@ -541,6 +536,14 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                   </span>
                 )}
               </div>
+
+              {/* Fund Manager */}
+              {matched && matched.manager && (
+                <div className="flex items-center px-5 py-3 gap-4">
+                  <span className="text-[10px] font-bold uppercase tracking-widest theme-text-muted w-28 shrink-0">Manager</span>
+                  <p className="text-sm theme-text font-medium">{matched.manager}</p>
+                </div>
+              )}
 
               {/* Document type */}
               <div className="flex items-center px-5 py-3 gap-4">
@@ -659,15 +662,26 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
           const matchedFund = funds.find(f => f.fund_id === done.fundId)
           return (
             <div className="rounded-xl border px-4 py-3 flex items-center justify-between gap-4 border-green-200 bg-green-50/60">
-              <div>
+              <div className="flex-1 space-y-1">
                 <p className="text-sm font-bold text-green-800">
                   {isTransactionDoc ? 'Saved to ledger' : 'Saved for viewing'}
                 </p>
-                <p className="text-xs mt-0.5 text-green-700">{done.fundName}</p>
-                {matchedFund?.manager && (
-                  <p className="text-xs mt-0.5 text-green-700">Manager: {matchedFund.manager}</p>
-                )}
-                <p className="text-xs mt-0.5 text-green-700">Type: {done.displayType}</p>
+                <div className="grid grid-cols-2 gap-3 text-xs text-green-700 mt-2">
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-wide text-green-600">Fund</span>
+                    <p className="font-medium">{done.fundName}</p>
+                  </div>
+                  {matchedFund?.manager && (
+                    <div>
+                      <span className="text-[9px] font-bold uppercase tracking-wide text-green-600">Manager</span>
+                      <p className="font-medium">{matchedFund.manager}</p>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-wide text-green-600">Type</span>
+                    <p className="font-medium">{done.displayType}</p>
+                  </div>
+                </div>
               </div>
               <button
                 onClick={uploadNext}
