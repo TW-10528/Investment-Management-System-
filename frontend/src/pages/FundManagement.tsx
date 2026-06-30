@@ -1529,6 +1529,7 @@ function CommitmentsTab({
 // FUND DETAILS TAB (all fields editable)
 // ─────────────────────────────────────────────────────────────────────────────
 function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; canEdit:boolean; fundId:string; onSaved:()=>void }) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [form, setForm]       = useState<any>({});
   const [saving, setSaving]   = useState(false);
@@ -1589,29 +1590,29 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
           <div className="flex justify-end mb-5">
             <button onClick={startEdit}
               className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
-              Edit Fund Details
+              {t('fundDetails.editButton')}
             </button>
           </div>
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y theme-border">
           {[
-            ['Fund Name',           detail.fund_name],
-            ['Japanese Name',       detail.fund_name_jp],
-            ['Manager',             detail.manager],
-            ['Administrator',       detail.administrator],
-            ['Strategy',            detail.strategy],
-            ['Vintage Year',        detail.vintage_year],
-            ['Currency',            detail.currency],
-            [isSdg ? 'Commitment (JPY)' : 'Commitment (USD)',         detail.commitment_usd ? (isSdg ? `¥${Number(detail.commitment_usd).toLocaleString()}` : fmt.usd(Number(detail.commitment_usd))) : '—'],
-            ...(isSdg ? [['Contract Commitment (JPY)', detail.contract_commitment_usd ? `¥${Number(detail.contract_commitment_usd).toLocaleString()}` : '—']] : []),
-            ['Entry FX Rate',            detail.entry_fx_rate ? Number(detail.entry_fx_rate).toFixed(4) : '—'],
-            ['Contract Date',       detail.contract_date],
-            ['Inv. Period Start',   detail.investment_period_start],
-            ['Inv. Period End',     detail.investment_period_end],
-            ['Fund Term (years)',   detail.fund_term_years],
-            ['Management Fee %',   detail.management_fee_pct != null ? `${detail.management_fee_pct}%` : '—'],
-            ['Carry %',            detail.carry_pct        != null ? `${detail.carry_pct}%`        : '—'],
-            ['Hurdle Rate %',      detail.hurdle_rate_pct  != null ? `${detail.hurdle_rate_pct}%`  : '—'],
+            [t('fundDetails.fundName'),           detail.fund_name],
+            [t('fundDetails.japaneseNameLabel'),       detail.fund_name_jp],
+            [t('fundDetails.manager'),             detail.manager],
+            [t('fundDetails.administrator'),       detail.administrator],
+            [t('fundDetails.strategy'),            detail.strategy],
+            [t('fundDetails.vintageYear'),        detail.vintage_year],
+            [t('fundDetails.currency'),            detail.currency],
+            [isSdg ? t('fundDetails.commitmentUsd').replace('(USD)', '(JPY)') : t('fundDetails.commitmentUsd'),         detail.commitment_usd ? (isSdg ? `¥${Number(detail.commitment_usd).toLocaleString()}` : fmt.usd(Number(detail.commitment_usd))) : '—'],
+            ...(isSdg ? [[t('fundDetails.commitmentUsd').replace('Commitment (USD)', 'Contract Commitment (JPY)'), detail.contract_commitment_usd ? `¥${Number(detail.contract_commitment_usd).toLocaleString()}` : '—']] : []),
+            [t('fundDetails.entryFxRate'),            detail.entry_fx_rate ? Number(detail.entry_fx_rate).toFixed(4) : '—'],
+            [t('fundDetails.contractDate'),       detail.contract_date],
+            [t('fundDetails.investmentPeriodStart'),   detail.investment_period_start],
+            [t('fundDetails.investmentPeriodEnd'),     detail.investment_period_end],
+            [t('fundDetails.fundTermYears'),   detail.fund_term_years],
+            [t('fundDetails.managementFeePercent'),   detail.management_fee_pct != null ? `${detail.management_fee_pct}%` : '—'],
+            [t('fundDetails.carryPercent'),            detail.carry_pct        != null ? `${detail.carry_pct}%`        : '—'],
+            [t('fundDetails.hurdleRatePercent'),      detail.hurdle_rate_pct  != null ? `${detail.hurdle_rate_pct}%`  : '—'],
           ].map(([label, value])=>(
             <div key={String(label)} className="flex items-start gap-4 py-3 px-1">
               <p className="text-xs font-semibold theme-text-muted w-44 flex-shrink-0">{label}</p>
@@ -1620,7 +1621,7 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
           ))}
           {detail.notes && (
             <div className="flex items-start gap-4 py-3 px-1 md:col-span-2">
-              <p className="text-xs font-semibold theme-text-muted w-44 flex-shrink-0">Notes</p>
+              <p className="text-xs font-semibold theme-text-muted w-44 flex-shrink-0">{t('fundDetails.notes')}</p>
               <p className="text-sm theme-text flex-1 whitespace-pre-wrap">{detail.notes}</p>
             </div>
           )}
@@ -1632,36 +1633,36 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
   return (
     <div className="p-5 space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        <Field label="Fund Name"><input className={inp} value={form.fund_name??''} onChange={e=>sf('fund_name',e.target.value)} /></Field>
-        <Field label="Japanese Name"><input className={inp} value={form.fund_name_jp??''} onChange={e=>sf('fund_name_jp',e.target.value)} /></Field>
-        <Field label="Manager"><input className={inp} value={form.manager??''} onChange={e=>sf('manager',e.target.value)} /></Field>
-        <Field label="Administrator"><input className={inp} value={form.administrator??''} onChange={e=>sf('administrator',e.target.value)} /></Field>
-        <Field label="Strategy">
+        <Field label={t('fundDetails.fundName')}><input className={inp} value={form.fund_name??''} onChange={e=>sf('fund_name',e.target.value)} /></Field>
+        <Field label={t('fundDetails.japaneseNameLabel')}><input className={inp} value={form.fund_name_jp??''} onChange={e=>sf('fund_name_jp',e.target.value)} /></Field>
+        <Field label={t('fundDetails.manager')}><input className={inp} value={form.manager??''} onChange={e=>sf('manager',e.target.value)} /></Field>
+        <Field label={t('fundDetails.administrator')}><input className={inp} value={form.administrator??''} onChange={e=>sf('administrator',e.target.value)} /></Field>
+        <Field label={t('fundDetails.strategy')}>
           <select className={inp} value={form.strategy??''} onChange={e=>sf('strategy',e.target.value)}>
             <option value="">Select…</option>
             {STRATEGIES.map(s=><option key={s} value={s}>{s}</option>)}
           </select>
         </Field>
-        <Field label="Vintage Year"><input type="number" className={inp} value={form.vintage_year??''} onChange={e=>sf('vintage_year',e.target.value)} /></Field>
-        <Field label="Currency">
+        <Field label={t('fundDetails.vintageYear')}><input type="number" className={inp} value={form.vintage_year??''} onChange={e=>sf('vintage_year',e.target.value)} /></Field>
+        <Field label={t('fundDetails.currency')}>
           <select className={inp} value={form.currency??'USD'} onChange={e=>sf('currency',e.target.value)}>
             <option>USD</option><option>EUR</option><option>JPY</option>
           </select>
         </Field>
-        <Field label={isSdg ? "Commitment (JPY)" : "Commitment (USD)"}><input type="number" className={inp} value={form.commitment_usd??''} onChange={e=>sf('commitment_usd',e.target.value)} /></Field>
+        <Field label={isSdg ? t('fundDetails.commitmentUsd').replace('(USD)', '(JPY)') : t('fundDetails.commitmentUsd')}><input type="number" className={inp} value={form.commitment_usd??''} onChange={e=>sf('commitment_usd',e.target.value)} /></Field>
         {isSdg && (
-          <Field label="Contract Commitment (JPY)"><input type="number" className={inp} value={form.contract_commitment_usd??''} onChange={e=>sf('contract_commitment_usd',e.target.value)} /></Field>
+          <Field label={t('fundDetails.commitmentUsd').replace('Commitment (USD)', 'Contract Commitment (JPY)')}><input type="number" className={inp} value={form.contract_commitment_usd??''} onChange={e=>sf('contract_commitment_usd',e.target.value)} /></Field>
         )}
-        <Field label="Entry FX Rate"><input type="number" step="0.0001" className={inp} value={form.entry_fx_rate??''} onChange={e=>sf('entry_fx_rate',e.target.value)} /></Field>
-        <Field label="Contract Date"><input type="date" className={inp} value={form.contract_date??''} onChange={e=>sf('contract_date',e.target.value)} /></Field>
-        <Field label="Inv. Period Start"><input type="date" className={inp} value={form.investment_period_start??''} onChange={e=>sf('investment_period_start',e.target.value)} /></Field>
-        <Field label="Inv. Period End"><input type="date" className={inp} value={form.investment_period_end??''} onChange={e=>sf('investment_period_end',e.target.value)} /></Field>
-        <Field label="Fund Term (yrs)"><input type="number" className={inp} value={form.fund_term_years??''} onChange={e=>sf('fund_term_years',e.target.value)} /></Field>
-        <Field label="Mgmt Fee %"><input type="number" step="0.01" className={inp} value={form.management_fee_pct??''} onChange={e=>sf('management_fee_pct',e.target.value)} /></Field>
-        <Field label="Carry %"><input type="number" step="0.01" className={inp} value={form.carry_pct??''} onChange={e=>sf('carry_pct',e.target.value)} /></Field>
-        <Field label="Hurdle Rate %"><input type="number" step="0.01" className={inp} value={form.hurdle_rate_pct??''} onChange={e=>sf('hurdle_rate_pct',e.target.value)} /></Field>
+        <Field label={t('fundDetails.entryFxRate')}><input type="number" step="0.0001" className={inp} value={form.entry_fx_rate??''} onChange={e=>sf('entry_fx_rate',e.target.value)} /></Field>
+        <Field label={t('fundDetails.contractDate')}><input type="date" className={inp} value={form.contract_date??''} onChange={e=>sf('contract_date',e.target.value)} /></Field>
+        <Field label={t('fundDetails.investmentPeriodStart')}><input type="date" className={inp} value={form.investment_period_start??''} onChange={e=>sf('investment_period_start',e.target.value)} /></Field>
+        <Field label={t('fundDetails.investmentPeriodEnd')}><input type="date" className={inp} value={form.investment_period_end??''} onChange={e=>sf('investment_period_end',e.target.value)} /></Field>
+        <Field label={t('fundDetails.fundTermYears')}><input type="number" className={inp} value={form.fund_term_years??''} onChange={e=>sf('fund_term_years',e.target.value)} /></Field>
+        <Field label={t('fundDetails.managementFeePercent')}><input type="number" step="0.01" className={inp} value={form.management_fee_pct??''} onChange={e=>sf('management_fee_pct',e.target.value)} /></Field>
+        <Field label={t('fundDetails.carryPercent')}><input type="number" step="0.01" className={inp} value={form.carry_pct??''} onChange={e=>sf('carry_pct',e.target.value)} /></Field>
+        <Field label={t('fundDetails.hurdleRatePercent')}><input type="number" step="0.01" className={inp} value={form.hurdle_rate_pct??''} onChange={e=>sf('hurdle_rate_pct',e.target.value)} /></Field>
         <div className="col-span-2 sm:col-span-3 lg:col-span-4">
-          <Field label="Notes"><textarea className={`${inp} resize-none`} rows={2} value={form.notes??''} onChange={e=>sf('notes',e.target.value)} /></Field>
+          <Field label={t('fundDetails.notes')}><textarea className={`${inp} resize-none`} rows={2} value={form.notes??''} onChange={e=>sf('notes',e.target.value)} /></Field>
         </div>
       </div>
       <div className="flex gap-3">

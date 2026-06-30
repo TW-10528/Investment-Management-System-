@@ -603,6 +603,7 @@
     "managementFeePercent": "Management Fee %",
     "carryPercent": "Carry %",
     "hurdleRatePercent": "Hurdle Rate %",
+    "notes": "Notes",
     "deactivateButton": "Deactivate Fund",
     "editButton": "Edit Fund Details"
   },

@@ -600,6 +600,7 @@
     "managementFeePercent": "管理報酬率％",
     "carryPercent": "キャリー％",
     "hurdleRatePercent": "ハードルレート％",
+    "notes": "メモ",
     "deactivateButton": "ファンドを無効化する",
     "editButton": "ファンド詳細を編集"
   },
