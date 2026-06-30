@@ -1683,6 +1683,7 @@ function FundSection({
   fund: FundSummary; detail: FundDetail;
   canEdit: boolean; onChanged: () => void; initialTab?: TabKey;
 }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<TabKey>(initialTab ?? 'ledger');
   const fundId   = fund.fund_id;
   const isActive = fund.is_active !== false;
@@ -1718,24 +1719,24 @@ function FundSection({
     : Number(detail.commitment_usd ?? 0);
 
   async function toggleActive() {
-    if (!confirm(isActive ? 'Deactivate this fund?' : 'Reactivate this fund?')) return;
+    if (!confirm(isActive ? t('manageFunds.deactivateConfirm') : t('manageFunds.reactivateConfirm'))) return;
     try {
       if (isActive) await fundsAPI.deactivate(fundId);
       else          await fundsAPI.reactivate(fundId);
-      toast.success(isActive ? 'Fund deactivated' : 'Fund reactivated');
+      toast.success(isActive ? t('manageFunds.fundDeactivated') : t('manageFunds.fundReactivated'));
       onChanged();
-    } catch { toast.error('Action failed'); }
+    } catch { toast.error(t('manageFunds.actionFailed')); }
   }
 
   const TABS: { key: TabKey; label: string }[] = [
-    { key:'ledger',        label:'Ledger'         },
-    { key:'cashflow',      label:'Cash Flow'      },
-    { key:'calls',         label:'Capital Calls'  },
-    { key:'distributions', label:'Distributions'  },
-    { key:'nav',           label:'NAV Records'    },
-    { key:'documents',     label:'Documents / Reports' },
-    ...(isSdg ? [{ key: 'commitments' as TabKey, label: 'Commitments' }] : []),
-    { key:'details',       label:'Fund Details'   },
+    { key:'ledger',        label:t('manageFunds.ledgerTab')         },
+    { key:'cashflow',      label:t('manageFunds.cashFlowTab')      },
+    { key:'calls',         label:t('manageFunds.capitalCallsTab')  },
+    { key:'distributions', label:t('manageFunds.distributionsTab')  },
+    { key:'nav',           label:t('manageFunds.navRecordsTab')    },
+    { key:'documents',     label:t('manageFunds.documentsReportsTab') },
+    ...(isSdg ? [{ key: 'commitments' as TabKey, label: t('manageFunds.commitmentsTab') }] : []),
+    { key:'details',       label:t('manageFunds.fundDetailsTab')   },
   ];
 
   const fmtMoney = (n: number) => detail.currency === 'JPY' ? fmt.jpy(n) : fmt.usd(n, true);
@@ -1755,16 +1756,16 @@ function FundSection({
                 <h2 className="text-lg font-bold theme-text leading-snug">{detail.fund_name}</h2>
                 {!isActive && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border text-slate-400 bg-slate-500/10 border-slate-500/20">
-                    Inactive
+                    {t('manageFunds.inactive')}
                   </span>
                 )}
               </div>
               {detail.fund_name_jp && <p className="text-sm theme-text-muted mt-0.5">{detail.fund_name_jp}</p>}
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 {detail.strategy && <span className={`text-xs font-medium px-2.5 py-0.5 rounded ${badge}`}>{detail.strategy}</span>}
-                {detail.vintage_year && <span className="text-xs theme-text-muted">Vintage {detail.vintage_year}</span>}
+                {detail.vintage_year && <span className="text-xs theme-text-muted">{t('manageFunds.vintage')} {detail.vintage_year}</span>}
                 {detail.manager && <span className="text-xs theme-text-muted">· {detail.manager}</span>}
-                {detail.administrator && <span className="text-xs theme-text-muted">· Admin: {detail.administrator}</span>}
+                {detail.administrator && <span className="text-xs theme-text-muted">· {t('manageFunds.admin')}: {detail.administrator}</span>}
               </div>
             </div>
           </div>
@@ -1775,7 +1776,7 @@ function FundSection({
                   ? 'text-red-400 border-red-500/25 hover:bg-red-500/10'
                   : 'text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/10'
               }`}>
-              {isActive ? 'Deactivate Fund' : 'Reactivate Fund'}
+              {isActive ? t('manageFunds.deactivateFund') : t('manageFunds.reactivateFund')}
             </button>
           )}
         </div>
@@ -1784,10 +1785,10 @@ function FundSection({
       {/* ── KPIs ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 border-t theme-border divide-x theme-border">
         {[
-          { label:'Total Commitment', value: fmtMoney(displayCommitment), note: isSdg && latestHistCommitment ? `${latestHistCommitment > 0 ? (paidIn / latestHistCommitment * 100).toFixed(2) : '0.00'}% drawn` : 'gross' },
-          { label:'Paid-in (E)',      value: fmtMoney(paidIn),          note:`${drawn.toFixed(2)}% drawn` },
-          { label:'Dry Powder (F)',   value: fmtMoney(powder),          note:'unfunded' },
-          { label:'DPI',             value: `${Number(summary.dpi??0).toFixed(3)}×`, note:'dist / paid-in' },
+          { label:t('manageFunds.totalCommitment'), value: fmtMoney(displayCommitment), note: isSdg && latestHistCommitment ? `${latestHistCommitment > 0 ? (paidIn / latestHistCommitment * 100).toFixed(2) : '0.00'}% ${t('manageFunds.drawn')}` : t('manageFunds.gross') },
+          { label:t('manageFunds.paidInE'),      value: fmtMoney(paidIn),          note:`${drawn.toFixed(2)}% ${t('manageFunds.drawn')}` },
+          { label:t('manageFunds.dryPowderF'),   value: fmtMoney(powder),          note:t('manageFunds.unfunded') },
+          { label:t('manageFunds.dpi'),             value: `${Number(summary.dpi??0).toFixed(3)}×`, note:t('manageFunds.distPaidIn') },
         ].map(m=>(
           <div key={m.label} className="px-5 py-4">
             <p className="text-[10px] font-bold uppercase tracking-widest theme-text-muted">{m.label}</p>
@@ -1842,61 +1843,6 @@ function FundSection({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FUND CARD (list view — name + a few headline stats, click to open)
-// ─────────────────────────────────────────────────────────────────────────────
-function FundCard({ fund, detail, onClick }: { fund: FundSummary; detail?: FundDetail; onClick: () => void }) {
-  const isActive = fund.is_active !== false;
-  const dotColor = strategyColor[fund.strategy ?? ''] ?? '#6b7280';
-  const badge    = strategyBg[fund.strategy ?? '']   ?? 'bg-gray-100 text-gray-700';
-  const summary  = (detail as any)?.summary ?? {};
-  const commitment = Number(detail?.commitment_usd ?? 0);
-  const drawn      = Number(summary.drawn_pct ?? 0);
-  const isSdg = /sdg/i.test(fund.fund_name ?? '');
-
-  // SDG fund displays JPY, others display USD
-  const commitmentDisplay = isSdg
-    ? `¥${commitment.toLocaleString()}`
-    : fmt.usd(commitment, true);
-
-  return (
-    <button onClick={onClick}
-      className="theme-card border theme-border rounded-2xl p-5 text-left w-full transition-colors hover:border-indigo-500/50"
-      style={{ opacity: isActive ? 1 : 0.6 }}>
-      <div className="flex items-start gap-3">
-        <span className="w-3 h-3 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: dotColor }} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-base font-bold theme-text leading-snug">{fund.fund_name}</h2>
-            {!isActive && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border text-slate-400 bg-slate-500/10 border-slate-500/20">Inactive</span>
-            )}
-          </div>
-          {detail?.fund_name_jp && <p className="text-xs theme-text-muted mt-0.5">{detail.fund_name_jp}</p>}
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            {fund.strategy && <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${badge}`}>{fund.strategy}</span>}
-            {detail?.vintage_year && <span className="text-[11px] theme-text-muted">Vintage {detail.vintage_year}</span>}
-            {fund.manager && <span className="text-[11px] theme-text-muted truncate">· {fund.manager}</span>}
-          </div>
-        </div>
-        <span className="theme-text-muted text-lg flex-shrink-0">→</span>
-      </div>
-
-      <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t theme-border">
-        {[
-          ['Commitment', commitmentDisplay],
-          ['Drawn',      `${drawn.toFixed(1)}%`],
-          ['DPI',        `${Number(summary.dpi ?? 0).toFixed(2)}×`],
-        ].map(([label, value]) => (
-          <div key={label}>
-            <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{label}</p>
-            <p className="text-sm font-bold tabular-nums theme-text mt-0.5">{value}</p>
-          </div>
-        ))}
-      </div>
-    </button>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REPORTS SECTION — per-fund folders; open a folder to see its files; click a
@@ -2149,10 +2095,7 @@ export default function FundManagement() {
 
   const [funds,       setFunds]       = useState<FundSummary[]>([]);
   const [details,     setDetails]     = useState<Record<string, FundDetail>>({});
-  const [loading,     setLoading]     = useState(true);
   const [showWizard,  setShowWizard]  = useState(false);
-  const [showInactive,setShowInactive]= useState(true);
-  const [search,      setSearch]      = useState('');
   const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
   const [openAtTab, setOpenAtTab]     = useState<TabKey>('ledger');
 
@@ -2172,7 +2115,6 @@ export default function FundManagement() {
   }, [fundParam]);
 
   const loadFunds = useCallback(async () => {
-    setLoading(true);
     try {
       const r = await fundsAPI.list();   // backend returns all (active + inactive)
       const list: FundSummary[] = r.data;
@@ -2185,21 +2127,12 @@ export default function FundManagement() {
         } catch { /* keep loading others */ }
       }));
     } catch { toast.error('Failed to load funds'); }
-    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { loadFunds(); }, [loadFunds]);
 
   const activeCount   = funds.filter(f => f.is_active !== false).length;
   const inactiveCount = funds.length - activeCount;
-
-  const filtered = funds
-    .filter(f => showInactive || f.is_active !== false)
-    .filter(f =>
-      f.fund_name.toLowerCase().includes(search.toLowerCase()) ||
-      (f.manager  ?? '').toLowerCase().includes(search.toLowerCase()) ||
-      (f.strategy ?? '').toLowerCase().includes(search.toLowerCase())
-    );
 
   const selectedFund   = selectedFundId ? funds.find(f => f.fund_id === selectedFundId) ?? null : null;
   const selectedDetail = selectedFundId ? details[selectedFundId] : undefined;
@@ -2226,7 +2159,6 @@ export default function FundManagement() {
             <p className="text-sm theme-text-muted mt-0.5">
               {activeCount} {t('dashboard.activeFunds')}
               {inactiveCount > 0 && ` · ${t('funds.showInactive', { count: inactiveCount })}`}
-              {' · '}{t('funds.selectToView')}
             </p>
           )}
           {section === 'reports' && (
@@ -2236,12 +2168,6 @@ export default function FundManagement() {
         <div className="flex items-center gap-2 flex-wrap">
           {section === 'manage' && !selectedFund && (
             <>
-              {inactiveCount > 0 && (
-                <button onClick={() => setShowInactive(v=>!v)}
-                  className="text-sm px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text transition-colors">
-                  {showInactive ? t('funds.hideInactive') : t('funds.showInactive', { count: inactiveCount })}
-                </button>
-              )}
               {canEdit && (
                 <button onClick={() => setShowWizard(true)}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
@@ -2291,36 +2217,6 @@ export default function FundManagement() {
 
           {/* Document upload lives in the Reports section — not here */}
 
-          {/* Search */}
-          <div className="relative max-w-sm">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 theme-text-sub">🔍</span>
-            <input type="text" placeholder={t('funds.search')} value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 theme-input rounded-xl text-sm" />
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center py-20">
-              <div className="w-9 h-9 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-20 theme-text-muted">
-              <p className="text-5xl mb-4">🏦</p>
-              <p className="text-base font-medium">{t('funds.noFunds')}</p>
-              {canEdit && <p className="text-sm mt-2">{t('funds.noFundsCreate')}</p>}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {filtered.map(fund => (
-                <FundCard
-                  key={fund.fund_id}
-                  fund={fund}
-                  detail={details[fund.fund_id]}
-                  onClick={() => { setOpenAtTab('ledger'); setSelectedFundId(fund.fund_id); }}
-                />
-              ))}
-            </div>
-          )}
         </>
       )}
 
