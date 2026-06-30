@@ -528,7 +528,22 @@
     "admin": "Admin",
     "strategy": "Strategy",
     "manager": "Manager",
-    "commitment": "Commitment"
+    "commitment": "Commitment",
+    "reportsTitle": "Reports",
+    "reportsSubtitle": "Upload, edit and delete fund reports.",
+    "uploadFundDocument": "Upload Fund Document",
+    "uploadSubtitle": "Drop a PDF — AI will identify the fund, document type, and amounts automatically",
+    "dropPdfHere": "Drop a fund PDF here or click to browse",
+    "capitalCalls": "Capital calls",
+    "distributions": "Distributions",
+    "contractDocuments": "Contract / Commitment documents",
+    "files": "files",
+    "calls": "calls",
+    "dists": "dists",
+    "ledger": "Ledger",
+    "searchFunds": "Search funds...",
+    "noFundsFound": "No funds found",
+    "allFunds": "All Funds"
   },
   "fundOverview": {
     "fund": "Fund",

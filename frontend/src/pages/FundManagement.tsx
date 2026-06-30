@@ -1962,10 +1962,12 @@ function ReportFilesTile({
 
 function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
   { funds: FundSummary[]; canEdit: boolean; onChanged: () => void; onOpenLedger: (fundId: string) => void }) {
+  const { t } = useTranslation();
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [openFundId, setOpenFundId] = useState<string | null>(null);
   const [viewerDoc, setViewerDoc] = useState<any | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -1988,6 +1990,16 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
     reports.forEach(r => { (m[r.fund_id] ??= []).push(r); });
     return m;
   }, [reports]);
+
+  // Filter funds based on search query
+  const filteredFunds = useMemo(() => {
+    if (!searchQuery.trim()) return funds;
+    const query = searchQuery.toLowerCase();
+    return funds.filter(f =>
+      f.fund_name.toLowerCase().includes(query) ||
+      f.manager?.toLowerCase().includes(query)
+    );
+  }, [funds, searchQuery]);
 
   if (funds.length === 0) {
     return (
@@ -2034,37 +2046,66 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
         </div>
       ) : (
         /* ── Fund folders grid ── */
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {funds.map(f => {
-            const list  = byFund[f.fund_id] ?? [];
-            const nCall = list.filter(r => r.notice_type === 'capital_call' || r.notice_type === 'capital_and_distribution').length;
-            const nDist = list.filter(r => r.notice_type === 'distribution'  || r.notice_type === 'capital_and_distribution').length;
-            return (
-              <button key={f.fund_id} onClick={() => setOpenFundId(f.fund_id)}
-                className="theme-card border theme-border rounded-2xl p-5 text-left transition-colors hover:border-indigo-500/50">
-                <div className="flex items-start gap-3">
-                  <span className="text-3xl">📁</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold theme-text text-sm leading-snug truncate" title={f.fund_name}>{f.fund_name}</p>
-                    <p className="text-xs theme-text-muted mt-0.5">{list.length} file{list.length !== 1 ? 's' : ''}</p>
+        <div className="space-y-4">
+          {/* Search bar */}
+          <div className="relative">
+            <input
+              type="text"
+              placeholder={t('manageFunds.searchFunds')}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl border theme-border bg-transparent theme-text text-sm placeholder-gray-400"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Results count */}
+          {searchQuery && (
+            <p className="text-sm text-gray-500">
+              {filteredFunds.length} {filteredFunds.length === 1 ? t('fundOverview.fund') : t('manageFunds.allFunds')}
+            </p>
+          )}
+
+          {/* Fund grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredFunds.map(f => {
+              const list  = byFund[f.fund_id] ?? [];
+              const nCall = list.filter(r => r.notice_type === 'capital_call' || r.notice_type === 'capital_and_distribution').length;
+              const nDist = list.filter(r => r.notice_type === 'distribution'  || r.notice_type === 'capital_and_distribution').length;
+              return (
+                <button key={f.fund_id} onClick={() => setOpenFundId(f.fund_id)}
+                  className="theme-card border theme-border rounded-2xl p-5 text-left transition-colors hover:border-indigo-500/50">
+                  <div className="flex items-start gap-3">
+                    <span className="text-3xl">📁</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold theme-text text-sm leading-snug truncate" title={f.fund_name}>{f.fund_name}</p>
+                      <p className="text-xs theme-text-muted mt-0.5">{list.length} {t('manageFunds.files')}</p>
+                    </div>
+                    <span className="theme-text-muted text-lg flex-shrink-0">→</span>
                   </div>
-                  <span className="theme-text-muted text-lg flex-shrink-0">→</span>
-                </div>
-                <div className="flex items-center gap-2 mt-4 pt-3 border-t theme-border flex-wrap">
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: C.indigo,  background: C.indigoBg }}>{nCall} calls</span>
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: C.emerald, background: C.emeraldBg }}>{nDist} dists</span>
-                  <div className="ml-auto flex gap-2">
-                    <button
-                      onClick={e => { e.stopPropagation(); onOpenLedger(f.fund_id); }}
-                      className="text-[11px] font-semibold px-3 py-0.5 rounded-full border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors"
-                    >
-                      Ledger →
-                    </button>
+                  <div className="flex items-center gap-2 mt-4 pt-3 border-t theme-border flex-wrap">
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: C.indigo,  background: C.indigoBg }}>{nCall} {t('manageFunds.calls')}</span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: C.emerald, background: C.emeraldBg }}>{nDist} {t('manageFunds.dists')}</span>
+                    <div className="ml-auto flex gap-2">
+                      <button
+                        onClick={e => { e.stopPropagation(); onOpenLedger(f.fund_id); }}
+                        className="text-[11px] font-semibold px-3 py-0.5 rounded-full border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors"
+                      >
+                        {t('manageFunds.ledger')} →
+                      </button>
+                    </div>
                   </div>
-                </div>
               </button>
             );
-          })}
+            })}
+          </div>
         </div>
       )}
 
@@ -2152,7 +2193,7 @@ export default function FundManagement() {
           <h1 className="text-xl font-bold theme-text">
             {section === 'manage'
               ? (selectedFund ? selectedFund.fund_name : t('funds.title'))
-              : section === 'reports' ? 'Reports'
+              : section === 'reports' ? t('manageFunds.reportsTitle')
               : 'Cashflow'}
           </h1>
           {section === 'manage' && !selectedFund && (
@@ -2162,7 +2203,7 @@ export default function FundManagement() {
             </p>
           )}
           {section === 'reports' && (
-            <p className="text-sm theme-text-muted mt-0.5">Upload, edit and delete fund reports.</p>
+            <p className="text-sm theme-text-muted mt-0.5">{t('manageFunds.reportsSubtitle')}</p>
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">

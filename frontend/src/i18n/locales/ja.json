@@ -525,7 +525,22 @@
     "admin": "管理者",
     "strategy": "戦略",
     "manager": "マネージャー",
-    "commitment": "コミットメント"
+    "commitment": "コミットメント",
+    "reportsTitle": "レポート",
+    "reportsSubtitle": "ファンドレポートをアップロード、編集、削除します。",
+    "uploadFundDocument": "ファンドドキュメントをアップロード",
+    "uploadSubtitle": "PDFをドロップしてください — AIがファンド、ドキュメントタイプ、および金額を自動的に識別します",
+    "dropPdfHere": "ファンドPDFをここにドロップするか、クリックして参照",
+    "capitalCalls": "資本呼出",
+    "distributions": "分配",
+    "contractDocuments": "契約/コミットメント文書",
+    "files": "ファイル",
+    "calls": "呼出",
+    "dists": "分配",
+    "ledger": "レジャー",
+    "searchFunds": "ファンドを検索...",
+    "noFundsFound": "ファンドが見つかりません",
+    "allFunds": "すべてのファンド"
   },
   "fundOverview": {
     "fund": "ファンド",
