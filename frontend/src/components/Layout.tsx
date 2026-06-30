@@ -1,26 +1,27 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { usersAPI } from '../services/api';
 import { usePreferences } from '../contexts/usePreferences';
 import { LANGUAGES } from '../i18n';
 import SettingsModal from './SettingsModal';
 
 /* ── Nav items ─────────────────────────────────────────────────────────────── */
-type SubItem = { to: string; section: string; label: string };
+type SubItem = { to: string; section: string; label: string; labelKey?: string };
 const NAV_ITEMS: {
-  to: string; key: string; label?: string; icon: string; end: boolean;
+  to: string; key: string; label?: string; labelKey?: string; icon: string; end: boolean;
   adminOnly: boolean; badge: 'none' | 'users'; children?: SubItem[];
 }[] = [
   { to: '/',           key: 'nav.dashboard', icon: '⊞',  end: true,  adminOnly: false, badge: 'none' },
   { to: '/funds',      key: 'nav.funds',     icon: '🏦', end: false, adminOnly: false, badge: 'none',
     children: [
-      { to: '/funds',                  section: 'manage',   label: 'Manage Funds' },
-      { to: '/funds?section=reports',  section: 'reports',  label: 'Reports' },
-      { to: '/funds?section=cashflow', section: 'cashflow', label: 'Cashflow' },
+      { to: '/funds',                  section: 'manage',   label: 'Manage Funds',      labelKey: 'manageFunds.manageFunds' },
+      { to: '/funds?section=reports',  section: 'reports',  label: 'Reports',          labelKey: 'nav.reports' },
+      { to: '/funds?section=cashflow', section: 'cashflow', label: 'Cashflow',         labelKey: 'nav.cashflow' },
     ] },
   { to: '/fx-rates',     key: 'nav.fxRates',   icon: '💱', end: false, adminOnly: false, badge: 'none' },
-  { to: '/notifications',key: '', label: 'Alerts & Notifications', icon: '🔔', end: false, adminOnly: false, badge: 'none' },
+  { to: '/notifications',key: 'nav.alertsNotifications', labelKey: 'nav.alertsNotifications', icon: '🔔', end: false, adminOnly: false, badge: 'none' },
   { to: '/users',        key: 'nav.users',     icon: '👥', end: false, adminOnly: true,  badge: 'users' },
 ];
 
@@ -99,16 +100,15 @@ export default function Layout() {
           borderBottom: '1px solid var(--color-card-border)',
         }}>
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-8 flex-shrink-0">
-              <img
-                src="/chevron-logo.svg"
-                alt="Thirdwave"
-                className="w-full h-full object-contain"
-              />
+            <div className="w-16 h-12 flex-shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 186" className="w-full h-full object-contain" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Thirdwave logo">
+                <path fill="#2735b3" d="M84 106 104 78h43L127 124z"/>
+                <path fill="#2735b3" d="M131 124 163 66h49L178 116z"/>
+                <path fill="#2735b3" d="M185 122 218 66 273 30 230 136z"/>
+              </svg>
             </div>
             <div>
-              <p className="font-bold text-sm theme-text leading-tight">Thirdwave</p>
-              <p className="text-[11px] mt-0.5 theme-text-sub leading-tight">Investment Systems</p>
+              <p className="font-bold text-base theme-text leading-tight">{i18n.language === 'ja' ? 'サードウェーブ' : 'Thirdwave'}</p>
             </div>
           </div>
         </div>
@@ -118,7 +118,7 @@ export default function Layout() {
           <p className="text-[10px] font-bold uppercase tracking-widest px-2.5 mb-2.5 theme-text-sub">
             {t('nav.navigation')}
           </p>
-          {NAV.map(({ to, key, label, icon, end, badge, children }) => {
+          {NAV.map(({ to, key, label, labelKey, icon, end, badge, children }) => {
             const badgeCount = badge === 'users' ? pendingUsers : 0;
             return (
               <div key={to}>
@@ -141,7 +141,7 @@ export default function Layout() {
                     <span className={`text-base w-5 text-center flex-shrink-0 transition-opacity ${isActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
                       {icon}
                     </span>
-                    <span className="flex-1 truncate">{label ?? t(key)}</span>
+                    <span className="flex-1 truncate">{labelKey ? t(labelKey) : (label ?? t(key))}</span>
                     {badgeCount > 0 && isAdmin && (
                       <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none
                         ${badge === 'users' ? 'bg-amber-500 text-white' : 'bg-yellow-400 text-gray-900'}`}>
@@ -165,7 +165,7 @@ export default function Layout() {
                             ${active ? 'font-semibold' : 'theme-text-muted hover:theme-text theme-row-hover'}`}
                           style={active ? { background: 'rgba(30,64,175,0.10)', color: '#1e40af' } : undefined}
                         >
-                          {sub.label}
+                          {sub.labelKey ? t(sub.labelKey) : sub.label}
                         </button>
                       );
                     })}
@@ -182,7 +182,7 @@ export default function Layout() {
             style={{ border: '1px solid transparent' }}
           >
             <span className="text-base w-5 text-center flex-shrink-0 opacity-70 group-hover:opacity-100">⚙️</span>
-            <span className="flex-1 truncate text-left">Settings</span>
+            <span className="flex-1 truncate text-left">{t('nav.settings')}</span>
           </button>
         </nav>
 

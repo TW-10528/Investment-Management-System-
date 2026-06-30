@@ -960,7 +960,7 @@ router.post('/:id/reject', async (c) => {
   return c.json({ message: 'Report rejected.', ...reportDict(updated) })
 })
 
-// ── PATCH /:id — update document metadata (e.g., rename) ─────────────────────────
+// ── PATCH /:id — update document metadata (e.g., rename, change document type) ───
 router.patch('/:id', async (c) => {
   const user = c.get('user')
   if (!canEdit(user.role)) return c.json({ detail: 'Edit access required.' }, 403)
@@ -971,8 +971,19 @@ router.patch('/:id', async (c) => {
   const body = await c.req.json()
   const updateData: any = {}
 
+  // Update document name
   if (body.originalName) {
     updateData.originalName = body.originalName.trim()
+  }
+
+  // Update document type (allow both standard and custom types)
+  if (body.notice_type) {
+    const newType = body.notice_type.trim()
+    if (newType.length > 0) {
+      updateData.noticeType = newType
+    } else {
+      return c.json({ detail: 'Document type cannot be empty' }, 400)
+    }
   }
 
   if (Object.keys(updateData).length === 0) {

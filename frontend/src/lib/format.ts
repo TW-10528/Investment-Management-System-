@@ -1,4 +1,5 @@
 /** Formatting helpers */
+import i18n from '../i18n';
 
 // Intl currency-style formatting resolves the currency symbol from locale data,
 // which on Japanese-locale browsers returns "ドル" for USD instead of "$".
@@ -39,7 +40,16 @@ export const fmt = {
 
   date: (s?: string | null) => {
     if (!s) return '—';
-    return new Date(s).toLocaleDateString('en-US', {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '—';
+
+    if (i18n.language === 'ja') {
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      return `${year}年${month}月${day}日`;
+    }
+    return d.toLocaleDateString('en-US', {
       year: 'numeric', month: 'short', day: '2-digit',
     });
   },
@@ -48,6 +58,16 @@ export const fmt = {
     if (!s) return '—';
     const d = new Date(s);
     return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+  },
+
+  dateWithKanjiJp: (s?: string | null) => {
+    if (!s) return '—';
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '—';
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    return `${year}年${month}月${day}日`;
   },
 
   rate: (v?: number | null) => v != null ? v.toFixed(2) : '—',

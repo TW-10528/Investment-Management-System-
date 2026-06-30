@@ -6,16 +6,32 @@
  *             with the TTM rate on each date and USD + JPY columns
  *  • sigf.ts per-fund analysis panels
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { dashboardAPI, fundPdfAPI, fundsAPI, fxRatesAPI } from '../services/api';
 import type { DashboardData, FundSummary, LedgerRow } from '../types/index';
 import { usePreferences } from '../contexts/usePreferences';
 import { fmt } from '../lib/format';
+import { enableHorizontalDragScroll } from '../lib/horizontalScroll';
 
 // Distinct colours for per-fund chart series
 const PALETTE = ['#1e3a8a', '#047857', '#0f766e', '#b45309', '#475569', '#1d4ed8', '#4d7c0f', '#9f1239', '#7c3aed'];
 const shortName = (s: string) => (s.length > 16 ? s.slice(0, 15) + '…' : s);
+
+function getFundNameTranslationKey(fundName: string): string {
+  const keyMap: Record<string, string> = {
+    'Dover Street XI Feeder Fund L.P.': 'fundNames.doverStreet',
+    'Siguler Guff Small Buyout Opportunities Fund VI (F), LP': 'fundNames.sigulerGuff',
+    'Vintage X (Flagship) Offshore SCSp': 'fundNames.vintageX',
+    'Capula Global Relative Value Trust': 'fundNames.capulaGlobal',
+    'Hamilton Lane Secondary Fund VI-B LP': 'fundNames.hamiltonLaneSecondary',
+    'Hamilton Lane Strategic Opportunities Fund IX-B LP': 'fundNames.hamiltonLane',
+    'NB Real Estate Secondary Opportunities Offshore Fund II LP': 'fundNames.nealEstate',
+    'SDG Fund': 'fundNames.sdgFund',
+  };
+  return keyMap[fundName] || '';
+}
 
 // Formal / corporate palette — deep navy primary, muted green, teal, slate
 const C = {
@@ -27,7 +43,6 @@ const C = {
 };
 
 function usd(n: number) { return fmt.usd(n); }
-function pct(n: number) { return n.toFixed(2) + '%'; }
 function yen(n: number | null | undefined) {
   if (n == null) return '—';
   return '¥' + Math.round(n).toLocaleString('ja-JP');
@@ -43,31 +58,12 @@ interface ReportRow {
   distDate?: string;  ttmDist?: number;  distUsd?: number;
 }
 
-/* ── KPI card ─────────────────────────────────────────────────────────────── */
-function KpiCard({ label, value, full, sub, color = C.indigo, bg = C.indigoBg, bdr = C.indigoBdr }:
-  { label:string; value:string; full?:string; sub?:string; color?:string; bg?:string; bdr?:string }) {
-  const getValueSize = (val: string) => {
-    if (val.length > 20) return 'text-base';
-    if (val.length > 15) return 'text-lg';
-    return 'text-2xl';
-  };
-  return (
-    <div className="theme-card border rounded-xl p-4 flex flex-col h-full" style={{ borderColor: bdr, background: bg }}
-         title={full ? `${label}: ${full}` : undefined}>
-      <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-1.5">{label}</p>
-      <p className={`${getValueSize(value)} font-bold tabular-nums leading-tight break-words flex-shrink-0`} style={{ color }}>{value}</p>
-      {full && <p className="text-[11px] font-semibold tabular-nums theme-text mt-2 flex-grow">{full}</p>}
-      {sub && <p className="text-[10px] theme-text-muted mt-auto pt-1">{sub}</p>}
-    </div>
-  );
-}
-
 /* ── Status pill ──────────────────────────────────────────────────────────── */
 function StatusPill({ active }: { active: boolean }) {
   return (
     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap"
       style={active
-        ? { color: C.emerald, background: C.emeraldBg, borderColor: C.emeraldBdr }
+        ? { color: C.indigo, background: C.indigoBg, borderColor: C.indigoBdr }
         : { color: C.slate,   background: C.slateBg,   borderColor: C.slateBdr }}>
       {active ? 'Active' : 'Inactive'}
     </span>
@@ -97,7 +93,7 @@ function SigfPanel({ sigfData }: { sigfData: any }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 divide-x theme-divider border-b theme-divider">
         {[
           { col:'E', label:'Cumulative Drawn',    val: fmt.usd(t.cumulative_drawn??0),              color: C.indigo },
-          { col:'F', label:'Investment Capacity', val: fmt.usd(t.investment_capacity??0),           color: C.emerald },
+          { col:'F', label:'Investment Capacity', val: fmt.usd(t.investment_capacity??0),           color: C.indigo },
           { col:'G', label:'Net Cash Flow',       val: '−'+fmt.usd(Math.abs(t.net_cash_flow??0)),  color: C.red },
           { col:'L', label:'Non-Recallable Dist', val: fmt.usd(t.non_recallable_dist??0),           color: C.slate },
         ].map(m => (
@@ -127,7 +123,7 @@ function SigfPanel({ sigfData }: { sigfData: any }) {
 
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
-          <thead style={{ background: 'var(--color-header-bg)' }}>
+          <thead className="sticky top-0 z-10" style={{ background: 'var(--color-header-bg)' }}>
             <tr className="border-b theme-divider">
               {['#','Due Date','Call %','Paid (B)','E — Cum. Drawn','F — Inv. Capacity','G — Net CF','L — NR Dist','Cumul %'].map(h => (
                 <th key={h} className={`px-4 py-2 text-[9px] font-semibold theme-text-muted uppercase tracking-wide ${h==='#'?'text-left':'text-right'}`}>{h}</th>
@@ -142,7 +138,7 @@ function SigfPanel({ sigfData }: { sigfData: any }) {
                 <td className="px-4 py-2.5 text-right theme-text">{cc.call_pct?.toFixed(2)}%</td>
                 <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.red }}>{fmt.usd(cc.paid??0)}</td>
                 <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.indigo }}>{fmt.usd(cc.cumulative_drawn??0)}</td>
-                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.emerald }}>{fmt.usd(cc.investment_capacity??0)}</td>
+                <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.indigo }}>{fmt.usd(cc.investment_capacity??0)}</td>
                 <td className="px-4 py-2.5 text-right font-semibold" style={{ color: C.red }}>−{fmt.usd(Math.abs(cc.net_cash_flow??0))}</td>
                 <td className="px-4 py-2.5 text-right theme-text-muted">{fmt.usd(cc.non_recallable_dist??0)}</td>
                 <td className="px-4 py-2.5 text-right theme-text-muted">{cc.cumulative_pct?.toFixed(2)}%</td>
@@ -157,6 +153,7 @@ function SigfPanel({ sigfData }: { sigfData: any }) {
 
 /* ── Main component ──────────────────────────────────────────────────────── */
 export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id: string) => void }) {
+  const { t, i18n } = useTranslation();
   const prefs = usePreferences();
   const [data, setData]         = useState<DashboardData | null>(null);
   const [sigfList, setSigfList] = useState<any[]>([]);
@@ -165,6 +162,10 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
   const [loading, setLoading]   = useState(true);
   const [reports, setReports]       = useState<ReportRow[]>([]);
   const [reportsLoading, setReportsLoading] = useState(true);
+
+  // Refs for horizontal drag scrolling on tables
+  const table1Ref = useRef<HTMLDivElement>(null);
+  const table2Ref = useRef<HTMLDivElement>(null);
 
   // 1) Dashboard summary + sigf + latest TTM rate
   const load = useCallback(async () => {
@@ -232,6 +233,16 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
     if (data) loadReports(data.fund_summaries.filter(f => f.is_active !== false));
   }, [data, loadReports]);
 
+  // Attach horizontal drag scrolling to tables
+  useEffect(() => {
+    const cleanup1 = enableHorizontalDragScroll(table1Ref.current);
+    const cleanup2 = enableHorizontalDragScroll(table2Ref.current);
+    return () => {
+      cleanup1?.();
+      cleanup2?.();
+    };
+  }, []);
+
   if (loading) return (
     <div className="flex justify-center py-10">
       <div className="w-7 h-7 border-4 border-t-transparent rounded-full animate-spin"
@@ -254,81 +265,180 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
     <div className="space-y-6">
       {/* ── Portfolio summary — metric tiles ── */}
       <div>
-        <h2 className="text-sm font-bold theme-text mb-3">Portfolio Summary</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3 auto-rows-fr">
-        <KpiCard label="Total Commitments"   value={fmt.usdFull(data.total_commitment_usd)} sub={`${data.total_funds} funds`} />
-        <KpiCard label="Total Contributions" value={fmt.usdFull(data.total_called_usd)}     sub={pct(data.drawn_pct) + ' drawn'} />
-        <KpiCard label="Total Distributions" value={fmt.usdFull(data.total_received_usd)}   sub={`DPI ${data.dpi.toFixed(2)}×`} color={C.emerald} bg={C.emeraldBg} bdr={C.emeraldBdr} />
-        <KpiCard label="Total NAV (Unreal.)" value={fmt.usdFull(data.total_nav_usd)}        sub="latest reported" color={C.violet} bg="rgba(15,118,110,0.07)" bdr="rgba(15,118,110,0.2)" />
-        <KpiCard label="Total Value"         value={fmt.usdFull(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd))} sub="Distributions + NAV" color={C.indigo} />
-        <KpiCard label="MOIC"                value={`${(data.moic ?? data.tvpi ?? 0).toFixed(2)}×`} sub={`DPI ${data.dpi.toFixed(2)}× · TVPI ${(data.tvpi ?? 0).toFixed(2)}×`} color={C.emerald} bg={C.emeraldBg} bdr={C.emeraldBdr} />
-        <KpiCard label="Net IRR"             value={data.irr != null ? `${data.irr.toFixed(1)}%` : '—'} sub="since inception" color={(data.irr ?? 0) < 0 ? C.red : C.emerald} bg={(data.irr ?? 0) < 0 ? C.redBg : C.emeraldBg} bdr={(data.irr ?? 0) < 0 ? C.redBdr : C.emeraldBdr} />
-        <KpiCard label="Dry Powder"          value={fmt.usdFull(data.dry_powder_usd)}      sub={pct(100 - data.drawn_pct) + ' available'} color={C.slate} bg={C.slateBg} bdr={C.slateBdr} />
+        <h2 className="text-sm font-bold theme-text mb-3">{t('manageFunds.portfolioSummary')}</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {/* Left: 7 Regular Funds in USD */}
+          <div className="grid grid-cols-2 gap-2">
+            {(() => {
+              const regularFunds = activeFunds.filter(f => !/sdg/i.test(f.fund_name ?? ''));
+              const regularCommit = regularFunds.reduce((sum, f) => sum + (f.commitment_usd ?? 0), 0);
+              const regularDist = regularFunds.reduce((sum, f) => sum + (f.total_received_usd ?? 0), 0);
+
+              return (
+                <>
+                  <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '120px' }}>
+                    <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{prefs.language === 'ja' ? '7ファンド\nコミットメント' : '7 Funds\nCommitment'}</p>
+                    <p className="text-lg font-bold tabular-nums theme-text text-center">{fmt.usdFull(regularCommit)}</p>
+                    <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
+                  </div>
+                  <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '120px' }}>
+                    <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{prefs.language === 'ja' ? '7ファンド\n分配金' : '7 Funds\nDistribution'}</p>
+                    <p className="text-lg font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.usdFull(regularDist)}</p>
+                    <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+
+          {/* Right: SDG Fund in JPY */}
+          <div className="grid grid-cols-2 gap-2">
+            {(() => {
+              const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
+              if (!sdgFund) return null;
+
+              const sdgCommit = sdgFund.commitment_usd ?? 0;
+              const sdgDist = sdgFund.total_received_usd ?? 0;
+
+              return (
+                <>
+                  <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '120px' }}>
+                    <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{prefs.language === 'ja' ? 'SDG\nコミットメント' : 'SDG\nCommitment'}</p>
+                    <p className="text-lg font-bold tabular-nums theme-text text-center">{rate ? fmt.jpy(sdgCommit * rate) : fmt.usdFull(sdgCommit)}</p>
+                    <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
+                  </div>
+                  <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '120px' }}>
+                    <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{prefs.language === 'ja' ? 'SDG\n分配金' : 'SDG\nDistribution'}</p>
+                    <p className="text-lg font-bold tabular-nums text-center" style={{ color: C.indigo }}>{rate ? fmt.jpy(sdgDist * rate) : fmt.usdFull(sdgDist)}</p>
+                    <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
         </div>
       </div>
 
       {/* ── Charts — fund calculations ── */}
       {activeFunds.length > 0 && (() => {
-        const barData = activeFunds.map(f => ({
+        const regularFunds = activeFunds.filter(f => !/sdg/i.test(f.fund_name ?? ''));
+        const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
+
+        // 7 Funds data (USD)
+        const barDataUsd = regularFunds.map(f => ({
           name:         shortName(f.fund_name),
           Commitment:   f.commitment_usd,
           Contribution: f.total_called_usd,
           Distribution: f.total_received_usd,
         }));
-        const pieData = activeFunds
+        const pieDataUsd = regularFunds
           .map(f => ({ name: f.fund_name, value: f.total_value_usd ?? (f.total_received_usd + (f.nav_usd ?? 0)) }))
           .filter(d => d.value > 0);
+
+        // SDG Fund data (JPY)
+        const barDataJpy = sdgFund ? [{
+          name: shortName(sdgFund.fund_name),
+          Commitment:   (sdgFund.commitment_usd ?? 0) * rate,
+          Contribution: (sdgFund.total_called_usd ?? 0) * rate,
+          Distribution: (sdgFund.total_received_usd ?? 0) * rate,
+        }] : [];
+        const pieDataJpy = sdgFund ? [{
+          name: sdgFund.fund_name,
+          value: ((sdgFund.total_value_usd ?? (sdgFund.total_received_usd + (sdgFund.nav_usd ?? 0))) * rate)
+        }] : [];
+
         return (
           <div>
-            <h2 className="text-sm font-bold theme-text mb-3">Fund Calculations</h2>
+            <h2 className="text-sm font-bold theme-text mb-3">{t('manageFunds.fundCalculations')}</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Bar — commitment / contribution / distribution per fund */}
-            <div className="theme-card border theme-border rounded-2xl p-4">
-              <p className="text-sm font-bold theme-text mb-1">Commitment vs Contribution vs Distribution</p>
-              <p className="text-[10px] theme-text-muted mb-3">USD · per fund</p>
-              <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
-                  <BarChart data={barData} margin={{ top: 4, right: 8, bottom: 4, left: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-card-border)" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} interval={0} angle={-20} textAnchor="end" height={60} />
-                    <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.usdAbbr(v)} width={56} />
-                    <Tooltip formatter={(v: any) => fmt.usdFull(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="Commitment"   fill="#1e40af" radius={[3,3,0,0]} />
-                    <Bar dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} />
-                    <Bar dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              {/* Bar — 7 Funds commitment / contribution / distribution (USD) */}
+              <div className="theme-card border theme-border rounded-2xl p-4">
+                <p className="text-sm font-bold theme-text mb-1">{t('manageFunds.sevenFundsDollar')}</p>
+                <p className="text-[10px] theme-text-muted mb-3">{i18n.language === 'ja' ? 'USD · ファンド別' : 'USD · per fund'}</p>
+                <div style={{ width: '100%', height: 300 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={barDataUsd} margin={{ top: 4, right: 8, bottom: 4, left: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-card-border)" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} interval={0} angle={-20} textAnchor="end" height={60} />
+                      <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.usdAbbr(v)} width={56} />
+                      <Tooltip formatter={(v: any) => fmt.usdFull(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="Commitment"   fill="#1e40af" radius={[3,3,0,0]} />
+                      <Bar dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} />
+                      <Bar dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
 
-            {/* Pie — total value share by fund */}
-            <div className="theme-card border theme-border rounded-2xl p-4">
-              <p className="text-sm font-bold theme-text mb-1">Total Value by Fund</p>
-              <p className="text-[10px] theme-text-muted mb-3">Distributions + NAV · share of portfolio</p>
-              <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
-                  <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={95} innerRadius={48} paddingAngle={2}>
-                      {pieData.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
-                    </Pie>
-                    <Tooltip formatter={(v: any) => fmt.usdFull(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                    <Legend wrapperStyle={{ fontSize: 10 }} />
-                  </PieChart>
-                </ResponsiveContainer>
+              {/* Pie — 7 Funds total value by fund (USD) */}
+              <div className="theme-card border theme-border rounded-2xl p-4">
+                <p className="text-sm font-bold theme-text mb-1">{t('manageFunds.sevenFundsDollar')}</p>
+                <p className="text-[10px] theme-text-muted mb-3">{i18n.language === 'ja' ? '配分 · ポートフォリオ比率' : 'Distribution + NAV · Share'}</p>
+                <div style={{ width: '100%', height: 300 }}>
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={pieDataUsd} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={95} innerRadius={48} paddingAngle={2}>
+                        {pieDataUsd.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                      </Pie>
+                      <Tooltip formatter={(v: any) => fmt.usdFull(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
+
+              {/* Bar — SDG Fund commitment / contribution / distribution (JPY) */}
+              {barDataJpy.length > 0 && (
+                <div className="theme-card border theme-border rounded-2xl p-4">
+                  <p className="text-sm font-bold theme-text mb-1">{t('manageFunds.sdgFundYen')}</p>
+                  <p className="text-[10px] theme-text-muted mb-3">{i18n.language === 'ja' ? 'JPY · ファンド別' : 'JPY · per fund'}</p>
+                  <div style={{ width: '100%', height: 300 }}>
+                    <ResponsiveContainer>
+                      <BarChart data={barDataJpy} margin={{ top: 4, right: 8, bottom: 4, left: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-card-border)" vertical={false} />
+                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} interval={0} angle={-20} textAnchor="end" height={60} />
+                        <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.jpy(v)} width={80} />
+                        <Tooltip formatter={(v: any) => fmt.jpy(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Bar dataKey="Commitment"   fill="#1e40af" radius={[3,3,0,0]} />
+                        <Bar dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} />
+                        <Bar dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* Pie — SDG Fund total value (JPY) */}
+              {pieDataJpy.length > 0 && (
+                <div className="theme-card border theme-border rounded-2xl p-4">
+                  <p className="text-sm font-bold theme-text mb-1">{t('manageFunds.sdgFundYen')}</p>
+                  <p className="text-[10px] theme-text-muted mb-3">{i18n.language === 'ja' ? '配分 · ポートフォリオ比率' : 'Distribution + NAV · Share'}</p>
+                  <div style={{ width: '100%', height: 300 }}>
+                    <ResponsiveContainer>
+                      <PieChart>
+                        <Pie data={pieDataJpy} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={95} innerRadius={48} paddingAngle={2}>
+                          {pieDataJpy.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                        </Pie>
+                        <Tooltip formatter={(v: any) => fmt.jpy(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                        <Legend wrapperStyle={{ fontSize: 10 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
       })()}
 
-      {/* ── TABLE 1 — per-fund total values in JPY ── */}
+      {/* ── TABLE 1 — per-fund total values (USD for 7 Funds, JPY for SDG) ── */}
       <div className="theme-card border rounded-2xl overflow-hidden">
         <div className="px-5 py-3 border-b theme-divider flex items-center justify-between flex-wrap gap-2"
              style={{ background: C.indigoBg }}>
           <div>
-            <h2 className="text-sm font-bold theme-text">Fund Overview <span className="theme-text-muted font-medium">· JPY</span></h2>
+            <h2 className="text-sm font-bold theme-text">{t('manageFunds.fundOverview')}</h2>
             <p className="text-[10px] theme-text-muted mt-0.5">{activeFunds.length} funds</p>
           </div>
           <p className="text-[10px] theme-text-muted">
@@ -337,67 +447,145 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
               : 'No TTM rate available'}
           </p>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" ref={table1Ref} style={{ cursor: 'grab' }}>
           <table className="w-full text-sm">
             <thead className="border-b theme-divider" style={{ background: 'var(--color-header-bg)' }}>
               <tr>
                 {[
-                  { label: 'Fund Name',         left: true  },
-                  { label: 'Fund Manager',      left: true  },
-                  { label: 'Commitment',        left: false },
-                  { label: 'Contribution',      left: false },
-                  { label: 'Distribution',      left: false },
-                  { label: 'NAV (Unreal.)',     left: false },
-                  { label: 'Total Value',       left: false },
-                  { label: 'MOIC',              left: false },
-                  { label: 'Net IRR',           left: false },
-                  { label: 'Status',            left: false },
+                  { key: 'fundOverview.fundName',      label: t('fundOverview.fundName'),      left: true  },
+                  { key: 'fundOverview.fundManager',   label: t('fundOverview.fundManager'),   left: true  },
+                  { key: 'fundOverview.commitment',    label: t('fundOverview.commitment'),    left: false },
+                  { key: 'fundOverview.contribution',  label: t('fundOverview.contribution'),  left: false },
+                  { key: 'fundOverview.distribution',  label: t('fundOverview.distribution'),  left: false },
+                  { key: 'fundOverview.navUnreal',     label: t('fundOverview.navUnreal'),     left: false },
+                  { key: 'manageFunds.totalValue',     label: t('manageFunds.totalValue'),     left: false },
+                  { key: 'metrics.moic',               label: t('metrics.moic'),               left: false },
+                  { key: 'manageFunds.netIRR',         label: t('manageFunds.netIRR'),         left: false },
+                  { key: 'fundOverview.status',        label: t('fundOverview.status'),        left: false },
                 ].map(h => (
-                  <th key={h.label} className={`px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap ${h.left ? 'text-left pl-5' : 'text-right'}`}>{h.label}</th>
+                  <th key={h.key} className={`px-4 py-3 text-xs font-semibold theme-text-muted uppercase tracking-wide whitespace-nowrap sticky top-0 z-10 ${h.left ? 'text-left pl-5' : 'text-right'}`} style={{ background: 'var(--color-header-bg)' }}>{h.label}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y theme-divider">
+              {/* 7 Funds rows (USD) */}
               {activeFunds.map(f => {
                 const navUsd   = f.nav_usd ?? 0;
                 const valueUsd = f.total_value_usd ?? (f.total_received_usd + navUsd);
+                const fundNameKey = getFundNameTranslationKey(f.fund_name);
+                const isSdg = /sdg/i.test(f.fund_name ?? '');
+
+                if (isSdg) return null; // Skip SDG in main rows
+
                 return (
                   <tr key={f.fund_id} className="theme-row-hover transition-colors">
                     <td className="px-5 py-3">
                       <button onClick={() => onSelectFund?.(f.fund_id)}
                         className="font-semibold theme-text hover:text-indigo-600 text-sm transition-colors text-left">
-                        {f.fund_name}
+                        {fundNameKey ? t(fundNameKey) : f.fund_name}
                       </button>
-                      {f.fund_name_jp && <p className="text-[10px] theme-text-muted mt-0.5">{f.fund_name_jp}</p>}
                     </td>
                     <td className="px-4 py-3 text-sm theme-text">{f.manager || '—'}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{yen(jpy(f.commitment_usd))}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{yen(jpy(f.total_called_usd))}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.emerald }}>{yen(jpy(f.total_received_usd))}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums" style={{ color: C.violet }}>{yen(jpy(navUsd))}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold theme-text">{yen(jpy(valueUsd))}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{fmt.usdFull(f.commitment_usd ?? 0)}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{fmt.usdFull(f.total_called_usd ?? 0)}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{fmt.usdFull(f.total_received_usd ?? 0)}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums" style={{ color: C.violet }}>{fmt.usdFull(navUsd)}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold theme-text">{fmt.usdFull(valueUsd)}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{(f.moic ?? f.tvpi ?? 0).toFixed(2)}×</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold"
-                        style={{ color: (f.irr ?? 0) < 0 ? C.red : C.emerald }}>
+                        style={{ color: (f.irr ?? 0) < 0 ? C.red : C.indigo }}>
                       {f.irr != null ? `${f.irr.toFixed(1)}%` : '—'}
                     </td>
                     <td className="px-4 py-3 text-right"><StatusPill active={f.is_active !== false} /></td>
                   </tr>
                 );
               })}
+              {/* SDG Fund row (JPY) - placed before totals */}
+              {(() => {
+                const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
+                if (!sdgFund) return null;
+
+                const navUsd   = sdgFund.nav_usd ?? 0;
+                const valueUsd = sdgFund.total_value_usd ?? (sdgFund.total_received_usd + navUsd);
+                const fundNameKey = getFundNameTranslationKey(sdgFund.fund_name);
+
+                return (
+                  <tr key={sdgFund.fund_id} className="theme-row-hover transition-colors" style={{ borderTop: '2px solid rgba(30,64,175,0.2)' }}>
+                    <td className="px-5 py-3">
+                      <button onClick={() => onSelectFund?.(sdgFund.fund_id)}
+                        className="font-semibold theme-text hover:text-indigo-600 text-sm transition-colors text-left">
+                        {fundNameKey ? t(fundNameKey) : sdgFund.fund_name}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 text-sm theme-text">{sdgFund.manager || '—'}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{yen(jpy(sdgFund.commitment_usd))}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{yen(jpy(sdgFund.total_called_usd))}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{yen(jpy(sdgFund.total_received_usd))}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums" style={{ color: C.violet }}>{yen(jpy(navUsd))}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold theme-text">{yen(jpy(valueUsd))}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{(sdgFund.moic ?? sdgFund.tvpi ?? 0).toFixed(2)}×</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold"
+                        style={{ color: (sdgFund.irr ?? 0) < 0 ? C.red : C.indigo }}>
+                      {sdgFund.irr != null ? `${sdgFund.irr.toFixed(1)}%` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right"><StatusPill active={sdgFund.is_active !== false} /></td>
+                  </tr>
+                );
+              })()}
             </tbody>
             <tfoot className="border-t theme-divider" style={{ background: 'rgba(30,64,175,0.03)' }}>
-              <tr>
-                <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">Portfolio Total</td>
-                <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{yen(tCommit)}</td>
-                <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{yen(tContrib)}</td>
-                <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.emerald }}>{yen(tDist)}</td>
-                <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }}>{yen(tNav)}</td>
-                <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{yen(tValue)}</td>
-                <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{(data.moic ?? data.tvpi ?? 0).toFixed(2)}×</td>
-                <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: (data.irr ?? 0) < 0 ? C.red : C.emerald }}>{data.irr != null ? `${data.irr.toFixed(1)}%` : '—'}</td>
-                <td className="px-4 py-2.5"></td>
-              </tr>
+              {/* Dollar Total (7 Funds in USD) */}
+              {(() => {
+                const regularFunds = activeFunds.filter(f => !/sdg/i.test(f.fund_name ?? ''));
+                const regCommit = regularFunds.reduce((sum, f) => sum + (f.commitment_usd ?? 0), 0);
+                const regContrib = regularFunds.reduce((sum, f) => sum + (f.total_called_usd ?? 0), 0);
+                const regDist = regularFunds.reduce((sum, f) => sum + (f.total_received_usd ?? 0), 0);
+                const regNav = regularFunds.reduce((sum, f) => sum + (f.nav_usd ?? 0), 0);
+                const regValue = regularFunds.reduce((sum, f) => sum + (f.total_value_usd ?? (f.total_received_usd + (f.nav_usd ?? 0))), 0);
+                const regMoic = regularFunds.reduce((sum, f) => sum + (f.moic ?? f.tvpi ?? 0), 0) / regularFunds.length;
+                const regIrr = regularFunds.reduce((sum, f) => sum + (f.irr ?? 0), 0) / regularFunds.length;
+
+                return (
+                  <tr>
+                    <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">{t('manageFunds.dollarTotal')}</td>
+                    <td className="px-4 py-2.5"></td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{fmt.usdFull(regCommit)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{fmt.usdFull(regContrib)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{fmt.usdFull(regDist)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }}>{fmt.usdFull(regNav)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{fmt.usdFull(regValue)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{regMoic.toFixed(2)}×</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: regIrr < 0 ? C.red : C.indigo }}>{regIrr.toFixed(1)}%</td>
+                    <td className="px-4 py-2.5"></td>
+                  </tr>
+                );
+              })()}
+              {/* Yen Total (SDG Fund in JPY) */}
+              {(() => {
+                const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
+                if (!sdgFund) return null;
+
+                const sdgCommit = jpy(sdgFund.commitment_usd);
+                const sdgContrib = jpy(sdgFund.total_called_usd);
+                const sdgDist = jpy(sdgFund.total_received_usd);
+                const sdgNav = jpy(sdgFund.nav_usd);
+                const sdgValue = jpy(sdgFund.total_value_usd ?? (sdgFund.total_received_usd + sdgFund.nav_usd));
+
+                return (
+                  <tr>
+                    <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">{t('manageFunds.yenTotal')}</td>
+                    <td className="px-4 py-2.5"></td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{yen(sdgCommit)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{yen(sdgContrib)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{yen(sdgDist)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }}>{yen(sdgNav)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{yen(sdgValue)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{(sdgFund.moic ?? sdgFund.tvpi ?? 0).toFixed(2)}×</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: (sdgFund.irr ?? 0) < 0 ? C.red : C.indigo }}>{sdgFund.irr != null ? `${sdgFund.irr.toFixed(1)}%` : '—'}</td>
+                    <td className="px-4 py-2.5"></td>
+                  </tr>
+                );
+              })()}
             </tfoot>
           </table>
         </div>
@@ -405,27 +593,27 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
 
       {/* ── TABLE 2 — capital calls, distributions & FX gain/loss ── */}
       <div className="theme-card border rounded-2xl overflow-hidden">
-        <div className="px-5 py-3 border-b theme-divider flex items-center justify-between flex-wrap gap-2" style={{ background: C.emeraldBg }}>
-          <h2 className="text-sm font-bold theme-text">Capital Calls, Distribution &amp; FX Gain/Loss</h2>
+        <div className="px-5 py-3 border-b theme-divider flex items-center justify-between flex-wrap gap-2" style={{ background: C.indigoBg }}>
+          <h2 className="text-sm font-bold theme-text">{t('manageFunds.capitalCallsDistributions')}</h2>
           {rate > 0 && (
             <p className="text-[10px] theme-text-muted">FX G/L revalued at current TTM <span className="font-semibold theme-text">¥{rate.toFixed(2)}</span> / USD</p>
           )}
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" ref={table2Ref} style={{ cursor: 'grab' }}>
           <table className="w-full text-sm">
             <thead className="border-b theme-divider" style={{ background: 'var(--color-header-bg)' }}>
               <tr className="text-[10px] uppercase tracking-wide font-semibold theme-text-muted">
-                <th className="px-5 py-3 text-left whitespace-nowrap min-w-[180px]">Fund Name</th>
-                <th className="px-4 py-3 text-left whitespace-nowrap">Fund Manager</th>
-                <th className="px-4 py-3 text-left  whitespace-nowrap border-l theme-divider" style={{ color: C.indigo,  background: C.indigoBg }}>Call Due Date</th>
-                <th className="px-4 py-3 text-right whitespace-nowrap" style={{ color: C.indigo,  background: C.indigoBg }}>TTM @ Due</th>
-                <th className="px-4 py-3 text-right whitespace-nowrap" style={{ color: C.indigo,  background: C.indigoBg }}>Call USD</th>
-                <th className="px-4 py-3 text-right whitespace-nowrap" style={{ color: C.indigo,  background: C.indigoBg }}>Call ¥</th>
-                <th className="px-4 py-3 text-left  whitespace-nowrap border-l theme-divider" style={{ color: C.emerald, background: C.emeraldBg }}>Dist. Date</th>
-                <th className="px-4 py-3 text-right whitespace-nowrap" style={{ color: C.emerald, background: C.emeraldBg }}>TTM @ Dist</th>
-                <th className="px-4 py-3 text-right whitespace-nowrap" style={{ color: C.emerald, background: C.emeraldBg }}>Dist USD</th>
-                <th className="px-4 py-3 text-right whitespace-nowrap" style={{ color: C.emerald, background: C.emeraldBg }}>Dist ¥</th>
-                <th className="px-4 py-3 text-right whitespace-nowrap border-l theme-divider" style={{ color: C.violet, background: 'rgba(15,118,110,0.08)' }}>FX Gain/Loss (¥)</th>
+                <th className="px-5 py-3 text-left whitespace-nowrap min-w-[180px] sticky top-0 z-10" style={{ background: 'var(--color-header-bg)' }}>{t('fundOverview.fundName')}</th>
+                <th className="px-4 py-3 text-left whitespace-nowrap sticky top-0 z-10" style={{ background: 'var(--color-header-bg)' }}>{t('fundOverview.fundManager')}</th>
+                <th className="px-4 py-3 text-left  whitespace-nowrap border-l theme-divider sticky top-0 z-10" style={{ color: C.indigo,  background: C.indigoBg }}>{t('manageFunds.callDueDate')}</th>
+                <th className="px-4 py-3 text-right whitespace-nowrap sticky top-0 z-10" style={{ color: C.indigo,  background: C.indigoBg }}>{t('manageFunds.ttmDue')}</th>
+                <th className="px-4 py-3 text-right whitespace-nowrap sticky top-0 z-10" style={{ color: C.indigo,  background: C.indigoBg }}>{t('manageFunds.callUSD')}</th>
+                <th className="px-4 py-3 text-right whitespace-nowrap sticky top-0 z-10" style={{ color: C.indigo,  background: C.indigoBg }}>{t('manageFunds.callYen')}</th>
+                <th className="px-4 py-3 text-left  whitespace-nowrap border-l theme-divider sticky top-0 z-10" style={{ color: C.indigo, background: C.indigoBg }}>{t('manageFunds.distDate')}</th>
+                <th className="px-4 py-3 text-right whitespace-nowrap sticky top-0 z-10" style={{ color: C.indigo, background: C.indigoBg }}>{t('manageFunds.ttmDistribution')}</th>
+                <th className="px-4 py-3 text-right whitespace-nowrap sticky top-0 z-10" style={{ color: C.indigo, background: C.indigoBg }}>{t('manageFunds.distributionUSD')}</th>
+                <th className="px-4 py-3 text-right whitespace-nowrap sticky top-0 z-10" style={{ color: C.indigo, background: C.indigoBg }}>{t('manageFunds.distributionYen')}</th>
+                <th className="px-4 py-3 text-right whitespace-nowrap border-l theme-divider sticky top-0 z-10" style={{ color: C.violet, background: 'rgba(15,118,110,0.08)' }}>{t('manageFunds.fxGainLoss')}</th>
               </tr>
             </thead>
             <tbody className="divide-y theme-divider">
@@ -441,14 +629,14 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                 const glDist     = r.distUsd    != null && r.ttmDist && rate ? r.distUsd    * (rate - r.ttmDist) : 0;
                 const fxGL       = glDist - glContrib;
                 const hasGL      = (r.contribUsd != null && r.ttmDue) || (r.distUsd != null && r.ttmDist);
+                const fundNameKey = getFundNameTranslationKey(r.fund_name);
                 return (
                   <tr key={r.fund_id} className="theme-row-hover transition-colors">
                     <td className="px-5 py-3">
                       <button onClick={() => onSelectFund?.(r.fund_id)}
                         className="font-semibold theme-text hover:text-indigo-600 text-sm transition-colors text-left">
-                        {r.fund_name}
+                        {fundNameKey ? t(fundNameKey) : r.fund_name}
                       </button>
-                      {r.fund_name_jp && <p className="text-[10px] theme-text-muted mt-0.5">{r.fund_name_jp}</p>}
                     </td>
                     <td className="px-4 py-3 text-sm theme-text-muted">{r.manager || '—'}</td>
                     {/* Capital call */}
@@ -459,11 +647,11 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                     {/* Distribution */}
                     <td className="px-4 py-3 text-left theme-text-muted whitespace-nowrap border-l theme-divider">{r.distDate ? fmt.date(r.distDate) : '—'}</td>
                     <td className="px-4 py-3 text-right tabular-nums theme-text-muted">{r.ttmDist ? r.ttmDist.toFixed(2) : '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: r.distUsd ? C.emerald : undefined }}>{r.distUsd != null ? usd(r.distUsd) : '—'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: r.distUsd ? C.indigo : undefined }}>{r.distUsd != null ? usd(r.distUsd) : '—'}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{yen(distJpy)}</td>
                     {/* FX gain/loss */}
                     <td className="px-4 py-3 text-right tabular-nums font-semibold border-l theme-divider"
-                        style={{ color: !hasGL ? undefined : fxGL < 0 ? C.red : C.emerald }}>
+                        style={{ color: !hasGL ? undefined : fxGL < 0 ? C.red : C.indigo }}>
                       {hasGL ? `${fxGL < 0 ? '−' : '+'}${yen(Math.abs(fxGL))}` : '—'}
                     </td>
                   </tr>
@@ -482,7 +670,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
               return (
                 <tfoot className="border-t theme-divider" style={{ background: 'rgba(30,64,175,0.03)' }}>
                   <tr>
-                    <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">All Funds · Total</td>
+                    <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">All Funds · {t('fundNames.total')}</td>
                     <td className="px-4 py-2.5"></td>
                     <td className="px-4 py-2.5 border-l theme-divider"></td>
                     <td className="px-4 py-2.5"></td>
@@ -490,10 +678,10 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                     <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{yen(cJpy)}</td>
                     <td className="px-4 py-2.5 border-l theme-divider"></td>
                     <td className="px-4 py-2.5"></td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.emerald }}>{usd(dUsd)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{usd(dUsd)}</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{yen(dJpy)}</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold border-l theme-divider"
-                        style={{ color: gl < 0 ? C.red : C.emerald }}>
+                        style={{ color: gl < 0 ? C.red : C.indigo }}>
                       {gl < 0 ? '−' : '+'}{yen(Math.abs(gl))}
                     </td>
                   </tr>
