@@ -32,8 +32,15 @@ router.get('/summary', async (c) => {
 
   const latestFx = await prisma.fxRate.findFirst({ orderBy: { rateDate: 'desc' } })
 
+  // Enrich summaries with contract commitment values
+  const enrichedSummaries = summaries.map((s: any, idx: number) => ({
+    ...s,
+    contract_commitment_usd: funds[idx].contractCommitmentUsd ? parseFloat(funds[idx].contractCommitmentUsd.toString()) : null,
+    contract_commitment_jpy: funds[idx].contractCommitmentJpy ? parseFloat(funds[idx].contractCommitmentJpy.toString()) : null,
+  }))
+
   const strategyMap: Record<string, { commitment: number; called: number; count: number }> = {}
-  for (const s of summaries as any[]) {
+  for (const s of enrichedSummaries as any[]) {
     const strat = s.strategy ?? 'Other'
     if (!strategyMap[strat]) strategyMap[strat] = { commitment: 0, called: 0, count: 0 }
     strategyMap[strat].commitment += s.commitment_usd
@@ -119,7 +126,7 @@ router.get('/summary', async (c) => {
     latest_fx_rate: latestFx ? parseFloat(latestFx.usdJpy.toString()) : null,
     latest_fx_date: latestFx ? latestFx.rateDate.toISOString().slice(0, 10) : null,
 
-    fund_summaries:       summaries,
+    fund_summaries:       enrichedSummaries,
     strategy_breakdown:   Object.entries(strategyMap).map(([strategy, v]) => ({ strategy, ...v })),
     distribution_breakdown: distBreakdown,
     nav_by_fund:          navByFund,
