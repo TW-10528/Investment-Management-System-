@@ -74,7 +74,11 @@ router.get('/:id/ledger', async (c) => {
 
   // Use the current commitment from the fund record. The CalculationEngine will
   // apply commitment history to adjust F (investment capacity) at specific dates.
-  const commitment = new Decimal(fund.commitmentUsd.toString())
+  // For SDG fund (JPY-only), use commitmentJpy. For USD funds, use commitmentUsd.
+  const isSdg = fund.fundName && /sdg/i.test(fund.fundName)
+  const commitment = isSdg && fund.commitmentJpy
+    ? new Decimal(fund.commitmentJpy.toString())
+    : new Decimal(fund.commitmentUsd.toString())
 
   const txns = [
     ...paidCalls.map((cc: any) => ({
@@ -114,7 +118,7 @@ router.get('/:id/ledger', async (c) => {
     return c.json({ fund_id: fund.id, fund_name: fund.fundName, commitment: parseFloat(commitment.toString()), rows: [], snapshot: null })
   }
 
-  const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new Decimal('150'), commitmentHistory, fund.currency ?? 'USD')
+  const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new Decimal('150'), commitmentHistory)
   const f = (d: Decimal) => parseFloat(d.toString())
 
   return c.json({
@@ -196,7 +200,7 @@ function buildCommitmentLedger(commitmentAmount: Decimal, paidCalls: any[], dist
   if (txns.length === 0) {
     return { rows: [] as any[], snapshot: null as any }
   }
-  const { rows, snapshot } = CalculationEngine.buildLedger(commitmentAmount, txns, new Decimal('150'), [], currency)
+  const { rows, snapshot } = CalculationEngine.buildLedger(commitmentAmount, txns, new Decimal('150'), [])
   return {
     rows: rows.map((r, i) => ({
       date:                r.date.toISOString().slice(0, 10),
