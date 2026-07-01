@@ -503,7 +503,7 @@ router.put('/:id', async (c) => {
     }
     data.commitmentUsd = newAmt
   }
-  if (body.commitment_jpy !== undefined && body.commitment_jpy !== '' && body.commitment_jpy !== null) data.commitmentJpy = new Decimal(body.commitment_jpy)
+  if (body.commitment_jpy !== undefined && body.commitment_jpy !== '' && body.commitment_jpy !== null) data.commitmentJpy = BigInt(body.commitment_jpy)
   if (body.contract_commitment_usd !== undefined && body.contract_commitment_usd !== '' && body.contract_commitment_usd !== null) data.contractCommitmentUsd = new Decimal(body.contract_commitment_usd)
   if (body.contract_commitment_jpy !== undefined && body.contract_commitment_jpy !== '' && body.contract_commitment_jpy !== null) data.contractCommitmentJpy = new Decimal(body.contract_commitment_jpy)
   if (body.entry_fx_rate           !== undefined && body.entry_fx_rate !== '' && body.entry_fx_rate !== null) data.entryFxRate           = new Decimal(body.entry_fx_rate)
