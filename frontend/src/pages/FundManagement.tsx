@@ -1578,11 +1578,10 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
     setSaving(true);
     try {
       const data = { ...form };
-      // Remove contract_commitment_jpy from save (it's read-only and constant - not editable by users)
-      delete data.contract_commitment_jpy;
       // Convert numeric fields to numbers (handle zero and empty values properly)
       if (data.commitment_usd !== undefined && data.commitment_usd !== '') data.commitment_usd = parseFloat(data.commitment_usd) || 0;
       if (data.commitment_jpy !== undefined && data.commitment_jpy !== '') data.commitment_jpy = parseFloat(data.commitment_jpy) || 0;
+      if (data.contract_commitment_jpy !== undefined && data.contract_commitment_jpy !== '') data.contract_commitment_jpy = parseFloat(data.contract_commitment_jpy) || 0;
       if (data.entry_fx_rate !== undefined && data.entry_fx_rate !== '') data.entry_fx_rate = parseFloat(data.entry_fx_rate) || null;
       if (data.vintage_year !== undefined && data.vintage_year !== '') data.vintage_year = parseInt(data.vintage_year) || null;
       if (data.fund_term_years !== undefined && data.fund_term_years !== '') data.fund_term_years = parseInt(data.fund_term_years) || null;
@@ -1668,13 +1667,8 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
         )}
         {isSdg && (
           <>
-            <Field label="Commitment (JPY)"><input type="number" className={inp} value={form.commitment_jpy??''} onChange={e=>sf('commitment_jpy',e.target.value)} /></Field>
-            <Field label="Contract Commitment (JPY) - Standard">
-              <div className="px-3 py-1.5 rounded-lg border theme-border bg-gray-50/50 dark:bg-gray-900/20 text-sm theme-text">
-                ¥{form.contract_commitment_jpy ? Number(form.contract_commitment_jpy).toLocaleString() : '—'}
-              </div>
-              <p className="text-xs theme-text-muted mt-1">Read-only - Fixed contract value</p>
-            </Field>
+            <Field label="Commitment (JPY) - Variable"><input type="number" className={inp} value={form.commitment_jpy??''} onChange={e=>sf('commitment_jpy',e.target.value)} /></Field>
+            <Field label="Contract Commitment (JPY) - Standard"><input type="number" className={inp} value={form.contract_commitment_jpy??''} onChange={e=>sf('contract_commitment_jpy',e.target.value)} /></Field>
           </>
         )}
         <Field label={t('fundDetails.entryFxRate')}><input type="number" step="0.0001" className={inp} value={form.entry_fx_rate??''} onChange={e=>sf('entry_fx_rate',e.target.value)} /></Field>
