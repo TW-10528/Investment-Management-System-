@@ -767,6 +767,7 @@ function LedgerTab({ fundId, canEdit, currency }: { fundId:string; canEdit:boole
   const [rows, setRows]           = useState<LedgerRow[]>([]);
   const [snap, setSnap]           = useState<LedgerSnapshot|null>(null);
   const [fundName, setFundName]   = useState('');
+  const [fundDetail, setFundDetail] = useState<any>(null);
   const [loading, setLoading]     = useState(true);
   const [editIdx, setEditIdx]     = useState<number|null>(null);
   const [noteText, setNoteText]   = useState('');
@@ -796,12 +797,16 @@ function LedgerTab({ fundId, canEdit, currency }: { fundId:string; canEdit:boole
 
   const loadLedger = useCallback(() => {
     setLoading(true);
-    fundsAPI.ledger(fundId)
-      .then(r => {
+    Promise.all([
+      fundsAPI.ledger(fundId),
+      fundsAPI.get(fundId)
+    ])
+      .then(([r, detailsR]) => {
         const loaded = r.data.rows ?? [];
         setRows(loaded);
         setSnap(r.data.snapshot ?? null);
         setFundName(r.data.fund_name ?? '');
+        setFundDetail(detailsR.data ?? null);
         fetchMurcRates(loaded);
       })
       .finally(() => setLoading(false));
@@ -897,16 +902,22 @@ function LedgerTab({ fundId, canEdit, currency }: { fundId:string; canEdit:boole
       {snap && (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 divide-x theme-border border-b theme-border"
              style={{ background:'rgba(79,70,229,0.04)' }}>
-          {[
-            ['Commitment',  fmtAmt(snap.commitment_usd)],
-            ['Paid-in',     fmtAmt(snap.total_called_usd)],
-            ['Received',    fmtAmt(snap.total_received_usd)],
-            ['Drawn %',     fmt.pct(snap.drawn_pct)],
-            ['Unfunded',    fmtAmt(snap.unfunded_usd)],
-            ['F Inv.Cap',   fmtAmt(snap.investment_capacity)],
-            ['H Net Cash',  fmtAmt(snap.net_cash_position)],
-            ['DPI',         snap.dpi.toFixed(3)+'×'],
-          ].map(([label, value]) => (
+          {(() => {
+            const isSdg = /sdg/i.test(fundName ?? '');
+            const commitmentValue = isSdg && fundDetail?.contract_commitment_jpy
+              ? fundDetail.contract_commitment_jpy
+              : snap.commitment_usd;
+            return [
+              ['Commitment',  fmtAmt(commitmentValue)],
+              ['Paid-in',     fmtAmt(snap.total_called_usd)],
+              ['Received',    fmtAmt(snap.total_received_usd)],
+              ['Drawn %',     fmt.pct(snap.drawn_pct)],
+              ['Unfunded',    fmtAmt(snap.unfunded_usd)],
+              ['F Inv.Cap',   fmtAmt(snap.investment_capacity)],
+              ['H Net Cash',  fmtAmt(snap.net_cash_position)],
+              ['DPI',         snap.dpi.toFixed(3)+'×'],
+            ];
+          })().map(([label, value]) => (
             <div key={String(label)} className="px-3 py-2.5">
               <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{label}</p>
               <p className="text-sm font-bold tabular-nums theme-text mt-0.5">{value}</p>
@@ -1569,15 +1580,15 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
       const data = { ...form };
       // Remove contract_commitment_jpy from save (it's read-only and constant - not editable by users)
       delete data.contract_commitment_jpy;
-      // Convert numeric fields to numbers
-      if (data.commitment_usd) data.commitment_usd = parseFloat(data.commitment_usd);
-      if (data.commitment_jpy) data.commitment_jpy = parseFloat(data.commitment_jpy);
-      if (data.entry_fx_rate) data.entry_fx_rate = parseFloat(data.entry_fx_rate);
-      if (data.vintage_year) data.vintage_year = parseInt(data.vintage_year);
-      if (data.fund_term_years) data.fund_term_years = parseInt(data.fund_term_years);
-      if (data.management_fee_pct) data.management_fee_pct = parseFloat(data.management_fee_pct);
-      if (data.carry_pct) data.carry_pct = parseFloat(data.carry_pct);
-      if (data.hurdle_rate_pct) data.hurdle_rate_pct = parseFloat(data.hurdle_rate_pct);
+      // Convert numeric fields to numbers (handle zero and empty values properly)
+      if (data.commitment_usd !== undefined && data.commitment_usd !== '') data.commitment_usd = parseFloat(data.commitment_usd) || 0;
+      if (data.commitment_jpy !== undefined && data.commitment_jpy !== '') data.commitment_jpy = parseFloat(data.commitment_jpy) || 0;
+      if (data.entry_fx_rate !== undefined && data.entry_fx_rate !== '') data.entry_fx_rate = parseFloat(data.entry_fx_rate) || null;
+      if (data.vintage_year !== undefined && data.vintage_year !== '') data.vintage_year = parseInt(data.vintage_year) || null;
+      if (data.fund_term_years !== undefined && data.fund_term_years !== '') data.fund_term_years = parseInt(data.fund_term_years) || null;
+      if (data.management_fee_pct !== undefined && data.management_fee_pct !== '') data.management_fee_pct = parseFloat(data.management_fee_pct) || 0;
+      if (data.carry_pct !== undefined && data.carry_pct !== '') data.carry_pct = parseFloat(data.carry_pct) || 0;
+      if (data.hurdle_rate_pct !== undefined && data.hurdle_rate_pct !== '') data.hurdle_rate_pct = parseFloat(data.hurdle_rate_pct) || 0;
       await fundsAPI.update(fundId, data);
       toast.success('Fund details saved');
       setEditing(false);

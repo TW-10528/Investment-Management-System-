@@ -254,13 +254,6 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
   const activeFunds = data.fund_summaries.filter(f => f.is_active !== false);
   const jpy = (usdVal: number) => rate ? usdVal * rate : null;
 
-  // JPY totals across funds (single-rate basis)
-  const tCommit = jpy(data.total_commitment_usd);
-  const tContrib = jpy(data.total_called_usd);
-  const tDist   = jpy(data.total_received_usd);
-  const tNav    = jpy(data.total_nav_usd);
-  const tValue  = jpy(data.total_value_usd ?? (data.total_received_usd + data.total_nav_usd));
-
   return (
     <div className="space-y-6">
       {/* ── Portfolio summary — metric tiles ── */}
@@ -297,14 +290,14 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
               const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
               if (!sdgFund) return null;
 
-              const sdgCommit = sdgFund.commitment_usd ?? 0;
+              const sdgCommit = (sdgFund as any).contract_commitment_jpy ?? (sdgFund as any).commitment_jpy ?? 0;
               const sdgDist = sdgFund.total_received_usd ?? 0;
 
               return (
                 <>
                   <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '120px' }}>
-                    <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{prefs.language === 'ja' ? 'SDG\nコミットメント' : 'SDG\nCommitment'}</p>
-                    <p className="text-lg font-bold tabular-nums theme-text text-center">{rate ? fmt.jpy(sdgCommit * rate) : fmt.usdFull(sdgCommit)}</p>
+                    <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{prefs.language === 'ja' ? 'SDG\n契約コミットメント' : 'SDG\nContract Commitment'}</p>
+                    <p className="text-lg font-bold tabular-nums theme-text text-center">{fmt.jpy(sdgCommit)}</p>
                     <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
                   </div>
                   <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '120px' }}>
@@ -338,7 +331,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
         // SDG Fund data (JPY)
         const barDataJpy = sdgFund ? [{
           name: shortName(sdgFund.fund_name),
-          Commitment:   (sdgFund.commitment_usd ?? 0) * rate,
+          Commitment:   (sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0),
           Contribution: (sdgFund.total_called_usd ?? 0) * rate,
           Distribution: (sdgFund.total_received_usd ?? 0) * rate,
         }] : [];
@@ -565,11 +558,11 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                 const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
                 if (!sdgFund) return null;
 
-                const sdgCommit = jpy(sdgFund.commitment_usd);
-                const sdgContrib = jpy(sdgFund.total_called_usd);
-                const sdgDist = jpy(sdgFund.total_received_usd);
-                const sdgNav = jpy(sdgFund.nav_usd);
-                const sdgValue = jpy(sdgFund.total_value_usd ?? (sdgFund.total_received_usd + sdgFund.nav_usd));
+                const sdgCommit = jpy(sdgFund.commitment_usd ?? 0);
+                const sdgContrib = jpy(sdgFund.total_called_usd ?? 0);
+                const sdgDist = jpy(sdgFund.total_received_usd ?? 0);
+                const sdgNav = jpy(sdgFund.nav_usd ?? 0);
+                const sdgValue = jpy(sdgFund.total_value_usd ?? ((sdgFund.total_received_usd ?? 0) + (sdgFund.nav_usd ?? 0)));
 
                 return (
                   <tr>
