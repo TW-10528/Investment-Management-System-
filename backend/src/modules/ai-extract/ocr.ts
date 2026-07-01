@@ -25,15 +25,16 @@ export async function extractPdfText(buffer: Buffer): Promise<{ text: string; us
       return { text: pdfText, usedOcr: false }
     }
     // Scanned / image-only PDF — OCR via PaddleOCR.
-    // For SDG documents: use 0.5× viewport scale (~36 DPI) for maximum speed.
-    // SDG templates are large print → readable at low DPI. ~1-2s/page vs 25s/page at 2×.
-    // For other funds: use 1× viewport scale (~72 DPI), fast enough but readable.
+    // For SDG documents: use 0.5× viewport scale (~36 DPI) + only first page.
+    // SDG capital call amounts always appear on page 1. ~2s for complete extraction.
+    // For other funds: use 1× viewport scale (~72 DPI), 2 pages front + 1 page back.
     // Limit to first 2 + last 1 pages (3 total) for documents longer than 5 pages.
-    // SDG at 0.5× = 3 pages × ~2s = ~6s total (vs 180s at default)
-    // headPages=2 covers the fund name / date; tailPages=1 covers amounts
+    // SDG at 0.5× with 1 page = ~2s total (vs 180s at default)
     const isLikelySdg = buffer.toString('latin1', 0, 2000).includes('SDG')
     const viewportScale = isLikelySdg ? 0.5 : 1.0  // Much faster for SDG
-    const ocrText = await ocrPdf(buffer, { pageSampleLimit: 5, viewportScale, headPages: 2, tailPages: 1 })
+    const headPages = isLikelySdg ? 1 : 2  // SDG: only first page (amounts always there)
+    const tailPages = isLikelySdg ? 0 : 1  // SDG: no need for tail page
+    const ocrText = await ocrPdf(buffer, { pageSampleLimit: 5, viewportScale, headPages, tailPages })
     const text    = ocrText.trim().length > pdfText.length ? ocrText : pdfText
     return { text, usedOcr: true }
   } catch {
