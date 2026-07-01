@@ -33,8 +33,10 @@ router.get('/:id', async (c) => {
     strategy:               fund.strategy,
     vintage_year:           fund.vintageYear,
     currency:               fund.currency,
-    commitment_usd:          parseFloat(fund.commitmentUsd.toString()),
+    commitment_usd:          summary.commitment_usd,
+    commitment_jpy:          summary.commitment_jpy,
     contract_commitment_usd: fund.contractCommitmentUsd ? parseFloat(fund.contractCommitmentUsd.toString()) : null,
+    contract_commitment_jpy: fund.contractCommitmentJpy ? parseFloat(fund.contractCommitmentJpy.toString()) : null,
     entry_fx_rate:           fund.entryFxRate ? parseFloat(fund.entryFxRate.toString()) : null,
     management_fee_pct:     fund.managementFeePct ? parseFloat(fund.managementFeePct.toString()) : 0,
     carry_pct:              fund.carryPct ? parseFloat(fund.carryPct.toString()) : 0,
@@ -112,7 +114,7 @@ router.get('/:id/ledger', async (c) => {
     return c.json({ fund_id: fund.id, fund_name: fund.fundName, commitment: parseFloat(commitment.toString()), rows: [], snapshot: null })
   }
 
-  const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new Decimal('150'), commitmentHistory)
+  const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new Decimal('150'), commitmentHistory, fund.currency ?? 'USD')
   const f = (d: Decimal) => parseFloat(d.toString())
 
   return c.json({
@@ -162,7 +164,7 @@ router.get('/:id/ledger', async (c) => {
 const num = (d: any) => parseFloat(d.toString())
 
 // Build a ledger + snapshot for a given commitment amount from its calls/dists.
-function buildCommitmentLedger(commitmentAmount: Decimal, paidCalls: any[], distributions: any[]) {
+function buildCommitmentLedger(commitmentAmount: Decimal, paidCalls: any[], distributions: any[], currency: string = 'JPY') {
   const txns = [
     ...paidCalls.map((cc: any) => ({
       date:              cc.executionDate ?? cc.dueDate,
@@ -194,7 +196,7 @@ function buildCommitmentLedger(commitmentAmount: Decimal, paidCalls: any[], dist
   if (txns.length === 0) {
     return { rows: [] as any[], snapshot: null as any }
   }
-  const { rows, snapshot } = CalculationEngine.buildLedger(commitmentAmount, txns)
+  const { rows, snapshot } = CalculationEngine.buildLedger(commitmentAmount, txns, new Decimal('150'), [], currency)
   return {
     rows: rows.map((r, i) => ({
       date:                r.date.toISOString().slice(0, 10),
@@ -501,12 +503,14 @@ router.put('/:id', async (c) => {
     }
     data.commitmentUsd = newAmt
   }
-  if (body.contract_commitment_usd !== undefined) data.contractCommitmentUsd = body.contract_commitment_usd ? new Decimal(body.contract_commitment_usd) : null
-  if (body.entry_fx_rate           !== undefined) data.entryFxRate           = body.entry_fx_rate ? new Decimal(body.entry_fx_rate) : null
+  if (body.commitment_jpy !== undefined && body.commitment_jpy !== '' && body.commitment_jpy !== null) data.commitmentJpy = new Decimal(body.commitment_jpy)
+  if (body.contract_commitment_usd !== undefined && body.contract_commitment_usd !== '' && body.contract_commitment_usd !== null) data.contractCommitmentUsd = new Decimal(body.contract_commitment_usd)
+  if (body.contract_commitment_jpy !== undefined && body.contract_commitment_jpy !== '' && body.contract_commitment_jpy !== null) data.contractCommitmentJpy = new Decimal(body.contract_commitment_jpy)
+  if (body.entry_fx_rate           !== undefined && body.entry_fx_rate !== '' && body.entry_fx_rate !== null) data.entryFxRate           = new Decimal(body.entry_fx_rate)
   if (body.contract_date         !== undefined) data.contractDate        = body.contract_date ? new Date(body.contract_date) : null
   if (body.investment_period_start !== undefined) data.investmentPeriodStart = body.investment_period_start ? new Date(body.investment_period_start) : null
   if (body.investment_period_end   !== undefined) data.investmentPeriodEnd   = body.investment_period_end   ? new Date(body.investment_period_end)   : null
-  if (body.fund_term_years       !== undefined) data.fundTermYears       = body.fund_term_years ? parseInt(body.fund_term_years) : null
+  if (body.fund_term_years       !== undefined) data.fundTermYears       = body.fund_term_years !== '' && body.fund_term_years !== null ? parseInt(body.fund_term_years) : null
   if (body.management_fee_pct    !== undefined) data.managementFeePct    = body.management_fee_pct
   if (body.carry_pct             !== undefined) data.carryPct            = body.carry_pct
   if (body.hurdle_rate_pct       !== undefined) data.hurdleRatePct       = body.hurdle_rate_pct
