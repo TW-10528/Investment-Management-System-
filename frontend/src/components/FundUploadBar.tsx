@@ -305,11 +305,17 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
     try {
       const form = new FormData()
       form.append('file', file)
-      // Send the AI-extracted data to the backend so it doesn't have to re-extract
-      // This ensures the correct values from the AI extraction are used, especially
-      // for SDG funds where re-extraction may fail for scanned PDFs
+      // Send only essential extraction fields to reduce payload size
+      // Full extraction object can be very large for multi-page scanned PDFs
       if (detection.extraction) {
-        form.append('extraction_data', JSON.stringify(detection.extraction))
+        const minimal = {
+          B_capital_contribution: detection.extraction.B_capital_contribution,
+          C_distribution_received: detection.extraction.C_distribution_received,
+          D_reinvestable: detection.extraction.D_reinvestable,
+          transaction_date: detection.extraction.transaction_date,
+          currency: detection.extraction.currency,
+        }
+        form.append('extraction_data', JSON.stringify(minimal))
       }
       // Send custom document type name if it was created by user
       if (customDocTypeName) {

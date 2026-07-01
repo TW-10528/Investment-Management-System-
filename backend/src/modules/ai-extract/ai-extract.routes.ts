@@ -16,7 +16,7 @@ import { parseDoverStreet } from '../../services/fundParsers/dover-street/index'
 
 const router = new Hono<HonoEnv>()
 
-router.use('/test', bodyLimit({ maxSize: 100 * 1024 * 1024 }))
+router.use('/test', bodyLimit({ maxSize: 500 * 1024 * 1024 }))
 
 // ── POST /api/v1/ai-extract/test ──────────────────────────────────────────────
 // Accepts: multipart form with:
