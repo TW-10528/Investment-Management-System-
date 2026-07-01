@@ -85,10 +85,16 @@ export class CalculationEngine {
   ): { rows: LedgerRow[]; snapshot: FundSnapshot } {
     // Pre-sort history descending so the first match is always the latest applicable entry.
     const histSorted = [...commitmentHistory].sort((a, b) => b.effectiveDate.getTime() - a.effectiveDate.getTime())
+    // Also get ascending sort for finding the oldest (initial) commitment
+    const histSortedAsc = [...commitmentHistory].sort((a, b) => a.effectiveDate.getTime() - b.effectiveDate.getTime())
 
     function commitmentAt(date: Date): Decimal | null {
+      // Find latest entry with effectiveDate <= date
       const entry = histSorted.find(h => h.effectiveDate <= date)
-      return entry ? entry.commitmentAmount : null
+      if (entry) return entry.commitmentAmount
+      // For dates before first history entry, use the oldest (initial) commitment
+      if (histSortedAsc.length > 0) return histSortedAsc[0].commitmentAmount
+      return null
     }
 
     const sorted = [...transactions].sort((a, b) => a.date.getTime() - b.date.getTime())
