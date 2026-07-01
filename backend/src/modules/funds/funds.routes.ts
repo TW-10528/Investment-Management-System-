@@ -34,7 +34,7 @@ router.get('/:id', async (c) => {
     vintage_year:           fund.vintageYear,
     currency:               fund.currency,
     commitment_usd:          summary.commitment_usd,
-    commitment_jpy:          summary.commitment_jpy,
+    commitment_jpy:          fund.commitmentJpy ? Number(fund.commitmentJpy.toString()) : null,
     contract_commitment_usd: fund.contractCommitmentUsd ? parseFloat(fund.contractCommitmentUsd.toString()) : null,
     contract_commitment_jpy: fund.contractCommitmentJpy ? parseFloat(fund.contractCommitmentJpy.toString()) : null,
     entry_fx_rate:           fund.entryFxRate ? parseFloat(fund.entryFxRate.toString()) : null,
