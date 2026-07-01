@@ -515,25 +515,55 @@ router.put('/:id', async (c) => {
 
     // Create commitment history entry when commitment_jpy changes (for SDG fund ledger tracking)
     if (newJpyAmt !== oldJpyAmt && oldJpyAmt !== 0) {
-      const [latestCall, latestDist] = await Promise.all([
-        prisma.capitalCall.findFirst({
-          where: { fundId: fund.id, status: { in: ['approved', 'paid'] } },
-          orderBy: { executionDate: 'desc' },
-        }),
-        prisma.distribution.findFirst({
-          where: { fundId: fund.id },
-          orderBy: { distributionDate: 'desc' },
-        }),
+      const [callCount, distCount, histCount] = await Promise.all([
+        prisma.capitalCall.count({ where: { fundId: fund.id, status: { in: ['approved', 'paid'] } } }),
+        prisma.distribution.count({ where: { fundId: fund.id } }),
+        prisma.fundCommitmentHistory.count({ where: { fundId: fund.id } }),
       ])
-      const dates = [latestCall?.executionDate, latestDist?.distributionDate].filter(Boolean) as Date[]
-      let effectiveDate = new Date()
-      if (dates.length > 0) {
-        const maxDate = new Date(Math.max(...dates.map(d => d.getTime())))
-        effectiveDate = new Date(maxDate.getTime() + 86400000)  // Add 1 day
+
+      if (callCount > 0 || distCount > 0) {
+        if (histCount === 0) {
+          // First-ever change — record the old commitment at the earliest tx date
+          // so all existing rows keep using the old commitment, not the new one
+          const [earliestCall, earliestDist] = await Promise.all([
+            prisma.capitalCall.findFirst({
+              where: { fundId: fund.id, status: { in: ['approved', 'paid'] } },
+              orderBy: { executionDate: 'asc' },
+            }),
+            prisma.distribution.findFirst({
+              where: { fundId: fund.id },
+              orderBy: { distributionDate: 'asc' },
+            }),
+          ])
+          const dates = [earliestCall?.executionDate, earliestDist?.distributionDate].filter(Boolean) as Date[]
+          const anchorDate = dates.length > 0
+            ? new Date(Math.min(...dates.map(d => d.getTime())))
+            : new Date()
+          await prisma.fundCommitmentHistory.create({
+            data: { fundId: fund.id, commitmentAmount: new Decimal(oldJpyAmt), effectiveDate: anchorDate, notes: 'Initial commitment (auto-anchored)' },
+          })
+        }
+        // New commitment takes effect from the day AFTER the latest transaction
+        const [latestCall, latestDist] = await Promise.all([
+          prisma.capitalCall.findFirst({
+            where: { fundId: fund.id, status: { in: ['approved', 'paid'] } },
+            orderBy: { executionDate: 'desc' },
+          }),
+          prisma.distribution.findFirst({
+            where: { fundId: fund.id },
+            orderBy: { distributionDate: 'desc' },
+          }),
+        ])
+        const dates = [latestCall?.executionDate, latestDist?.distributionDate].filter(Boolean) as Date[]
+        let effectiveDate = new Date()
+        if (dates.length > 0) {
+          const maxDate = new Date(Math.max(...dates.map(d => d.getTime())))
+          effectiveDate = new Date(maxDate.getTime() + 86400000)  // Add 1 day
+        }
+        await prisma.fundCommitmentHistory.create({
+          data: { fundId: fund.id, commitmentAmount: new Decimal(newJpyAmt), effectiveDate, notes: 'Updated via Fund Details' },
+        })
       }
-      await prisma.fundCommitmentHistory.create({
-        data: { fundId: fund.id, commitmentAmount: new Decimal(newJpyAmt), effectiveDate, notes: 'Updated via Fund Details' },
-      })
     }
   }
   if (body.contract_commitment_usd !== undefined && body.contract_commitment_usd !== '' && body.contract_commitment_usd !== null) data.contractCommitmentUsd = new Decimal(body.contract_commitment_usd)
