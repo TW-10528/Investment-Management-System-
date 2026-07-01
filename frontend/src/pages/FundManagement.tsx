@@ -1547,8 +1547,9 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
       strategy:                detail.strategy??'',
       vintage_year:            detail.vintage_year??'',
       currency:                detail.currency??'USD',
-      commitment_usd:          detail.commitment_usd??'',
-      contract_commitment_usd: isSdg ? (detail.contract_commitment_usd??'') : undefined,
+      commitment_usd:          isSdg ? undefined : (detail.commitment_usd??''),
+      commitment_jpy:          isSdg ? (detail.commitment_jpy??'') : undefined,
+      contract_commitment_jpy: isSdg ? (detail.contract_commitment_jpy??'') : undefined,
       entry_fx_rate:           detail.entry_fx_rate??'',
       contract_date:           detail.contract_date??'',
       investment_period_start: detail.investment_period_start??'',
@@ -1566,9 +1567,11 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
     setSaving(true);
     try {
       const data = { ...form };
+      // Remove contract_commitment_jpy from save (it's read-only and constant - not editable by users)
+      delete data.contract_commitment_jpy;
       // Convert numeric fields to numbers
       if (data.commitment_usd) data.commitment_usd = parseFloat(data.commitment_usd);
-      if (data.contract_commitment_usd) data.contract_commitment_usd = parseFloat(data.contract_commitment_usd);
+      if (data.commitment_jpy) data.commitment_jpy = parseFloat(data.commitment_jpy);
       if (data.entry_fx_rate) data.entry_fx_rate = parseFloat(data.entry_fx_rate);
       if (data.vintage_year) data.vintage_year = parseInt(data.vintage_year);
       if (data.fund_term_years) data.fund_term_years = parseInt(data.fund_term_years);
@@ -1603,8 +1606,8 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
             [t('fundDetails.strategy'),            detail.strategy],
             [t('fundDetails.vintageYear'),        detail.vintage_year],
             [t('fundDetails.currency'),            detail.currency],
-            [isSdg ? t('fundDetails.commitmentUsd').replace('(USD)', '(JPY)') : t('fundDetails.commitmentUsd'),         detail.commitment_usd ? (isSdg ? `¥${Number(detail.commitment_usd).toLocaleString()}` : fmt.usd(Number(detail.commitment_usd))) : '—'],
-            ...(isSdg ? [[t('fundDetails.commitmentUsd').replace('Commitment (USD)', 'Contract Commitment (JPY)'), detail.contract_commitment_usd ? `¥${Number(detail.contract_commitment_usd).toLocaleString()}` : '—']] : []),
+            ...(isSdg ? [['Commitment (JPY) - Variable', (detail as any).commitment_jpy ? `¥${Number((detail as any).commitment_jpy).toLocaleString()}` : '—']] : [[t('fundDetails.commitmentUsd'), detail.commitment_usd ? fmt.usd(Number(detail.commitment_usd)) : '—']]),
+            ...(isSdg ? [['Contract Commitment (JPY) - Standard', (detail as any).contract_commitment_jpy ? `¥${Number((detail as any).contract_commitment_jpy).toLocaleString()}` : '—']] : []),
             [t('fundDetails.entryFxRate'),            detail.entry_fx_rate ? Number(detail.entry_fx_rate).toFixed(4) : '—'],
             [t('fundDetails.contractDate'),       detail.contract_date],
             [t('fundDetails.investmentPeriodStart'),   detail.investment_period_start],
@@ -1649,9 +1652,19 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
             <option>USD</option><option>EUR</option><option>JPY</option>
           </select>
         </Field>
-        <Field label={isSdg ? t('fundDetails.commitmentUsd').replace('(USD)', '(JPY)') : t('fundDetails.commitmentUsd')}><input type="number" className={inp} value={form.commitment_usd??''} onChange={e=>sf('commitment_usd',e.target.value)} /></Field>
+        {!isSdg && (
+          <Field label={t('fundDetails.commitmentUsd')}><input type="number" className={inp} value={form.commitment_usd??''} onChange={e=>sf('commitment_usd',e.target.value)} /></Field>
+        )}
         {isSdg && (
-          <Field label={t('fundDetails.commitmentUsd').replace('Commitment (USD)', 'Contract Commitment (JPY)')}><input type="number" className={inp} value={form.contract_commitment_usd??''} onChange={e=>sf('contract_commitment_usd',e.target.value)} /></Field>
+          <>
+            <Field label="Commitment (JPY)"><input type="number" className={inp} value={form.commitment_jpy??''} onChange={e=>sf('commitment_jpy',e.target.value)} /></Field>
+            <Field label="Contract Commitment (JPY) - Standard">
+              <div className="px-3 py-1.5 rounded-lg border theme-border bg-gray-50/50 dark:bg-gray-900/20 text-sm theme-text">
+                ¥{form.contract_commitment_jpy ? Number(form.contract_commitment_jpy).toLocaleString() : '—'}
+              </div>
+              <p className="text-xs theme-text-muted mt-1">Read-only - Fixed contract value</p>
+            </Field>
+          </>
         )}
         <Field label={t('fundDetails.entryFxRate')}><input type="number" step="0.0001" className={inp} value={form.entry_fx_rate??''} onChange={e=>sf('entry_fx_rate',e.target.value)} /></Field>
         <Field label={t('fundDetails.contractDate')}><input type="date" className={inp} value={form.contract_date??''} onChange={e=>sf('contract_date',e.target.value)} /></Field>
@@ -1712,11 +1725,11 @@ function FundSection({
   }, [fundId, isSdg]);
   useEffect(() => { refreshHistCommitment(); }, [refreshHistCommitment]);
 
-  // For commitments page: show permanent contract commitment for SDG, regular commitment for others
-  // SDG: displayCommitment = contract_commitment_usd (fixed/standard base)
-  // Others: displayCommitment = commitment_usd (regular commitment value)
+  // For commitments page: show contract_commitment_jpy for SDG, commitment_usd for others
+  // SDG: displayCommitment = contract_commitment_jpy (fixed contract amount in JPY)
+  // Others: displayCommitment = commitment_usd (USD value)
   const displayCommitment = isSdg
-    ? Number(detail.contract_commitment_usd ?? detail.commitment_usd ?? 0)
+    ? Number((detail as any).contract_commitment_jpy ?? (detail as any).commitment_jpy ?? detail.commitment_usd ?? 0)
     : Number(detail.commitment_usd ?? 0);
 
   async function toggleActive() {
