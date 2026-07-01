@@ -5,6 +5,7 @@
 //         → recalculate ledger via CalculationEngine → return updated snapshot.
 
 import { Hono } from 'hono'
+import { bodyLimit } from 'hono/body-limit'
 import fs from 'fs'
 import path from 'path'
 import { createHash } from 'node:crypto'
@@ -26,6 +27,7 @@ import { config } from '../../config/index'
 
 const router = new Hono<HonoEnv>()
 router.use('*', auth)
+router.use('/upload', bodyLimit({ maxSize: 500 * 1024 * 1024 }))
 
 // Upload folder name per fund (defaults to the fundKey with hyphens → spaces).
 // Override here when a fund should store its PDFs under a friendlier name.
