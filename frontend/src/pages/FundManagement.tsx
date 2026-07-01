@@ -1616,8 +1616,8 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
             [t('fundDetails.strategy'),            detail.strategy],
             [t('fundDetails.vintageYear'),        detail.vintage_year],
             [t('fundDetails.currency'),            detail.currency],
-            ...(isSdg ? [['Commitment (JPY) - Variable', (detail as any).commitment_jpy ? `¥${Number((detail as any).commitment_jpy).toLocaleString()}` : '—']] : [[t('fundDetails.commitmentUsd'), detail.commitment_usd ? fmt.usd(Number(detail.commitment_usd)) : '—']]),
-            ...(isSdg ? [['Contract Commitment (JPY) - Standard', (detail as any).contract_commitment_jpy ? `¥${Number((detail as any).contract_commitment_jpy).toLocaleString()}` : '—']] : []),
+            ...(isSdg ? [['Commitment (JPY)', (detail as any).commitment_jpy ? `¥${Number((detail as any).commitment_jpy).toLocaleString()}` : '—']] : [[t('fundDetails.commitmentUsd'), detail.commitment_usd ? fmt.usd(Number(detail.commitment_usd)) : '—']]),
+            ...(isSdg ? [['Contract Commitment (JPY)', (detail as any).contract_commitment_jpy ? `¥${Number((detail as any).contract_commitment_jpy).toLocaleString()}` : '—']] : []),
             [t('fundDetails.entryFxRate'),            detail.entry_fx_rate ? Number(detail.entry_fx_rate).toFixed(4) : '—'],
             [t('fundDetails.contractDate'),       detail.contract_date],
             [t('fundDetails.investmentPeriodStart'),   detail.investment_period_start],
@@ -1667,8 +1667,8 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
         )}
         {isSdg && (
           <>
-            <Field label="Commitment (JPY) - Variable"><input type="number" className={inp} value={form.commitment_jpy??''} onChange={e=>sf('commitment_jpy',e.target.value)} /></Field>
-            <Field label="Contract Commitment (JPY) - Standard"><input type="number" className={inp} value={form.contract_commitment_jpy??''} onChange={e=>sf('contract_commitment_jpy',e.target.value)} /></Field>
+            <Field label="Commitment (JPY)"><input type="number" className={inp} value={form.commitment_jpy??''} onChange={e=>sf('commitment_jpy',e.target.value)} /></Field>
+            <Field label="Contract Commitment (JPY)"><input type="number" className={inp} value={form.contract_commitment_jpy??''} onChange={e=>sf('contract_commitment_jpy',e.target.value)} /></Field>
           </>
         )}
         <Field label={t('fundDetails.entryFxRate')}><input type="number" step="0.0001" className={inp} value={form.entry_fx_rate??''} onChange={e=>sf('entry_fx_rate',e.target.value)} /></Field>
