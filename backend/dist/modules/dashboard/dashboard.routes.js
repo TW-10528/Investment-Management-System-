@@ -11,7 +11,14 @@ router.use('*', auth_1.auth);
 router.get('/summary', async (c) => {
     const funds = await prisma_1.prisma.fund.findMany({ where: { isActive: true } });
     const summaries = await Promise.all(funds.map(f => calculationEngine_1.CalculationEngine.fundSummary(f)));
-    const totalCommitment = summaries.reduce((s, f) => s + f.commitment_usd, 0);
+    // For each fund, use contract commitment (USD or JPY) if it exists, else use current commitment
+    const totalCommitment = summaries.reduce((s, f, idx) => {
+        const contractUsd = funds[idx].contractCommitmentUsd ? parseFloat(funds[idx].contractCommitmentUsd.toString()) : 0;
+        const contractJpy = funds[idx].contractCommitmentJpy ? parseFloat(funds[idx].contractCommitmentJpy.toString()) : 0;
+        const currentCommit = f.commitment_usd;
+        // Use USD if available, else use JPY (as-is for JPY funds like SDG), else use current commitment
+        return s + (contractUsd > 0 ? contractUsd : (contractJpy > 0 ? contractJpy : currentCommit));
+    }, 0);
     const totalCalled = summaries.reduce((s, f) => s + f.total_called_usd, 0);
     const totalReceived = summaries.reduce((s, f) => s + f.total_received_usd, 0);
     const netCash = summaries.reduce((s, f) => s + f.net_cash_position, 0);
@@ -26,8 +33,14 @@ router.get('/summary', async (c) => {
         .filter(cc => { const d = new Date(cc.dueDate); return d >= today && d <= todayEnd; })
         .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
     const latestFx = await prisma_1.prisma.fxRate.findFirst({ orderBy: { rateDate: 'desc' } });
+    // Enrich summaries with contract commitment values
+    const enrichedSummaries = summaries.map((s, idx) => ({
+        ...s,
+        contract_commitment_usd: funds[idx].contractCommitmentUsd ? parseFloat(funds[idx].contractCommitmentUsd.toString()) : null,
+        contract_commitment_jpy: funds[idx].contractCommitmentJpy ? parseFloat(funds[idx].contractCommitmentJpy.toString()) : null,
+    }));
     const strategyMap = {};
-    for (const s of summaries) {
+    for (const s of enrichedSummaries) {
         const strat = s.strategy ?? 'Other';
         if (!strategyMap[strat])
             strategyMap[strat] = { commitment: 0, called: 0, count: 0 };
@@ -109,7 +122,7 @@ router.get('/summary', async (c) => {
         })),
         latest_fx_rate: latestFx ? parseFloat(latestFx.usdJpy.toString()) : null,
         latest_fx_date: latestFx ? latestFx.rateDate.toISOString().slice(0, 10) : null,
-        fund_summaries: summaries,
+        fund_summaries: enrichedSummaries,
         strategy_breakdown: Object.entries(strategyMap).map(([strategy, v]) => ({ strategy, ...v })),
         distribution_breakdown: distBreakdown,
         nav_by_fund: navByFund,

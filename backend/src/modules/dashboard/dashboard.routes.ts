@@ -14,7 +14,14 @@ router.get('/summary', async (c) => {
   const funds     = await prisma.fund.findMany({ where: { isActive: true } })
   const summaries = await Promise.all(funds.map(f => CalculationEngine.fundSummary(f)))
 
-  const totalCommitment = summaries.reduce((s: number, f: any) => s + f.commitment_usd, 0)
+  // For each fund, use contract commitment (USD or JPY) if it exists, else use current commitment
+  const totalCommitment = summaries.reduce((s: number, f: any, idx: number) => {
+    const contractUsd = funds[idx].contractCommitmentUsd ? parseFloat(funds[idx].contractCommitmentUsd.toString()) : 0
+    const contractJpy = funds[idx].contractCommitmentJpy ? parseFloat(funds[idx].contractCommitmentJpy.toString()) : 0
+    const currentCommit = f.commitment_usd
+    // Use USD if available, else use JPY (as-is for JPY funds like SDG), else use current commitment
+    return s + (contractUsd > 0 ? contractUsd : (contractJpy > 0 ? contractJpy : currentCommit))
+  }, 0)
   const totalCalled     = summaries.reduce((s: number, f: any) => s + f.total_called_usd, 0)
   const totalReceived   = summaries.reduce((s: number, f: any) => s + f.total_received_usd, 0)
   const netCash         = summaries.reduce((s: number, f: any) => s + f.net_cash_position, 0)

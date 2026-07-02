@@ -201,7 +201,7 @@ export class CalculationEngine {
 
   /** Get current fund summary (used by list and dashboard endpoints). */
   static async fundSummary(fund: any): Promise<Record<string, unknown>> {
-    const [paidCalls, distributions, navRec] = await Promise.all([
+    const [paidCalls, distributions, navRec, commitmentHistory] = await Promise.all([
       prisma.capitalCall.findMany({
         where:   { fundId: fund.id, status: { in: ['approved', 'paid'] } },
         orderBy: { executionDate: 'asc' },
@@ -211,6 +211,10 @@ export class CalculationEngine {
         orderBy: { distributionDate: 'asc' },
       }),
       prisma.navRecord.findFirst({ where: { fundId: fund.id }, orderBy: { navDate: 'desc' } }),
+      prisma.fundCommitmentHistory.findMany({
+        where:   { fundId: fund.id },
+        orderBy: { effectiveDate: 'asc' },
+      }),
     ])
     const navUsd  = navRec ? parseFloat(navRec.navUsd?.toString() ?? '0') : 0
     const navDate = navRec ? new Date(navRec.navDate) : null
@@ -269,7 +273,11 @@ export class CalculationEngine {
       }
     }
 
-    const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns)
+    const commHistory = commitmentHistory.map(h => ({
+      commitmentAmount: new Decimal(h.commitmentAmount.toString()),
+      effectiveDate: new Date(h.effectiveDate),
+    }))
+    const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new Decimal('150'), commHistory)
     const f = (d: Decimal) => parseFloat(d.toString())
     // JPY totals (sum of each row's B×fx / C×fx) for the dashboard's per-fund view.
     const totalCalledJpy   = rows.reduce((s, r) => s.plus(r.capitalPaidJpy),     new Decimal(0))

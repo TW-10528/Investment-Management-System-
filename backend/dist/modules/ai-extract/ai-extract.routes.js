@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const hono_1 = require("hono");
+const body_limit_1 = require("hono/body-limit");
 const ocr_1 = require("./ocr");
 const index_1 = require("../../config/index");
 const prompts_1 = require("./prompts");
@@ -11,6 +12,7 @@ const index_3 = require("../../services/fundParsers/hamilton-lane/index");
 const index_4 = require("../../services/fundParsers/hamilton-strategic/index");
 const index_5 = require("../../services/fundParsers/dover-street/index");
 const router = new hono_1.Hono();
+router.use('/test', (0, body_limit_1.bodyLimit)({ maxSize: 500 * 1024 * 1024 }));
 // ── POST /api/v1/ai-extract/test ──────────────────────────────────────────────
 // Accepts: multipart form with:
 //   file         – PDF file
@@ -21,25 +23,33 @@ const router = new hono_1.Hono();
 //   model_name   – model name                         (optional, overrides config)
 router.post('/test', async (c) => {
     try {
-        const body = await c.req.parseBody();
+        console.log('[ai-extract] POST /test - Starting file upload processing');
+        const body = await c.req.parseBody({ all: true });
         const fileField = body['file'];
         if (!fileField || typeof fileField === 'string') {
+            console.warn('[ai-extract] No valid file field in request');
             return c.json({ detail: 'No PDF file uploaded. Send multipart form with field "file".' }, 400);
         }
         const file = fileField;
+        console.log(`[ai-extract] File received: ${file.name}, size: ${file.size} bytes`);
         const buffer = Buffer.from(await file.arrayBuffer());
+        console.log(`[ai-extract] Buffer created: ${buffer.length} bytes`);
         // ── Extract PDF text (OCR fallback for scanned PDFs) ──────────────────
         let pdfText = '';
         let usedOcr = false;
         try {
+            console.log('[ai-extract] Extracting PDF text...');
             const result = await (0, ocr_1.extractPdfText)(buffer);
             pdfText = result.text;
             usedOcr = result.usedOcr;
+            console.log(`[ai-extract] PDF text extracted: ${pdfText.length} chars, OCR used: ${usedOcr}`);
         }
-        catch {
+        catch (err) {
+            console.error('[ai-extract] PDF extraction error:', err.message);
             return c.json({ detail: 'Could not parse PDF. Ensure the file is a valid PDF.' }, 400);
         }
         if (!pdfText || pdfText.length < 20) {
+            console.warn('[ai-extract] Insufficient text extracted from PDF');
             return c.json({
                 detail: 'Could not extract text from this PDF even after OCR. The file may be corrupt or in an unsupported format.',
             }, 422);
@@ -64,8 +74,10 @@ router.post('/test', async (c) => {
         // recognises as SDG bypasses Stage 1 & 2 entirely.
         // If no amount was found (confidence = 0.3) the frontend shows 0 with a low
         // gate score so the user knows to review — still better than a 500 error.
+        console.log('[ai-extract] Checking if document is SDG...');
         const sdgDet = (0, sdgExtractor_1.extractSdgNotice)(pdfText, file.name);
         if (sdgDet) {
+            console.log(`[ai-extract] ✓ SDG document detected: ${sdgDet.fundName}, confidence: ${sdgDet.confidence}`);
             const detReportType = sdgDet.noticeType === 'distribution' ? 'DISTRIBUTION' : 'CAPITAL_CALL';
             const detExtraction = {
                 transaction_date: sdgDet.dueDate,
@@ -103,10 +115,14 @@ router.post('/test', async (c) => {
             });
         }
         // ── Stage 1: Classify ─────────────────────────────────────────────────
+        console.log(`[ai-extract] SDG not detected, proceeding to AI classification using model: ${modelName}`);
+        console.log(`[ai-extract] Stage 1: Classifying document...`);
         const classifyPrompt = prompts_1.CLASSIFIER_PROMPT.replace('{{DOCUMENT_TEXT}}', truncate(pdfText, 6000));
         const stage1Raw = await callModel(modelUrl, modelName, prompts_1.SYSTEM_PROMPT, classifyPrompt);
         const classification = parseJSON(stage1Raw);
+        console.log(`[ai-extract] Stage 1 classification: ${classification?.fund_key ?? 'unknown'}, confidence: ${classification?.confidence_score ?? 0}`);
         if (!classification) {
+            console.error('[ai-extract] Stage 1: Invalid JSON response from model');
             return c.json({
                 detail: 'Model returned invalid JSON for classification.',
                 raw_response: stage1Raw,
@@ -114,12 +130,16 @@ router.post('/test', async (c) => {
         }
         const { fund_key, fund_display_name, report_type, currency, confidence_score } = classification;
         const isUnknown = !fund_key || fund_key === 'UNKNOWN' || confidence_score < 75;
+        console.log(`[ai-extract] Stage 1 result: fund_key=${fund_key}, confidence=${confidence_score}%, report_type=${report_type}`);
         // ── Stage 2: Extract ──────────────────────────────────────────────────
+        console.log(`[ai-extract] Stage 2: Extracting data for fund: ${fund_display_name}`);
         const extractorTemplate = prompts_1.EXTRACTOR_PROMPTS[fund_key] ?? prompts_1.EXTRACTOR_PROMPTS['UNKNOWN'];
         const extractPrompt = extractorTemplate.replace('{{DOCUMENT_TEXT}}', truncate(pdfText, 8000));
         const stage2Raw = await callModel(modelUrl, modelName, prompts_1.SYSTEM_PROMPT, extractPrompt);
         const extraction = parseJSON(stage2Raw);
+        console.log(`[ai-extract] Stage 2 extraction result:`, extraction);
         if (!extraction) {
+            console.error('[ai-extract] Stage 2: Invalid JSON response from model');
             return c.json({
                 detail: 'Model returned invalid JSON for extraction.',
                 classification,
@@ -170,6 +190,8 @@ router.post('/test', async (c) => {
         // ── Confidence gate ───────────────────────────────────────────────────
         const extractionConf = extraction.extraction_confidence ?? extraction.mapping_confidence ?? 0;
         const gate = confidenceGate(confidence_score, extractionConf);
+        console.log(`[ai-extract] Processing complete. Confidence gate: ${gate.label} (${gate.level})`);
+        console.log(`[ai-extract] Returning response for ${fund_display_name}`);
         return c.json({
             // ── Input
             pdf_characters: pdfText.length,
@@ -193,13 +215,15 @@ router.post('/test', async (c) => {
         });
     }
     catch (err) {
+        console.error('[ai-extract] ERROR:', err);
         if (err.message?.includes('fetch') || err.code === 'ECONNREFUSED') {
+            console.error('[ai-extract] Cannot reach AI model at', index_1.config.aiModelUrl);
             return c.json({
                 detail: `Cannot reach AI model at ${index_1.config.aiModelUrl}. Is Ollama/vLLM running?`,
                 hint: 'Start Ollama: ollama serve  |  then pull: ollama pull qwen2.5:32b',
             }, 503);
         }
-        console.error('[ai-extract]', err);
+        console.error('[ai-extract] Unexpected error:', err.message);
         return c.json({ detail: err.message ?? 'Internal error' }, 500);
     }
 });

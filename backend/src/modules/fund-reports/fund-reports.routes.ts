@@ -859,9 +859,10 @@ router.post('/:id/approve', async (c) => {
   }
 
   // ── Recalculate full ledger via CalculationEngine ──────────────────────────
-  const [paidCalls, distributions] = await Promise.all([
+  const [paidCalls, distributions, commitmentHistory] = await Promise.all([
     prisma.capitalCall.findMany({ where: { fundId: notice.fundId, status: { in: ['approved', 'paid'] } }, orderBy: { executionDate: 'asc' } }),
     prisma.distribution.findMany({ where: { fundId: notice.fundId }, orderBy: { distributionDate: 'asc' } }),
+    prisma.fundCommitmentHistory.findMany({ where: { fundId: notice.fundId }, orderBy: { effectiveDate: 'asc' } }),
   ])
 
   const commitment = new Decimal(fund.commitmentUsd.toString())
@@ -896,7 +897,11 @@ router.post('/:id/approve', async (c) => {
   let ledgerRows: any[] = []
 
   if (txns.length > 0) {
-    const result = CalculationEngine.buildLedger(commitment, txns)
+    const commHistory = commitmentHistory.map(h => ({
+      commitmentAmount: new Decimal(h.commitmentAmount.toString()),
+      effectiveDate: new Date(h.effectiveDate),
+    }))
+    const result = CalculationEngine.buildLedger(commitment, txns, new Decimal('150'), commHistory)
     snapshot     = result.snapshot
     ledgerRows   = result.rows.map((r, i) => ({
       row:                 i + 1,
@@ -1039,9 +1044,10 @@ router.get('/:id/ledger', async (c) => {
   const fund = await prisma.fund.findUnique({ where: { id: notice.fundId } })
   if (!fund) return c.json({ detail: 'Fund not found.' }, 404)
 
-  const [paidCalls, distributions] = await Promise.all([
+  const [paidCalls, distributions, commitmentHistory] = await Promise.all([
     prisma.capitalCall.findMany({ where: { fundId: notice.fundId, status: { in: ['approved', 'paid'] } }, orderBy: { executionDate: 'asc' } }),
     prisma.distribution.findMany({ where: { fundId: notice.fundId }, orderBy: { distributionDate: 'asc' } }),
+    prisma.fundCommitmentHistory.findMany({ where: { fundId: notice.fundId }, orderBy: { effectiveDate: 'asc' } }),
   ])
 
   const commitment = new Decimal(fund.commitmentUsd.toString())
@@ -1070,7 +1076,11 @@ router.get('/:id/ledger', async (c) => {
 
   if (txns.length === 0) return c.json({ fund_id: fund.id, fund_name: fund.fundName, commitment: f(commitment), rows: [], snapshot: null })
 
-  const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns)
+  const commHistory = commitmentHistory.map(h => ({
+    commitmentAmount: new Decimal(h.commitmentAmount.toString()),
+    effectiveDate: new Date(h.effectiveDate),
+  }))
+  const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new Decimal('150'), commHistory)
 
   return c.json({
     fund_id:    fund.id,

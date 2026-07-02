@@ -66,8 +66,10 @@ router.get('/:id', async (c) => {
         strategy: fund.strategy,
         vintage_year: fund.vintageYear,
         currency: fund.currency,
-        commitment_usd: parseFloat(fund.commitmentUsd.toString()),
+        commitment_usd: summary.commitment_usd,
+        commitment_jpy: fund.commitmentJpy ? Number(fund.commitmentJpy.toString()) : null,
         contract_commitment_usd: fund.contractCommitmentUsd ? parseFloat(fund.contractCommitmentUsd.toString()) : null,
+        contract_commitment_jpy: fund.contractCommitmentJpy ? parseFloat(fund.contractCommitmentJpy.toString()) : null,
         entry_fx_rate: fund.entryFxRate ? parseFloat(fund.entryFxRate.toString()) : null,
         management_fee_pct: fund.managementFeePct ? parseFloat(fund.managementFeePct.toString()) : 0,
         carry_pct: fund.carryPct ? parseFloat(fund.carryPct.toString()) : 0,
@@ -102,7 +104,11 @@ router.get('/:id/ledger', async (c) => {
     }));
     // Use the current commitment from the fund record. The CalculationEngine will
     // apply commitment history to adjust F (investment capacity) at specific dates.
-    const commitment = new decimal_js_1.default(fund.commitmentUsd.toString());
+    // For SDG fund (JPY-only), use commitmentJpy. For USD funds, use commitmentUsd.
+    const isSdg = fund.fundName && /sdg/i.test(fund.fundName);
+    const commitment = isSdg && fund.commitmentJpy
+        ? new decimal_js_1.default(fund.commitmentJpy.toString())
+        : new decimal_js_1.default(fund.commitmentUsd.toString());
     const txns = [
         ...paidCalls.map((cc) => ({
             date: cc.executionDate ?? cc.dueDate,
@@ -185,7 +191,7 @@ router.get('/:id/ledger', async (c) => {
 // remaining / cash flow). Calls & distributions carry an optional commitmentId.
 const num = (d) => parseFloat(d.toString());
 // Build a ledger + snapshot for a given commitment amount from its calls/dists.
-function buildCommitmentLedger(commitmentAmount, paidCalls, distributions) {
+function buildCommitmentLedger(commitmentAmount, paidCalls, distributions, currency = 'JPY') {
     const txns = [
         ...paidCalls.map((cc) => ({
             date: cc.executionDate ?? cc.dueDate,
@@ -217,7 +223,7 @@ function buildCommitmentLedger(commitmentAmount, paidCalls, distributions) {
     if (txns.length === 0) {
         return { rows: [], snapshot: null };
     }
-    const { rows, snapshot } = calculationEngine_1.CalculationEngine.buildLedger(commitmentAmount, txns);
+    const { rows, snapshot } = calculationEngine_1.CalculationEngine.buildLedger(commitmentAmount, txns, new decimal_js_1.default('150'), []);
     return {
         rows: rows.map((r, i) => ({
             date: r.date.toISOString().slice(0, 10),
@@ -519,10 +525,69 @@ router.put('/:id', async (c) => {
         }
         data.commitmentUsd = newAmt;
     }
-    if (body.contract_commitment_usd !== undefined)
-        data.contractCommitmentUsd = body.contract_commitment_usd ? new decimal_js_1.default(body.contract_commitment_usd) : null;
-    if (body.entry_fx_rate !== undefined)
-        data.entryFxRate = body.entry_fx_rate ? new decimal_js_1.default(body.entry_fx_rate) : null;
+    // Handle commitment_jpy changes for SDG fund (create history for ledger calculations)
+    if (body.commitment_jpy !== undefined && body.commitment_jpy !== '' && body.commitment_jpy !== null) {
+        const newJpyAmt = parseInt(String(body.commitment_jpy), 10);
+        const oldJpyAmt = fund.commitmentJpy ? parseInt(fund.commitmentJpy.toString(), 10) : 0;
+        data.commitmentJpy = BigInt(body.commitment_jpy);
+        // Create commitment history entry when commitment_jpy changes (for SDG fund ledger tracking)
+        if (newJpyAmt !== oldJpyAmt && oldJpyAmt !== 0) {
+            const [callCount, distCount, histCount] = await Promise.all([
+                prisma_1.prisma.capitalCall.count({ where: { fundId: fund.id, status: { in: ['approved', 'paid'] } } }),
+                prisma_1.prisma.distribution.count({ where: { fundId: fund.id } }),
+                prisma_1.prisma.fundCommitmentHistory.count({ where: { fundId: fund.id } }),
+            ]);
+            if (callCount > 0 || distCount > 0) {
+                if (histCount === 0) {
+                    // First-ever change — record the old commitment at the earliest tx date
+                    // so all existing rows keep using the old commitment, not the new one
+                    const [earliestCall, earliestDist] = await Promise.all([
+                        prisma_1.prisma.capitalCall.findFirst({
+                            where: { fundId: fund.id, status: { in: ['approved', 'paid'] } },
+                            orderBy: { executionDate: 'asc' },
+                        }),
+                        prisma_1.prisma.distribution.findFirst({
+                            where: { fundId: fund.id },
+                            orderBy: { distributionDate: 'asc' },
+                        }),
+                    ]);
+                    const dates = [earliestCall?.executionDate, earliestDist?.distributionDate].filter(Boolean);
+                    const anchorDate = dates.length > 0
+                        ? new Date(Math.min(...dates.map(d => d.getTime())))
+                        : new Date();
+                    await prisma_1.prisma.fundCommitmentHistory.create({
+                        data: { fundId: fund.id, commitmentAmount: new decimal_js_1.default(oldJpyAmt), effectiveDate: anchorDate, notes: 'Initial commitment (auto-anchored)' },
+                    });
+                }
+                // New commitment takes effect from the day AFTER the latest transaction
+                const [latestCall, latestDist] = await Promise.all([
+                    prisma_1.prisma.capitalCall.findFirst({
+                        where: { fundId: fund.id, status: { in: ['approved', 'paid'] } },
+                        orderBy: { executionDate: 'desc' },
+                    }),
+                    prisma_1.prisma.distribution.findFirst({
+                        where: { fundId: fund.id },
+                        orderBy: { distributionDate: 'desc' },
+                    }),
+                ]);
+                const dates = [latestCall?.executionDate, latestDist?.distributionDate].filter(Boolean);
+                let effectiveDate = new Date();
+                if (dates.length > 0) {
+                    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+                    effectiveDate = new Date(maxDate.getTime() + 86400000); // Add 1 day
+                }
+                await prisma_1.prisma.fundCommitmentHistory.create({
+                    data: { fundId: fund.id, commitmentAmount: new decimal_js_1.default(newJpyAmt), effectiveDate, notes: 'Updated via Fund Details' },
+                });
+            }
+        }
+    }
+    if (body.contract_commitment_usd !== undefined && body.contract_commitment_usd !== '' && body.contract_commitment_usd !== null)
+        data.contractCommitmentUsd = new decimal_js_1.default(body.contract_commitment_usd);
+    if (body.contract_commitment_jpy !== undefined && body.contract_commitment_jpy !== '' && body.contract_commitment_jpy !== null)
+        data.contractCommitmentJpy = new decimal_js_1.default(body.contract_commitment_jpy);
+    if (body.entry_fx_rate !== undefined && body.entry_fx_rate !== '' && body.entry_fx_rate !== null)
+        data.entryFxRate = new decimal_js_1.default(body.entry_fx_rate);
     if (body.contract_date !== undefined)
         data.contractDate = body.contract_date ? new Date(body.contract_date) : null;
     if (body.investment_period_start !== undefined)
@@ -530,7 +595,7 @@ router.put('/:id', async (c) => {
     if (body.investment_period_end !== undefined)
         data.investmentPeriodEnd = body.investment_period_end ? new Date(body.investment_period_end) : null;
     if (body.fund_term_years !== undefined)
-        data.fundTermYears = body.fund_term_years ? parseInt(body.fund_term_years) : null;
+        data.fundTermYears = body.fund_term_years !== '' && body.fund_term_years !== null ? parseInt(body.fund_term_years) : null;
     if (body.management_fee_pct !== undefined)
         data.managementFeePct = body.management_fee_pct;
     if (body.carry_pct !== undefined)

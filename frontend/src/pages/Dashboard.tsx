@@ -246,14 +246,14 @@ export default function Dashboard() {
             const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
             if (!sdgFund) return null;
 
-            const sdgCommit = sdgFund.commitment_usd ?? 0;
+            const sdgCommit = sdgFund.contract_commitment_jpy ?? sdgFund.commitment_usd ?? 0;
             const sdgDist = sdgFund.total_received_usd ?? 0;
 
             return (
               <>
                 <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '100px' }}>
                   <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{i18n.language === 'ja' ? 'SDG\nコミットメント' : 'SDG\nCommitment'}</p>
-                  <p className="text-lg font-bold tabular-nums theme-text text-center">{latestSaved ? fmt.jpy(sdgCommit * latestSaved) : fmt.usdFull(sdgCommit)}</p>
+                  <p className="text-lg font-bold tabular-nums theme-text text-center">{fmt.jpy(sdgCommit)}</p>
                   <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
                 </div>
                 <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '100px' }}>
@@ -317,7 +317,7 @@ export default function Dashboard() {
             const sdgCalled = sdgFund ? (sdgFund.total_called_usd ?? 0) : 0;
             const sdgDist = sdgFund ? (sdgFund.total_received_usd ?? 0) : 0;
             const sdgNav = sdgFund ? (sdgFund.nav_usd ?? 0) : 0;
-            const sdgCommit = sdgFund ? (sdgFund.commitment_usd ?? 0) : 0;
+            const sdgCommit = sdgFund ? (sdgFund.contract_commitment_jpy ?? sdgFund.commitment_usd ?? 0) : 0;
             const sdgValue = sdgFund ? (sdgFund.total_value_usd ?? (sdgFund.total_received_usd + (sdgFund.nav_usd ?? 0))) : 0;
             const sdgDpi = sdgCalled > 0 ? sdgDist / sdgCalled : 0;
             const sdgTvpi = sdgCalled > 0 ? sdgValue / sdgCalled : 0;

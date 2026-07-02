@@ -14,6 +14,8 @@ export interface FundSummary {
   currency?: string;
   commitment_usd: number;
   contract_commitment_usd?: number | null;
+  commitment_jpy?: number | null;
+  contract_commitment_jpy?: number | null;
   total_called_usd: number;
   total_called_jpy?: number;
   drawn_pct: number;

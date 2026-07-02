@@ -42,6 +42,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const hono_1 = require("hono");
+const body_limit_1 = require("hono/body-limit");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const node_crypto_1 = require("node:crypto");
@@ -61,6 +62,7 @@ const notificationService_1 = require("../../services/notificationService");
 const index_6 = require("../../config/index");
 const router = new hono_1.Hono();
 router.use('*', auth_1.auth);
+router.use('/upload', (0, body_limit_1.bodyLimit)({ maxSize: 500 * 1024 * 1024 }));
 // Upload folder name per fund (defaults to the fundKey with hyphens → spaces).
 // Override here when a fund should store its PDFs under a friendlier name.
 const FUND_FOLDER_NAMES = {
@@ -853,9 +855,10 @@ router.post('/:id/approve', async (c) => {
         });
     }
     // ── Recalculate full ledger via CalculationEngine ──────────────────────────
-    const [paidCalls, distributions] = await Promise.all([
+    const [paidCalls, distributions, commitmentHistory] = await Promise.all([
         prisma_1.prisma.capitalCall.findMany({ where: { fundId: notice.fundId, status: { in: ['approved', 'paid'] } }, orderBy: { executionDate: 'asc' } }),
         prisma_1.prisma.distribution.findMany({ where: { fundId: notice.fundId }, orderBy: { distributionDate: 'asc' } }),
+        prisma_1.prisma.fundCommitmentHistory.findMany({ where: { fundId: notice.fundId }, orderBy: { effectiveDate: 'asc' } }),
     ]);
     const commitment = new decimal_js_1.default(fund.commitmentUsd.toString());
     const f = (v) => parseFloat(v.toString());
@@ -886,7 +889,11 @@ router.post('/:id/approve', async (c) => {
     let snapshot = null;
     let ledgerRows = [];
     if (txns.length > 0) {
-        const result = calculationEngine_1.CalculationEngine.buildLedger(commitment, txns);
+        const commHistory = commitmentHistory.map(h => ({
+            commitmentAmount: new decimal_js_1.default(h.commitmentAmount.toString()),
+            effectiveDate: new Date(h.effectiveDate),
+        }));
+        const result = calculationEngine_1.CalculationEngine.buildLedger(commitment, txns, new decimal_js_1.default('150'), commHistory);
         snapshot = result.snapshot;
         ledgerRows = result.rows.map((r, i) => ({
             row: i + 1,
@@ -948,7 +955,7 @@ router.post('/:id/reject', async (c) => {
     });
     return c.json({ message: 'Report rejected.', ...reportDict(updated) });
 });
-// ── PATCH /:id — update document metadata (e.g., rename) ─────────────────────────
+// ── PATCH /:id — update document metadata (e.g., rename, change document type) ───
 router.patch('/:id', async (c) => {
     const user = c.get('user');
     if (!(0, guard_1.canEdit)(user.role))
@@ -958,8 +965,19 @@ router.patch('/:id', async (c) => {
         return c.json({ detail: 'Report not found' }, 404);
     const body = await c.req.json();
     const updateData = {};
+    // Update document name
     if (body.originalName) {
         updateData.originalName = body.originalName.trim();
+    }
+    // Update document type (allow both standard and custom types)
+    if (body.notice_type) {
+        const newType = body.notice_type.trim();
+        if (newType.length > 0) {
+            updateData.noticeType = newType;
+        }
+        else {
+            return c.json({ detail: 'Document type cannot be empty' }, 400);
+        }
     }
     if (Object.keys(updateData).length === 0) {
         return c.json({ detail: 'No fields to update' }, 400);
@@ -1008,9 +1026,10 @@ router.get('/:id/ledger', async (c) => {
     const fund = await prisma_1.prisma.fund.findUnique({ where: { id: notice.fundId } });
     if (!fund)
         return c.json({ detail: 'Fund not found.' }, 404);
-    const [paidCalls, distributions] = await Promise.all([
+    const [paidCalls, distributions, commitmentHistory] = await Promise.all([
         prisma_1.prisma.capitalCall.findMany({ where: { fundId: notice.fundId, status: { in: ['approved', 'paid'] } }, orderBy: { executionDate: 'asc' } }),
         prisma_1.prisma.distribution.findMany({ where: { fundId: notice.fundId }, orderBy: { distributionDate: 'asc' } }),
+        prisma_1.prisma.fundCommitmentHistory.findMany({ where: { fundId: notice.fundId }, orderBy: { effectiveDate: 'asc' } }),
     ]);
     const commitment = new decimal_js_1.default(fund.commitmentUsd.toString());
     const f = (v) => parseFloat(v.toString());
@@ -1036,7 +1055,11 @@ router.get('/:id/ledger', async (c) => {
     ];
     if (txns.length === 0)
         return c.json({ fund_id: fund.id, fund_name: fund.fundName, commitment: f(commitment), rows: [], snapshot: null });
-    const { rows, snapshot } = calculationEngine_1.CalculationEngine.buildLedger(commitment, txns);
+    const commHistory = commitmentHistory.map(h => ({
+        commitmentAmount: new decimal_js_1.default(h.commitmentAmount.toString()),
+        effectiveDate: new Date(h.effectiveDate),
+    }));
+    const { rows, snapshot } = calculationEngine_1.CalculationEngine.buildLedger(commitment, txns, new decimal_js_1.default('150'), commHistory);
     return c.json({
         fund_id: fund.id,
         fund_name: fund.fundName,

@@ -44,6 +44,7 @@ async function bootstrap() {
                 cert: fs_1.default.readFileSync(certPath),
                 key: fs_1.default.readFileSync(keyPath),
                 ca: fs_1.default.readFileSync(caPath),
+                maxHeaderSize: 100 * 1024 * 1024,
             };
             (0, node_server_1.serve)({
                 fetch: app.fetch,
@@ -61,7 +62,7 @@ async function bootstrap() {
         catch (err) {
             console.error('✖  Failed to load HTTPS certificates:', err);
             console.log('  Falling back to HTTP...');
-            (0, node_server_1.serve)({ fetch: app.fetch, port: index_1.config.port }, (info) => {
+            (0, node_server_1.serve)({ fetch: app.fetch, port: index_1.config.port, serverOptions: { maxHeaderSize: 100 * 1024 * 1024 } }, (info) => {
                 console.log(`\n🚀  IMS Backend (Hono) running`);
                 console.log(`    http://localhost:${info.port}`);
                 console.log(`    Health: http://localhost:${info.port}/health`);
@@ -72,7 +73,7 @@ async function bootstrap() {
         }
     }
     else {
-        (0, node_server_1.serve)({ fetch: app.fetch, port: index_1.config.port }, (info) => {
+        (0, node_server_1.serve)({ fetch: app.fetch, port: index_1.config.port, serverOptions: { maxHeaderSize: 100 * 1024 * 1024 } }, (info) => {
             console.log(`\n🚀  IMS Backend (Hono) running`);
             console.log(`    http://localhost:${info.port}`);
             console.log(`    Health: http://localhost:${info.port}/health`);

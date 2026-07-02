@@ -36,9 +36,17 @@ class CalculationEngine {
     static buildLedger(commitmentUsd, transactions, defaultFx = new decimal_js_1.default('150'), commitmentHistory = []) {
         // Pre-sort history descending so the first match is always the latest applicable entry.
         const histSorted = [...commitmentHistory].sort((a, b) => b.effectiveDate.getTime() - a.effectiveDate.getTime());
+        // Also get ascending sort for finding the oldest (initial) commitment
+        const histSortedAsc = [...commitmentHistory].sort((a, b) => a.effectiveDate.getTime() - b.effectiveDate.getTime());
         function commitmentAt(date) {
+            // Find latest entry with effectiveDate <= date
             const entry = histSorted.find(h => h.effectiveDate <= date);
-            return entry ? entry.commitmentAmount : null;
+            if (entry)
+                return entry.commitmentAmount;
+            // For dates before first history entry, use the oldest (initial) commitment
+            if (histSortedAsc.length > 0)
+                return histSortedAsc[0].commitmentAmount;
+            return null;
         }
         const sorted = [...transactions].sort((a, b) => a.date.getTime() - b.date.getTime());
         let E = new decimal_js_1.default(0); // cumulative called (pure sum of B — D does NOT reduce E)
@@ -142,7 +150,7 @@ class CalculationEngine {
     }
     /** Get current fund summary (used by list and dashboard endpoints). */
     static async fundSummary(fund) {
-        const [paidCalls, distributions, navRec] = await Promise.all([
+        const [paidCalls, distributions, navRec, commitmentHistory] = await Promise.all([
             prisma_1.prisma.capitalCall.findMany({
                 where: { fundId: fund.id, status: { in: ['approved', 'paid'] } },
                 orderBy: { executionDate: 'asc' },
@@ -152,6 +160,10 @@ class CalculationEngine {
                 orderBy: { distributionDate: 'asc' },
             }),
             prisma_1.prisma.navRecord.findFirst({ where: { fundId: fund.id }, orderBy: { navDate: 'desc' } }),
+            prisma_1.prisma.fundCommitmentHistory.findMany({
+                where: { fundId: fund.id },
+                orderBy: { effectiveDate: 'asc' },
+            }),
         ]);
         const navUsd = navRec ? parseFloat(navRec.navUsd?.toString() ?? '0') : 0;
         const navDate = navRec ? new Date(navRec.navDate) : null;
@@ -206,7 +218,11 @@ class CalculationEngine {
                 tvpi: 0,
             };
         }
-        const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns);
+        const commHistory = commitmentHistory.map(h => ({
+            commitmentAmount: new decimal_js_1.default(h.commitmentAmount.toString()),
+            effectiveDate: new Date(h.effectiveDate),
+        }));
+        const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new decimal_js_1.default('150'), commHistory);
         const f = (d) => parseFloat(d.toString());
         // JPY totals (sum of each row's B×fx / C×fx) for the dashboard's per-fund view.
         const totalCalledJpy = rows.reduce((s, r) => s.plus(r.capitalPaidJpy), new decimal_js_1.default(0));

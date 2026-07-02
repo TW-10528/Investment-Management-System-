@@ -29,9 +29,9 @@ const execFileAsync = (0, util_1.promisify)(child_process_1.execFile);
 const VENV_PYTHON = path_1.default.join(__dirname, '../../../paddle-venv/bin/python');
 const SCRIPT_PATH = path_1.default.join(__dirname, '../../../scripts/paddle_ocr.py');
 // Budget: 5s model load + N pages × ~25s/page at 2x scale.
-// 600s covers large scanned contracts (22-page subscription booklets etc.)
+// 1200s (20 min) covers large scanned contracts (22-page subscription booklets etc.)
 // on CPU-only machines where each page can take 60s+ at default resolution.
-const TIMEOUT_MS = 600_000;
+const TIMEOUT_MS = 1_200_000;
 // Parse the JSON result from the sidecar's stdout.
 // PaddleOCR/Paddle may emit progress lines; scan backwards for the JSON.
 function parseOcrStdout(stdout) {
