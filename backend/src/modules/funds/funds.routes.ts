@@ -563,6 +563,19 @@ router.put('/:id', async (c) => {
         await prisma.fundCommitmentHistory.create({
           data: { fundId: fund.id, commitmentAmount: new Decimal(newJpyAmt), effectiveDate, notes: 'Updated via Fund Details' },
         })
+      } else {
+        // No transactions yet — still create a history entry with today's date for the new commitment
+        // Check if we already have a history entry for today to avoid duplicates
+        const todayStart = new Date()
+        todayStart.setHours(0, 0, 0, 0)
+        const existingToday = await prisma.fundCommitmentHistory.findFirst({
+          where: { fundId: fund.id, effectiveDate: { gte: todayStart } },
+        })
+        if (!existingToday) {
+          await prisma.fundCommitmentHistory.create({
+            data: { fundId: fund.id, commitmentAmount: new Decimal(newJpyAmt), effectiveDate: todayStart, notes: 'Updated via Fund Details' },
+          })
+        }
       }
     }
   }

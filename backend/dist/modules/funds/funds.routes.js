@@ -580,6 +580,20 @@ router.put('/:id', async (c) => {
                     data: { fundId: fund.id, commitmentAmount: new decimal_js_1.default(newJpyAmt), effectiveDate, notes: 'Updated via Fund Details' },
                 });
             }
+            else {
+                // No transactions yet — still create a history entry with today's date for the new commitment
+                // Check if we already have a history entry for today to avoid duplicates
+                const todayStart = new Date();
+                todayStart.setHours(0, 0, 0, 0);
+                const existingToday = await prisma_1.prisma.fundCommitmentHistory.findFirst({
+                    where: { fundId: fund.id, effectiveDate: { gte: todayStart } },
+                });
+                if (!existingToday) {
+                    await prisma_1.prisma.fundCommitmentHistory.create({
+                        data: { fundId: fund.id, commitmentAmount: new decimal_js_1.default(newJpyAmt), effectiveDate: todayStart, notes: 'Updated via Fund Details' },
+                    });
+                }
+            }
         }
     }
     if (body.contract_commitment_usd !== undefined && body.contract_commitment_usd !== '' && body.contract_commitment_usd !== null)
