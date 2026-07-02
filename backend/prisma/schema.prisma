@@ -61,10 +61,11 @@ model Fund {
   strategy              String?
   vintageYear           Int?      @map("vintage_year")
   currency              String    @default("USD")
-  commitmentUsd         Decimal   @default(0) @db.Decimal(20, 6) @map("commitment_usd")
-  contractCommitmentUsd Decimal?  @db.Decimal(20, 6) @map("contract_commitment_usd")
-  commitmentJpy         BigInt?   @map("commitment_jpy")
-  entryFxRate           Decimal?  @db.Decimal(12, 6) @map("entry_fx_rate")
+  commitmentUsd          Decimal   @default(0) @db.Decimal(20, 6) @map("commitment_usd")
+  contractCommitmentUsd  Decimal?  @db.Decimal(20, 6) @map("contract_commitment_usd")
+  commitmentJpy          BigInt?   @map("commitment_jpy")
+  contractCommitmentJpy  BigInt?   @map("contract_commitment_jpy")
+  entryFxRate            Decimal?  @db.Decimal(12, 6) @map("entry_fx_rate")
   contractDate          DateTime? @map("contract_date") @db.Date
   investmentPeriodStart DateTime? @map("investment_period_start") @db.Date
   investmentPeriodEnd   DateTime? @map("investment_period_end") @db.Date
