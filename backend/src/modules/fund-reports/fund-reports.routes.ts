@@ -936,7 +936,7 @@ router.post('/:id/approve', async (c) => {
     },
     // CalculationEngine snapshot (dashboard KPIs)
     snapshot: snapshot ? {
-      commitment_usd:      f(commitment),
+      commitment_usd:      f(snapshot.commitmentUsd),
       total_called_usd:    f(snapshot.totalCalledUsd),    // sum of B
       total_received_usd:  f(snapshot.totalReceivedUsd),  // sum of C
       drawn_pct:           f(snapshot.drawnPct),
@@ -1085,7 +1085,7 @@ router.get('/:id/ledger', async (c) => {
   return c.json({
     fund_id:    fund.id,
     fund_name:  fund.fundName,
-    commitment: f(commitment),
+    commitment: f(snapshot.commitmentUsd),
     rows: rows.map((r, i) => ({
       row: i + 1, date: r.date.toISOString().slice(0, 10), type: r.txType, description: r.description,
       capital_paid_in:     f(r.capitalPaidIn),   // B
@@ -1097,7 +1097,7 @@ router.get('/:id/ledger', async (c) => {
       net_cash_position:   f(r.netCashPosition),   // H
     })),
     snapshot: {
-      commitment_usd:      f(commitment),
+      commitment_usd:      f(snapshot.commitmentUsd),
       total_called_usd:    f(snapshot.totalCalledUsd),
       total_received_usd:  f(snapshot.totalReceivedUsd),
       drawn_pct:           f(snapshot.drawnPct),
