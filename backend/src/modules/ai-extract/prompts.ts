@@ -23,13 +23,13 @@ export const CLASSIFIER_PROMPT = `TASK: Identify which fund issued this report a
 
 KNOWN FUNDS (return the exact key on the left):
   NB_REAL_ESTATE   → "Real Estate Secondary Opportunities Fund II", "Neuberger Berman"
-  HAMILTON_SEC     → "Secondary Fund VI-B"
-  HAMILTON_STRAT   → "Strategic Opportunities Fund IX"
+  HAMILTON_SEC     → "Hamilton Lane Secondary Fund VI-B"
+  HAMILTON_STRAT   → "Hamilton Lane Strategic Opportunities Fund IX-B"
   SDG              → "SDGs投資事業有限責任組合", "AFM株式会社"
-  DOVER            → "Dover Street XI", "Dover Street XII", "HarbourVest"
-  GOLDMAN          → "Vintage X(Flagship)", "Goldman Sachs"
-  SIGULER_GUFF     → "Small Buyout Opportunities Fund VI"
-  CAPULA           → "Capula Global Relative Fund"
+  DOVER            → "Dover Street XI Feeder Fund", "HarbourVest"
+  GOLDMAN          → "Vintage", "Goldman Sachs Asset Management", "SCSp"
+  SIGULER_GUFF     → "Siguler Guff Small Buyout Opportunities Fund"
+  CAPULA           → "Capula Global Relative Value", "CGRV"
 
 REPORT TYPES — transaction documents (will be calculated and added to ledger):
   CAPITAL_CALL          → calls capital only (B>0, C=0)
