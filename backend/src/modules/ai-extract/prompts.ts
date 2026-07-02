@@ -111,24 +111,34 @@ export const EXTRACTOR_PROMPTS: Record<string, string> = {
 
   NB_REAL_ESTATE: `You are extracting from an NB Real Estate Secondary Opportunities notice.
 
-FIELD MAPPING (verified rules):
+DATE EXTRACTION (CRITICAL):
+- Look for "Payment Date:" or "payment date" in the document → USE THIS DATE
+- Fallback: Use "Total Net Cash Distribution:" date if available
+- DO NOT use the letter date or today's date. Find the actual payment/execution date.
+
+FIELD MAPPING (handles all three formats):
+
+IF CAPITAL CALL ONLY (no distribution):
 - B = "Limited Partner's Share of Capital Contribution" + Net Management Fee
-     Net Management Fee = Management Fee Amount - Management Fee Rebate
-     DO NOT include Tax expense in B.
-     DO NOT use "Amount Due From Limited Partner" for B.
-- C = "Limited Partner's Share of Distributable Proceeds" + Additional Payment Received
-     Include Additional Payment in C ONLY when it is negative / in parentheses
-     (meaning received/offset). If Additional Payment is positive (payable by
-     investor), it is NOT included in C.
-- D = "Limited Partner's Share of Distributable Proceeds"  (Additional Payment NOT in D)
+     (Net Management Fee = Management Fee Amount - Management Fee Rebate)
+- C = 0, D = 0
+
+IF DISTRIBUTION ONLY (no capital call, or capital call is deemed/negative):
+- B = "Capital Contributions Required for Partnership Management Fees" if present
+     (if shown in parentheses/negative, this is a deduction from C, so B = 0)
+- C = "Limited Partner's Share of Distributable Proceeds"
+- D = "Limited Partner's Share of Distributable Proceeds" (same as C)
+
+IF CAPITAL CALL + DISTRIBUTION (NETTED):
+- B = "Limited Partner's Share of Capital Contribution"
+- C = "Limited Partner's Share of Distributable Proceeds"
+- D = "Limited Partner's Share of Distributable Proceeds"
 
 FINANCE DETAIL:
 - return_of_capital = Limited Partner's Share of Distributable Proceeds
 - gain = 0
-- interest = Additional Payment Received ONLY when it is negative/received
-- total_commitment_amount = The LP's total commitment to this fund (often found as "Commitment Amount" or "Initial Commitment" or "Total Commitment"). Extract if visible.
-- If the report is only a capital contribution with no distribution:
-    return_of_capital = 0, gain = 0, interest = 0
+- interest = 0
+- total_commitment_amount = Original Commitment or "Commitment" amount if shown
 ${COMMON_SCHEMA}
 
 DOCUMENT TEXT:
