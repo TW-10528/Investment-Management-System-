@@ -366,15 +366,19 @@ router.post('/:id/commitment-history', async (c) => {
             notes: b.notes ?? null,
         },
     });
-    // Keep fund.commitmentUsd in sync with the latest history entry so the
+    // Keep fund.commitmentJpy/commitmentUsd in sync with the latest history entry so the
     // dashboard always shows the current commitment without extra queries.
     const latest = await prisma_1.prisma.fundCommitmentHistory.findFirst({
         where: { fundId }, orderBy: { effectiveDate: 'desc' },
     });
     if (latest) {
+        const isSdg = fund.fundName && /sdg/i.test(fund.fundName);
+        const updateData = isSdg
+            ? { commitmentJpy: BigInt(latest.commitmentAmount.toString()) }
+            : { commitmentUsd: new decimal_js_1.default(latest.commitmentAmount.toString()) };
         await prisma_1.prisma.fund.update({
             where: { id: fundId },
-            data: { commitmentUsd: new decimal_js_1.default(latest.commitmentAmount.toString()) },
+            data: updateData,
         });
     }
     return c.json({
