@@ -22,10 +22,10 @@ ABSOLUTE RULES:
 export const CLASSIFIER_PROMPT = `TASK: Identify which fund issued this report and what type of report it is.
 
 KNOWN FUNDS (return the exact key on the left):
-  NB_REAL_ESTATE   → "Real Estate Secondary Opportunities Fund II", "Neuberger Berman"
+  NB_REAL_ESTATE   → "NB Real Estate Secondary Opportunities", "Neuberger Berman"
   HAMILTON_SEC     → "Hamilton Lane Secondary Fund VI-B"
   HAMILTON_STRAT   → "Hamilton Lane Strategic Opportunities Fund IX-B"
-  SDG              → "SDGs投資事業有限責任組合", "AFM株式会社"
+  SDG              → "SDGｓ投資事業有限責任組合", "SDG", Japanese AFM report
   DOVER            → "Dover Street XI Feeder Fund", "HarbourVest"
   GOLDMAN          → "Vintage", "Goldman Sachs Asset Management", "SCSp"
   SIGULER_GUFF     → "Siguler Guff Small Buyout Opportunities Fund"
