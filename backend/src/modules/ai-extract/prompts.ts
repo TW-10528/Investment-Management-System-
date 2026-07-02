@@ -47,6 +47,14 @@ REPORT TYPES — reference documents (stored for viewing, no ledger calculation)
   COMMITMENT_NOTICE     → subscription/investment agreement, 出資契約書, 匿名組合契約書, 有限責任組合契約書, commitment letter — documents that state the LP's total commitment amount but are NOT capital calls or distributions
   OTHER                 → any other fund-related document not matching above
 
+NB REAL ESTATE DOCUMENT TYPE GUIDE (critical):
+  All NB Real Estate Secondary Opportunities notices are NETTED_CALL reports.
+  Every notice contains BOTH:
+  - "Limited Partner's Share of Capital Contribution" (capital call / B)
+  - "Limited Partner's Share of Distributable Proceeds" (distribution / C)
+  Even if one amount is $0, classify as NETTED_CALL for NB Real Estate.
+  IF the notice contains both fields, ALWAYS return report_type: "NETTED_CALL"
+
 SDG DOCUMENT TYPE GUIDE (critical — SDG notices use investment terms that can mislead):
   CAPITAL_CALL  → SDG 払込通知書: contains "払込み頂く金額" (amount to pay in).
                   The presence of "出資未履行金額" (unfunded balance) does NOT make
