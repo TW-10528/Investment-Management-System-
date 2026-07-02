@@ -48,12 +48,14 @@ REPORT TYPES — reference documents (stored for viewing, no ledger calculation)
   OTHER                 → any other fund-related document not matching above
 
 NB REAL ESTATE DOCUMENT TYPE GUIDE (critical):
-  All NB Real Estate Secondary Opportunities notices are NETTED_CALL reports.
-  Every notice contains BOTH:
-  - "Limited Partner's Share of Capital Contribution" (capital call / B)
-  - "Limited Partner's Share of Distributable Proceeds" (distribution / C)
-  Even if one amount is $0, classify as NETTED_CALL for NB Real Estate.
-  IF the notice contains both fields, ALWAYS return report_type: "NETTED_CALL"
+  Analyze the document content to determine the actual type:
+  - Look for "Limited Partner's Share of Capital Contribution" → indicates B (capital call)
+  - Look for "Limited Partner's Share of Distributable Proceeds" → indicates C (distribution)
+  - IF both sections are present with non-zero amounts → NETTED_CALL
+  - IF only capital contribution section present → CAPITAL_CALL
+  - IF only distribution section present → DISTRIBUTION
+  Do NOT assume all NB Real Estate docs are the same type. Check what's actually in
+  the document text before classifying.
 
 SDG DOCUMENT TYPE GUIDE (critical — SDG notices use investment terms that can mislead):
   CAPITAL_CALL  → SDG 払込通知書: contains "払込み頂く金額" (amount to pay in).
