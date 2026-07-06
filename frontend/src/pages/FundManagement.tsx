@@ -1798,6 +1798,9 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
   const [openFundId, setOpenFundId] = useState<string | null>(null);
   const [viewerDoc, setViewerDoc] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('recent');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
   const load = useCallback(() => {
     setLoading(true);
@@ -1877,65 +1880,139 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
       ) : (
         /* ── Fund folders grid ── */
         <div className="space-y-4">
-          {/* Search bar */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder={t('manageFunds.searchFunds')}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border theme-border bg-transparent theme-text text-sm placeholder-gray-400"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                ✕
-              </button>
-            )}
-          </div>
+          {/* Search and Filters */}
+          <div className="flex gap-4 items-end">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder={t('manageFunds.searchFunds')}
+                value={searchQuery}
+                onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                className="w-full px-4 py-2.5 rounded-lg border theme-border bg-transparent theme-text text-sm placeholder-gray-400"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
 
-          {/* Results count */}
-          {searchQuery && (
-            <p className="text-sm text-gray-500">
-              {filteredFunds.length} {filteredFunds.length === 1 ? t('fundOverview.fund') : t('manageFunds.allFunds')}
-            </p>
-          )}
+            {/* Filter dropdowns */}
+            <select className="px-3 py-2.5 rounded-lg border theme-border bg-transparent theme-text text-sm cursor-pointer">
+              <option>All Funds</option>
+            </select>
+            <select className="px-3 py-2.5 rounded-lg border theme-border bg-transparent theme-text text-sm cursor-pointer">
+              <option>All Document Types</option>
+              <option>Capital Calls</option>
+              <option>Distributions</option>
+            </select>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="px-3 py-2.5 rounded-lg border theme-border bg-transparent theme-text text-sm cursor-pointer">
+              <option value="recent">Recently Updated</option>
+              <option value="name">By Name</option>
+            </select>
+          </div>
 
           {/* Fund grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredFunds.map(f => {
-              const list  = byFund[f.fund_id] ?? [];
-              const nCall = list.filter(r => r.notice_type === 'capital_call' || r.notice_type === 'capital_and_distribution').length;
-              const nDist = list.filter(r => r.notice_type === 'distribution'  || r.notice_type === 'capital_and_distribution').length;
-              return (
-                <button key={f.fund_id} onClick={() => setOpenFundId(f.fund_id)}
-                  className="theme-card border theme-border rounded-2xl p-5 text-left transition-colors hover:border-indigo-500/50">
-                  <div className="flex items-start gap-3">
-                    <span className="text-3xl">📁</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold theme-text text-sm leading-snug truncate" title={f.fund_name}>{f.fund_name}</p>
-                      <p className="text-xs theme-text-muted mt-0.5">{list.length} {t('manageFunds.files')}</p>
-                    </div>
-                    <span className="theme-text-muted text-lg flex-shrink-0">→</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-4 pt-3 border-t theme-border flex-wrap">
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: C.indigo,  background: C.indigoBg }}>{nCall} {t('manageFunds.calls')}</span>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: C.emerald, background: C.emeraldBg }}>{nDist} {t('manageFunds.dists')}</span>
-                    <div className="ml-auto flex gap-2">
+          {filteredFunds.length > 0 ? (
+            <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {filteredFunds.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(f => {
+                  const list  = byFund[f.fund_id] ?? [];
+                  const nCall = list.filter(r => r.notice_type === 'capital_call' || r.notice_type === 'capital_and_distribution').length;
+                  const nDist = list.filter(r => r.notice_type === 'distribution'  || r.notice_type === 'capital_and_distribution').length;
+                  const lastUpdated = list.length > 0 ? new Date(Math.max(...list.map(r => new Date(r.created_at || 0).getTime()))).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No updates';
+
+                  return (
+                    <button key={f.fund_id} onClick={() => setOpenFundId(f.fund_id)}
+                      className="theme-card border theme-border rounded-lg p-4 text-left transition-shadow hover:shadow-md">
+                      {/* Header with icon, name, and menu */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start gap-2 min-w-0 flex-1">
+                          <span className="text-2xl flex-shrink-0">📁</span>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold theme-text text-sm truncate" title={f.fund_name}>{f.fund_name}</h3>
+                            <p className="text-[11px] theme-text-muted mt-0.5">Updated {lastUpdated}</p>
+                          </div>
+                        </div>
+                        <button className="text-gray-400 hover:text-gray-600 text-lg flex-shrink-0">⋯</button>
+                      </div>
+
+                      {/* File count */}
+                      <div className="flex items-center gap-1.5 mb-4">
+                        <span className="text-sm">📄</span>
+                        <p className="text-xs theme-text-muted">{list.length} file{list.length !== 1 ? 's' : ''}</p>
+                      </div>
+
+                      {/* Statistics grid */}
+                      <div className="grid grid-cols-2 gap-4 mb-4 pt-4 border-t theme-border">
+                        <div className="text-center">
+                          <p className="text-base font-bold theme-text">{nCall}</p>
+                          <p className="text-[10px] theme-text-muted mt-1">{t('manageFunds.calls')}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-base font-bold theme-text">{nDist}</p>
+                          <p className="text-[10px] theme-text-muted mt-1">{t('manageFunds.dists')}</p>
+                        </div>
+                      </div>
+
+                      {/* Action link */}
                       <button
                         onClick={e => { e.stopPropagation(); onOpenLedger(f.fund_id); }}
-                        className="text-[11px] font-semibold px-3 py-0.5 rounded-full border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors"
+                        className="w-full text-center text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
                       >
-                        {t('manageFunds.ledger')} →
+                        View Ledger →
                       </button>
-                    </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Pagination */}
+              {filteredFunds.length > itemsPerPage && (
+                <div className="mt-6 flex items-center justify-between">
+                  <p className="text-sm text-gray-500">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredFunds.length)} of {filteredFunds.length} funds
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 rounded-lg border theme-border hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      ←
+                    </button>
+                    {Array.from({ length: Math.ceil(filteredFunds.length / itemsPerPage) }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1.5 rounded-lg border transition-colors ${
+                          currentPage === page
+                            ? 'border-indigo-600 bg-indigo-600 text-white'
+                            : 'border theme-border hover:bg-gray-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredFunds.length / itemsPerPage), p + 1))}
+                      disabled={currentPage === Math.ceil(filteredFunds.length / itemsPerPage)}
+                      className="px-3 py-1.5 rounded-lg border theme-border hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      →
+                    </button>
                   </div>
-              </button>
-            );
-            })}
-          </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-12 theme-text-muted">
+              <p className="text-sm">No funds found</p>
+            </div>
+          )}
         </div>
       )}
 
