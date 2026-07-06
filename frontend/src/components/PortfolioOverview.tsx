@@ -500,7 +500,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                         <Bar yAxisId="left" dataKey="Commitment" fill="#1e40af" radius={[3,3,0,0]} />
                         <Bar yAxisId="left" dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} />
-                        <Bar yAxisId="left" dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} label={{ dataKey: 'utilizationPct', formatter: (v: any) => `${(v ?? 0).toFixed(0)}%`, position: 'top', fontSize: 10, fill: '#1e40af' }} />
+                        <Bar yAxisId="left" dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} label={{ dataKey: 'Distribution', formatter: (v: any) => fmt.jpy(v ?? 0), position: 'top', fontSize: 10, fill: '#1e40af' }} />
                         <Line yAxisId="right" type="monotone" dataKey="utilizationPct" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} name="Interest Rate %" />
                       </ComposedChart>
                     </ResponsiveContainer>
