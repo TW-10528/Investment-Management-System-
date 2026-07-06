@@ -82,9 +82,16 @@ model Fund {
   notes                 String?
   aiExtractionTemplate  Json?     @map("ai_extraction_template")
   isActive              Boolean   @default(true) @map("is_active")
+
+  // ISOLATED FIELDS FOR NEW FUND FAMILY ONBOARDING (DO NOT MODIFY EXISTING 8 FUNDS)
+  fundFamilyId          String?   @map("fund_family_id")   // NULL for existing 8 funds
+  familySequence        Int?      @map("family_sequence")   // XI=11, XII=12, etc. (for new funds only)
+  isNewFund             Boolean   @default(false) @map("is_new_fund")  // TRUE only for newly added funds
+
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
 
+  // Relations
   capitalCalls      CapitalCall[]
   distributions     Distribution[]
   navRecords        NavRecord[]
@@ -94,8 +101,26 @@ model Fund {
   sigfSnapshot      SigfSnapshot?
   commitments       Commitment[]
   commitmentHistory FundCommitmentHistory[]
+  fundFamily        FundFamily?  @relation(fields: [fundFamilyId], references: [id])
 
   @@map("funds")
+}
+
+// NEW: FundFamily model (isolated for new fund onboarding)
+// Existing 8 funds do NOT belong to any family (fundFamilyId = NULL)
+model FundFamily {
+  id          String   @id @default(uuid())
+  familyName  String   @unique @map("family_name")  // e.g., "Dover Street"
+  familyCode  String?  @map("family_code")          // e.g., "DOVER"
+  strategy    String?                               // inherited from first fund in family
+  manager     String?                               // inherited from first fund in family
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  funds       Fund[]
+
+  @@map("fund_families")
 }
 
 // A commitment is an optional sub-grouping INSIDE a fund. Some funds (e.g. the
