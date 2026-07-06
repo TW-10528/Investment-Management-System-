@@ -1941,20 +1941,24 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
                       </div>
 
                       {/* File count */}
-                      <div className="flex items-center gap-1.5 mb-4">
-                        <span className="text-sm">📄</span>
+                      <div className="flex items-center gap-2.5 mb-4">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(217, 119, 6, 0.15)' }}>
+                          <span className="text-sm">📄</span>
+                        </div>
                         <p className="text-xs theme-text-muted">{list.length} file{list.length !== 1 ? 's' : ''}</p>
                       </div>
 
-                      {/* Statistics grid */}
-                      <div className="grid grid-cols-2 gap-4 mb-4 pt-4 border-t theme-border">
-                        <div className="text-center">
-                          <p className="text-base font-bold" style={{ color: C.indigo }}>{nCall}</p>
-                          <p className="text-[10px] theme-text-muted mt-1">{t('manageFunds.calls')}</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-base font-bold" style={{ color: C.emerald }}>{nDist}</p>
-                          <p className="text-[10px] theme-text-muted mt-1">{t('manageFunds.dists')}</p>
+                      {/* Statistics table */}
+                      <div className="mb-4 border theme-border rounded-lg overflow-hidden">
+                        <div className="grid grid-cols-2 divide-x theme-divider">
+                          <div className="px-3 py-3 text-center border-b theme-border">
+                            <p className="text-base font-bold" style={{ color: C.indigo }}>{nCall}</p>
+                            <p className="text-[10px] theme-text-muted mt-1">{t('manageFunds.calls')}</p>
+                          </div>
+                          <div className="px-3 py-3 text-center">
+                            <p className="text-base font-bold" style={{ color: C.emerald }}>{nDist}</p>
+                            <p className="text-[10px] theme-text-muted mt-1">{t('manageFunds.dists')}</p>
+                          </div>
                         </div>
                       </div>
 
