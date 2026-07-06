@@ -1949,11 +1949,11 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
                       {/* Statistics grid */}
                       <div className="grid grid-cols-2 gap-4 mb-4 pt-4 border-t theme-border">
                         <div className="text-center">
-                          <p className="text-base font-bold theme-text">{nCall}</p>
+                          <p className="text-base font-bold" style={{ color: C.indigo }}>{nCall}</p>
                           <p className="text-[10px] theme-text-muted mt-1">{t('manageFunds.calls')}</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-base font-bold theme-text">{nDist}</p>
+                          <p className="text-base font-bold" style={{ color: C.emerald }}>{nDist}</p>
                           <p className="text-[10px] theme-text-muted mt-1">{t('manageFunds.dists')}</p>
                         </div>
                       </div>
