@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { dashboardAPI, fxRatesAPI, fundsAPI } from '../services/api';
 import type { DashboardData, LedgerRow } from '../types/index';
 import { fmt } from '../lib/format';
@@ -400,50 +399,6 @@ export default function Dashboard() {
           </div>
         );
       })()}
-
-      {/* ── Portfolio Performance Chart ── */}
-      <div className="bg-white border border-gray-200 rounded-lg p-5">
-        <div className="mb-4">
-          <h3 className="text-sm font-semibold text-gray-900">Portfolio Performance</h3>
-          <p className="text-xs text-gray-500 mt-1">Latest Reported</p>
-        </div>
-        <div style={{ width: '100%', height: 300 }}>
-          <ResponsiveContainer>
-            <AreaChart data={[
-              { date: 'Jan', value: 45000000 },
-              { date: 'Feb', value: 47000000 },
-              { date: 'Mar', value: 46500000 },
-              { date: 'Apr', value: 49000000 },
-              { date: 'May', value: 51000000 },
-              { date: 'Jun', value: 53000000 },
-              { date: 'Jul', value: 55000000 },
-            ]} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-              <defs>
-                <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#1e40af" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#1e40af" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} />
-              <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(v: number) => `$${(v / 1000000).toFixed(0)}M`} />
-              <Tooltip
-                formatter={(value: any) => fmt.usdFull(Number(value))}
-                contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', background: 'white' }}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="#1e40af"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#colorValue)"
-                dot={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
 
       {/* ── KPI Metrics Row ── */}
       <div className="border-t border-gray-200 pt-4 mt-2">
