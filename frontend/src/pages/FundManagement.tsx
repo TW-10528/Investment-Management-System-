@@ -11,6 +11,7 @@ import { fundsAPI, fxRatesAPI, fundReportsAPI } from '../services/api';
 import type { FundDetail, FundSummary, LedgerRow, LedgerSnapshot } from '../types/index';
 import { fmt, strategyBg, strategyColor } from '../lib/format';
 import AddFundWizard from '../components/AddFundWizard';
+import AddFundModal from '../components/AddFundModal';
 import FundDocuments from '../components/FundDocuments';
 import FundUploadBar from '../components/FundUploadBar';
 import PortfolioOverview from '../components/PortfolioOverview';
@@ -2035,6 +2036,7 @@ export default function FundManagement() {
   const [funds,       setFunds]       = useState<FundSummary[]>([]);
   const [details,     setDetails]     = useState<Record<string, FundDetail>>({});
   const [showWizard,  setShowWizard]  = useState(false);
+  const [showAddFundModal, setShowAddFundModal] = useState(false);
   const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
   const [openAtTab, setOpenAtTab]     = useState<TabKey>('ledger');
 
@@ -2119,6 +2121,12 @@ export default function FundManagement() {
               )}
             </>
           )}
+          {section === 'reports' && canEdit && (
+            <button onClick={() => setShowAddFundModal(true)}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+              ⬆️ Upload Report
+            </button>
+          )}
         </div>
       </div>
 
@@ -2161,6 +2169,14 @@ export default function FundManagement() {
 
       {showWizard && (
         <AddFundWizard onClose={() => { setShowWizard(false); loadFunds(); }} />
+      )}
+
+      {showAddFundModal && (
+        <AddFundModal
+          isOpen={showAddFundModal}
+          onClose={() => setShowAddFundModal(false)}
+          onSuccess={() => { loadFunds(); setShowAddFundModal(false); }}
+        />
       )}
     </div>
   );
