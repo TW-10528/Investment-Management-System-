@@ -5,6 +5,7 @@ import { dashboardAPI, fxRatesAPI, fundsAPI } from '../services/api';
 import type { DashboardData, LedgerRow } from '../types/index';
 import { fmt } from '../lib/format';
 import toast from 'react-hot-toast';
+import { LockIcon, ArrowIcon, ChartIcon, PercentIcon, DistributionIcon } from '../components/DashboardIcons';
 
 const SUMMARY_REFRESH_MS = 60_000;   // dashboard summary + fx — 1 min
 
@@ -316,27 +317,40 @@ export default function Dashboard() {
             const regularDist = regularFunds.reduce((sum: number, f: any) => sum + (f.total_received_usd ?? 0), 0);
 
             const cards = [
-              { iconEmoji: '📋', iconColor: '#3b82f6', label: 'Commitment', value: fmt.usdFull(regularCommit), currency: 'USD' },
-              { iconEmoji: '📈', iconColor: '#22c55e', label: 'Distribution', value: fmt.usdFull(regularDist), currency: 'USD' },
+              { label: 'Commitment', value: fmt.usdFull(regularCommit), currency: 'USD' },
+              { label: 'Distribution', value: fmt.usdFull(regularDist), currency: 'USD' },
             ];
 
             if (totals.regularReturnOfCapital !== 0) {
-              cards.push({ iconEmoji: '💸', iconColor: '#a855f7', label: 'Return of Capital', value: fmt.usdFull(totals.regularReturnOfCapital), currency: 'USD' });
+              cards.push({ label: 'Return of Capital', value: fmt.usdFull(totals.regularReturnOfCapital), currency: 'USD' });
             }
             if (totals.regularGain !== 0) {
-              cards.push({ iconEmoji: '📊', iconColor: '#fb923c', label: 'Gain', value: fmt.usdFull(totals.regularGain), currency: 'USD' });
+              cards.push({ label: 'Gain', value: fmt.usdFull(totals.regularGain), currency: 'USD' });
             }
             if (totals.regularInterest !== 0) {
-              cards.push({ iconEmoji: '📌', iconColor: '#0ea5e9', label: 'Interest', value: fmt.usdFull(totals.regularInterest), currency: 'USD' });
+              cards.push({ label: 'Interest', value: fmt.usdFull(totals.regularInterest), currency: 'USD' });
             }
 
+            const getIcon = (label: string) => {
+              switch (label) {
+                case 'Commitment': return <LockIcon />;
+                case 'Distribution': return <DistributionIcon />;
+                case 'Return of Capital': return <ArrowIcon />;
+                case 'Gain': return <ChartIcon />;
+                case 'Interest': return <PercentIcon />;
+                default: return null;
+              }
+            };
+
             return cards.map(card => (
-              <div key={card.label} className="border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all bg-white">
+              <div key={card.label} className="relative overflow-hidden rounded-lg p-3 bg-white border border-gray-200 transition-all hover:shadow-lg"
+                style={{
+                  backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(249,250,251,0.5) 100%)',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.04), inset 0 1px 0 0 rgba(255, 255, 255, 0.5)'
+                }}>
                 <div className="flex items-start gap-2">
-                  <div className="rounded p-1 flex-shrink-0">
-                    <span className="text-lg" style={{ color: card.iconColor }}>
-                      {card.iconEmoji}
-                    </span>
+                  <div className="rounded-lg p-2 flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100" style={{ boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)' }}>
+                    {getIcon(card.label)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[8px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">
@@ -361,25 +375,36 @@ export default function Dashboard() {
         const sdgDist = sdgFund.total_received_usd ?? 0;
 
         const cards = [
-          { iconEmoji: '📋', iconColor: '#3b82f6', label: 'Commitment', value: fmt.jpy(sdgCommit), currency: 'JPY' },
-          { iconEmoji: '📈', iconColor: '#22c55e', label: 'Distribution', value: latestSaved ? fmt.jpy(sdgDist * latestSaved) : fmt.jpy(sdgDist), currency: 'JPY' },
+          { label: 'Commitment', value: fmt.jpy(sdgCommit), currency: 'JPY' },
+          { label: 'Distribution', value: latestSaved ? fmt.jpy(sdgDist * latestSaved) : fmt.jpy(sdgDist), currency: 'JPY' },
         ];
 
         if (totals.sdgInterest !== 0) {
-          cards.push({ iconEmoji: '📌', iconColor: '#0ea5e9', label: 'Interest', value: fmt.jpy(totals.sdgInterest), currency: 'JPY' });
+          cards.push({ label: 'Interest', value: fmt.jpy(totals.sdgInterest), currency: 'JPY' });
         }
+
+        const getIcon = (label: string) => {
+          switch (label) {
+            case 'Commitment': return <LockIcon />;
+            case 'Distribution': return <DistributionIcon />;
+            case 'Interest': return <PercentIcon />;
+            default: return null;
+          }
+        };
 
         return (
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wider theme-text-muted mb-2">SDG Fund (JPY)</h3>
             <div className="grid grid-cols-3 gap-4">
               {cards.map(card => (
-                <div key={card.label} className="border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all bg-white">
+                <div key={card.label} className="relative overflow-hidden rounded-lg p-3 bg-white border border-gray-200 transition-all hover:shadow-lg"
+                  style={{
+                    backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(249,250,251,0.5) 100%)',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.04), inset 0 1px 0 0 rgba(255, 255, 255, 0.5)'
+                  }}>
                   <div className="flex items-start gap-2">
-                    <div className="rounded p-1 flex-shrink-0">
-                      <span className="text-lg" style={{ color: card.iconColor }}>
-                        {card.iconEmoji}
-                      </span>
+                    <div className="rounded-lg p-2 flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100" style={{ boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)' }}>
+                      {getIcon(card.label)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[8px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">
