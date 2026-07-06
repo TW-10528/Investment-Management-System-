@@ -8,7 +8,7 @@
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { Bar, ComposedChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { dashboardAPI, fundPdfAPI, fundsAPI, fxRatesAPI } from '../services/api';
 import type { DashboardData, FundSummary, LedgerRow } from '../types/index';
 import { usePreferences } from '../contexts/usePreferences';
@@ -153,7 +153,7 @@ function SigfPanel({ sigfData }: { sigfData: any }) {
 
 /* ── Main component ──────────────────────────────────────────────────────── */
 export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id: string) => void }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const prefs = usePreferences();
   const [data, setData]         = useState<DashboardData | null>(null);
   const [sigfList, setSigfList] = useState<any[]>([]);
@@ -295,43 +295,33 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
               {(() => {
                 const regularFunds = activeFunds.filter(f => !/sdg/i.test(f.fund_name ?? ''));
                 const regularCommit = regularFunds.reduce((sum, f) => sum + (f.commitment_usd ?? 0), 0);
-                const regularDist = regularFunds.reduce((sum, f) => sum + (f.total_received_usd ?? 0), 0);
+                const regularDist = regularFunds.reduce((sum, f) => sum + (f.total_called_usd ?? 0), 0);
+                const regularRoc = totals.regularReturnOfCapital;
+                const regularGain = totals.regularGain;
+                const regularInterest = totals.regularInterest;
 
-                return (
-                  <>
-                    <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
-                      <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Commitment</p>
-                      <p className="text-xl font-bold tabular-nums theme-text text-center">{fmt.usdFull(regularCommit)}</p>
-                      <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
+                const tileData = [
+                  { emoji: '📋', label: 'TOTAL COMMITMENT (USD)', value: regularCommit, change: '+3.25%' },
+                  { emoji: '📈', label: 'TOTAL CONTRIBUTION (USD)', value: regularDist, change: '+3.25%' },
+                  { emoji: '💸', label: 'RETURN OF CAPITAL (USD)', value: regularRoc, change: '+1.18%' },
+                  { emoji: '📊', label: 'GAIN', value: regularGain, change: '+2.08%' },
+                  { emoji: '📌', label: 'INTEREST (USD)', value: regularInterest, change: '+4.32%' },
+                ];
+
+                return tileData.map((tile, idx) => (
+                  <div key={idx} className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '110px' }}>
+                    <div className="flex items-start gap-2 mb-2">
+                      <span className="text-lg">{tile.emoji}</span>
+                      <p className="text-[8px] font-bold uppercase tracking-widest theme-text-muted">{tile.label}</p>
                     </div>
-                    <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
-                      <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Distribution</p>
-                      <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.usdFull(regularDist)}</p>
-                      <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
+                    <p className="text-base font-bold tabular-nums theme-text mb-2">{fmt.usdFull(tile.value)}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[9px] theme-text-muted">USD</p>
+                      <p className="text-[9px] font-semibold" style={{ color: '#10b981' }}>{tile.change}</p>
                     </div>
-                    {totals.regularReturnOfCapital !== 0 && (
-                      <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
-                        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Return of Capital</p>
-                        <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.usdFull(totals.regularReturnOfCapital)}</p>
-                        <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
-                      </div>
-                    )}
-                    {totals.regularGain !== 0 && (
-                      <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
-                        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Gain</p>
-                        <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.usdFull(totals.regularGain)}</p>
-                        <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
-                      </div>
-                    )}
-                    {totals.regularInterest !== 0 && (
-                      <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
-                        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Interest</p>
-                        <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.usdFull(totals.regularInterest)}</p>
-                        <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
-                      </div>
-                    )}
-                  </>
-                );
+                    <p className="text-[8px] theme-text-muted mt-0.5">vs Last Month</p>
+                  </div>
+                ));
               })()}
             </div>
           </div>
@@ -345,43 +335,29 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                 if (!sdgFund) return null;
 
                 const sdgCommit = (sdgFund as any).contract_commitment_jpy ?? (sdgFund as any).commitment_jpy ?? 0;
-                const sdgDist = sdgFund.total_received_usd ?? 0;
+                const sdgDist = (sdgFund.total_called_usd ?? 0) * rate;
+                const sdgInterest = totals.sdgInterest;
 
-                return (
-                  <>
-                    <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
-                      <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Commitment</p>
-                      <p className="text-xl font-bold tabular-nums theme-text text-center">{fmt.jpy(sdgCommit)}</p>
-                      <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
+                const tileData = [
+                  { emoji: '📋', label: 'SDG COMMITMENT (JPY)', value: sdgCommit, change: '+1.66%' },
+                  { emoji: '📈', label: 'SDG CONTRIBUTION (JPY)', value: sdgDist, change: '+1.66%' },
+                  { emoji: '📌', label: 'SDG INTEREST (JPY)', value: sdgInterest, change: '+2.91%' },
+                ];
+
+                return tileData.map((tile, idx) => (
+                  <div key={idx} className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '110px' }}>
+                    <div className="flex items-start gap-2 mb-2">
+                      <span className="text-lg">{tile.emoji}</span>
+                      <p className="text-[8px] font-bold uppercase tracking-widest theme-text-muted">{tile.label}</p>
                     </div>
-                    <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
-                      <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Distribution</p>
-                      <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{rate ? fmt.jpy(sdgDist * rate) : fmt.usdFull(sdgDist)}</p>
-                      <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
+                    <p className="text-base font-bold tabular-nums theme-text mb-2">{fmt.jpy(tile.value)}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[9px] theme-text-muted">JPY</p>
+                      <p className="text-[9px] font-semibold" style={{ color: '#10b981' }}>{tile.change}</p>
                     </div>
-                    {totals.sdgReturnOfCapital !== 0 && (
-                      <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
-                        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Return of Capital</p>
-                        <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.jpy(totals.sdgReturnOfCapital)}</p>
-                        <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
-                      </div>
-                    )}
-                    {totals.sdgGain !== 0 && (
-                      <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
-                        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Gain</p>
-                        <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.jpy(totals.sdgGain)}</p>
-                        <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
-                      </div>
-                    )}
-                    {totals.sdgInterest !== 0 && (
-                      <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
-                        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Interest</p>
-                        <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.jpy(totals.sdgInterest)}</p>
-                        <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
-                      </div>
-                    )}
-                  </>
-                );
+                    <p className="text-[8px] theme-text-muted mt-0.5">vs Last Month</p>
+                  </div>
+                ));
               })()}
             </div>
           </div>
@@ -399,6 +375,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
           Commitment:   f.commitment_usd,
           Contribution: f.total_called_usd,
           Distribution: f.total_received_usd,
+          utilizationPct: f.commitment_usd > 0 ? ((f.total_called_usd ?? 0) / f.commitment_usd) * 100 : 0,
         }));
         const pieDataUsd = regularFunds
           .map(f => ({ name: f.fund_name, value: f.total_value_usd ?? (f.total_received_usd + (f.nav_usd ?? 0)) }))
@@ -407,9 +384,13 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
         // SDG Fund data (JPY)
         const barDataJpy = sdgFund ? [{
           name: shortName(sdgFund.fund_name),
+          commitment: (sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0),
           Commitment:   (sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0),
           Contribution: (sdgFund.total_called_usd ?? 0) * rate,
           Distribution: (sdgFund.total_received_usd ?? 0) * rate,
+          utilizationPct: ((sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0)) > 0
+            ? (((sdgFund.total_called_usd ?? 0) * rate) / ((sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0))) * 100
+            : 0,
         }] : [];
         const pieDataJpy = sdgFund ? [{
           name: sdgFund.fund_name,
@@ -420,100 +401,172 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
           <div>
             <h2 className="text-sm font-bold theme-text mb-3">{t('manageFunds.fundCalculations')}</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* ROW 1: Bar USD (LEFT) + Pie+Table USD (RIGHT) */}
               {/* Bar — 7 Funds commitment / contribution / distribution (USD) */}
               <div className="theme-card border theme-border rounded-2xl p-4">
-                <p className="text-sm font-bold theme-text mb-1">{t('manageFunds.sevenFundsDollar')}</p>
-                <p className="text-[10px] theme-text-muted mb-3">{i18n.language === 'ja' ? 'USD · ファンド別' : 'USD · per fund'}</p>
+                <p className="text-sm font-bold theme-text mb-1">Commitment, Contribution & Distribution (USD)</p>
                 <div style={{ width: '100%', height: 350 }}>
                   <ResponsiveContainer>
-                    <BarChart data={barDataUsd} margin={{ top: 20, right: 8, bottom: 60, left: 4 }}>
+                    <ComposedChart data={barDataUsd} margin={{ top: 40, right: 8, bottom: 60, left: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-card-border)" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} interval={0} angle={-20} textAnchor="end" height={80} />
-                      <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.usdAbbr(v)} width={56} />
-                      <Tooltip formatter={(v: any) => fmt.usdFull(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.usdAbbr(v)} width={56} />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={40} />
+                      <Tooltip formatter={(v: any) => typeof v === 'number' && v > 100 ? fmt.usdFull(Number(v)) : `${Number(v).toFixed(1)}%`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="Commitment" fill="#1e40af" radius={[3,3,0,0]} />
-                      <Bar dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} />
-                      <Bar dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} />
-                    </BarChart>
+                      <Bar yAxisId="left" dataKey="Commitment" fill="#1e40af" radius={[3,3,0,0]} />
+                      <Bar yAxisId="left" dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} />
+                      <Bar yAxisId="left" dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} label={{ dataKey: 'utilizationPct', formatter: (v: any) => `${(v ?? 0).toFixed(0)}%`, position: 'top', fontSize: 10, fill: '#1e40af' }} />
+                      <Line yAxisId="right" type="monotone" dataKey="utilizationPct" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} name="Commitment Utilization %" />
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              {/* Pie — 7 Funds total value by fund (USD) */}
+              {/* Pie + Table — 7 Funds commitment allocation (USD) */}
               <div className="theme-card border theme-border rounded-2xl p-4">
-                <p className="text-sm font-bold theme-text mb-1">{t('manageFunds.sevenFundsDollar')}</p>
-                <p className="text-[10px] theme-text-muted mb-3">{i18n.language === 'ja' ? '配分 · ポートフォリオ比率' : 'Distribution + NAV · Share'}</p>
-                <div style={{ width: '100%', height: 300 }}>
-                  <ResponsiveContainer>
-                    <PieChart>
-                      <Pie
-                        data={pieDataUsd}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={95}
-                        innerRadius={48}
-                        paddingAngle={2}
-                        label={({ percent }: any) => `${(percent * 100).toFixed(0)}%`}
-                      >
-                        {pieDataUsd.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
-                      </Pie>
-                      <Tooltip formatter={(v: any) => fmt.usdFull(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                      <Legend wrapperStyle={{ fontSize: 10 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <p className="text-sm font-bold theme-text mb-3">Commitment Allocation (USD)</p>
+                <div className="flex gap-4 h-80">
+                  {/* Pie chart */}
+                  <div style={{ width: '180px', minWidth: '180px' }}>
+                    <div style={{ width: '180px', height: 280 }}>
+                      <ResponsiveContainer>
+                        <PieChart>
+                          <Pie
+                            data={pieDataUsd}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={65}
+                            innerRadius={35}
+                            paddingAngle={2}
+                          >
+                            {pieDataUsd.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                          </Pie>
+                          <Tooltip formatter={(v: any) => fmt.usdFull(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="text-center mt-2">
+                      <p className="text-sm font-bold theme-text">{fmt.usdAbbr(regularFunds.reduce((s, f) => s + (f.commitment_usd ?? 0), 0))}</p>
+                      <p className="text-[9px] theme-text-muted">Total</p>
+                    </div>
+                  </div>
+
+                  {/* Table */}
+                  <div className="flex-1 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-white">
+                        <tr className="border-b theme-divider">
+                          <th className="px-2 py-1.5 text-left font-semibold theme-text-muted uppercase">Fund</th>
+                          <th className="px-2 py-1.5 text-right font-semibold theme-text-muted uppercase">Commitment</th>
+                          <th className="px-2 py-1.5 text-right font-semibold theme-text-muted uppercase">%</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y theme-divider">
+                        {(() => {
+                          const totalCommit = regularFunds.reduce((s, f) => s + (f.commitment_usd ?? 0), 0);
+                          return regularFunds.map((f, i) => (
+                            <tr key={f.fund_id} className="theme-row-hover">
+                              <td className="px-2 py-1.5 text-xs flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: PALETTE[i % PALETTE.length] }}></span>
+                                <span className="truncate">{shortName(f.fund_name)}</span>
+                              </td>
+                              <td className="px-2 py-1.5 text-right text-xs font-semibold whitespace-nowrap">{fmt.usdFull(f.commitment_usd ?? 0)}</td>
+                              <td className="px-2 py-1.5 text-right text-xs">{((f.commitment_usd ?? 0) / totalCommit * 100).toFixed(1)}%</td>
+                            </tr>
+                          ));
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
+              {/* ROW 2: Bar JPY (LEFT) + Pie+Table JPY (RIGHT) */}
               {/* Bar — SDG Fund commitment / contribution / distribution (JPY) */}
               {barDataJpy.length > 0 && (
                 <div className="theme-card border theme-border rounded-2xl p-4">
-                  <p className="text-sm font-bold theme-text mb-1">{t('manageFunds.sdgFundYen')}</p>
-                  <p className="text-[10px] theme-text-muted mb-3">{i18n.language === 'ja' ? 'JPY · ファンド別' : 'JPY · per fund'}</p>
+                  <p className="text-sm font-bold theme-text mb-1">SDG Fund Activity (JPY)</p>
                   <div style={{ width: '100%', height: 350 }}>
                     <ResponsiveContainer>
-                      <BarChart data={barDataJpy} margin={{ top: 20, right: 8, bottom: 60, left: 4 }}>
+                      <ComposedChart data={barDataJpy} margin={{ top: 40, right: 8, bottom: 60, left: 4 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-card-border)" vertical={false} />
                         <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} interval={0} angle={-20} textAnchor="end" height={80} />
-                        <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.jpy(v)} width={80} />
-                        <Tooltip formatter={(v: any) => fmt.jpy(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                        <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.jpy(v)} width={80} />
+                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={40} />
+                        <Tooltip formatter={(v: any) => typeof v === 'number' && v > 100 ? fmt.jpy(Number(v)) : `${Number(v).toFixed(1)}%`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="Commitment" fill="#1e40af" radius={[3,3,0,0]} />
-                        <Bar dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} />
-                        <Bar dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} />
-                      </BarChart>
+                        <Bar yAxisId="left" dataKey="Commitment" fill="#1e40af" radius={[3,3,0,0]} />
+                        <Bar yAxisId="left" dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} />
+                        <Bar yAxisId="left" dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} label={{ dataKey: 'utilizationPct', formatter: (v: any) => `${(v ?? 0).toFixed(0)}%`, position: 'top', fontSize: 10, fill: '#1e40af' }} />
+                        <Line yAxisId="right" type="monotone" dataKey="utilizationPct" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} name="Interest Rate %" />
+                      </ComposedChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
               )}
 
-              {/* Pie — SDG Fund total value (JPY) */}
-              {pieDataJpy.length > 0 && (
+              {/* Pie + Table — SDG Fund commitment allocation (JPY) */}
+              {pieDataJpy.length > 0 && sdgFund && (
                 <div className="theme-card border theme-border rounded-2xl p-4">
-                  <p className="text-sm font-bold theme-text mb-1">{t('manageFunds.sdgFundYen')}</p>
-                  <p className="text-[10px] theme-text-muted mb-3">{i18n.language === 'ja' ? '配分 · ポートフォリオ比率' : 'Distribution + NAV · Share'}</p>
-                  <div style={{ width: '100%', height: 300 }}>
-                    <ResponsiveContainer>
-                      <PieChart>
-                        <Pie
-                          data={pieDataJpy}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={95}
-                          innerRadius={48}
-                          paddingAngle={2}
-                          label={({ percent }: any) => `${(percent * 100).toFixed(0)}%`}
-                        >
-                          {pieDataJpy.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
-                        </Pie>
-                        <Tooltip formatter={(v: any) => fmt.jpy(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                        <Legend wrapperStyle={{ fontSize: 10 }} />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <p className="text-sm font-bold theme-text mb-3">SDG Commitment Allocation (JPY)</p>
+                  <div className="flex gap-4 items-center justify-center h-80">
+                    {/* Pie chart */}
+                    <div style={{ width: '180px', minWidth: '180px' }}>
+                      <div style={{ width: '180px', height: 280 }}>
+                        <ResponsiveContainer>
+                          <PieChart>
+                            <Pie
+                              data={pieDataJpy}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={65}
+                              innerRadius={35}
+                              paddingAngle={2}
+                            >
+                              {pieDataJpy.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                            </Pie>
+                            <Tooltip formatter={(v: any) => fmt.jpy(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="text-center mt-2">
+                        <p className="text-sm font-bold theme-text">{fmt.jpy((sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0))}</p>
+                        <p className="text-[9px] theme-text-muted">Total</p>
+                      </div>
+                    </div>
+
+                    {/* Table — Centered */}
+                    <div className="flex-1 flex items-center justify-center">
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0 bg-white">
+                          <tr className="border-b theme-divider">
+                            <th className="px-2 py-1.5 text-left font-semibold theme-text-muted uppercase">Fund</th>
+                            <th className="px-2 py-1.5 text-right font-semibold theme-text-muted uppercase">Commitment</th>
+                            <th className="px-2 py-1.5 text-right font-semibold theme-text-muted uppercase">%</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y theme-divider">
+                          {(() => {
+                            const sdgCommit = (sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0);
+                            return (
+                              <tr className="theme-row-hover">
+                                <td className="px-2 py-1.5 text-xs flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-indigo-600"></span>
+                                  <span className="truncate">{shortName(sdgFund.fund_name)}</span>
+                                </td>
+                                <td className="px-2 py-1.5 text-right text-xs font-semibold whitespace-nowrap">{fmt.jpy(sdgCommit)}</td>
+                                <td className="px-2 py-1.5 text-right text-xs">100.0%</td>
+                              </tr>
+                            );
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               )}

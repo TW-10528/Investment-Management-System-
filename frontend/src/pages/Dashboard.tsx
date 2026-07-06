@@ -5,7 +5,6 @@ import { dashboardAPI, fxRatesAPI, fundsAPI } from '../services/api';
 import type { DashboardData, LedgerRow } from '../types/index';
 import { fmt } from '../lib/format';
 import toast from 'react-hot-toast';
-import { LockIcon, ArrowIcon, ChartIcon, PercentIcon, DistributionIcon } from '../components/DashboardIcons';
 
 const SUMMARY_REFRESH_MS = 60_000;   // dashboard summary + fx — 1 min
 
@@ -317,30 +316,19 @@ export default function Dashboard() {
             const regularDist = regularFunds.reduce((sum: number, f: any) => sum + (f.total_received_usd ?? 0), 0);
 
             const cards = [
-              { label: 'Commitment', value: fmt.usdFull(regularCommit), currency: 'USD' },
-              { label: 'Distribution', value: fmt.usdFull(regularDist), currency: 'USD' },
+              { emoji: '📋', label: 'Commitment', value: fmt.usdFull(regularCommit), currency: 'USD' },
+              { emoji: '📈', label: 'Distribution', value: fmt.usdFull(regularDist), currency: 'USD' },
             ];
 
             if (totals.regularReturnOfCapital !== 0) {
-              cards.push({ label: 'Return of Capital', value: fmt.usdFull(totals.regularReturnOfCapital), currency: 'USD' });
+              cards.push({ emoji: '💸', label: 'Return of Capital', value: fmt.usdFull(totals.regularReturnOfCapital), currency: 'USD' });
             }
             if (totals.regularGain !== 0) {
-              cards.push({ label: 'Gain', value: fmt.usdFull(totals.regularGain), currency: 'USD' });
+              cards.push({ emoji: '📊', label: 'Gain', value: fmt.usdFull(totals.regularGain), currency: 'USD' });
             }
             if (totals.regularInterest !== 0) {
-              cards.push({ label: 'Interest', value: fmt.usdFull(totals.regularInterest), currency: 'USD' });
+              cards.push({ emoji: '📌', label: 'Interest', value: fmt.usdFull(totals.regularInterest), currency: 'USD' });
             }
-
-            const getIcon = (label: string) => {
-              switch (label) {
-                case 'Commitment': return <LockIcon />;
-                case 'Distribution': return <DistributionIcon />;
-                case 'Return of Capital': return <ArrowIcon />;
-                case 'Gain': return <ChartIcon />;
-                case 'Interest': return <PercentIcon />;
-                default: return null;
-              }
-            };
 
             return cards.map(card => (
               <div key={card.label} className="relative overflow-hidden rounded-lg p-3 bg-white border border-gray-200 transition-all hover:shadow-lg"
@@ -350,7 +338,7 @@ export default function Dashboard() {
                 }}>
                 <div className="flex items-start gap-2">
                   <div className="rounded-lg p-2 flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100" style={{ boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)' }}>
-                    {getIcon(card.label)}
+                    <span className="text-xl">{card.emoji}</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[8px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">
@@ -375,22 +363,13 @@ export default function Dashboard() {
         const sdgDist = sdgFund.total_received_usd ?? 0;
 
         const cards = [
-          { label: 'Commitment', value: fmt.jpy(sdgCommit), currency: 'JPY' },
-          { label: 'Distribution', value: latestSaved ? fmt.jpy(sdgDist * latestSaved) : fmt.jpy(sdgDist), currency: 'JPY' },
+          { emoji: '📋', label: 'Commitment', value: fmt.jpy(sdgCommit), currency: 'JPY' },
+          { emoji: '📈', label: 'Distribution', value: latestSaved ? fmt.jpy(sdgDist * latestSaved) : fmt.jpy(sdgDist), currency: 'JPY' },
         ];
 
         if (totals.sdgInterest !== 0) {
-          cards.push({ label: 'Interest', value: fmt.jpy(totals.sdgInterest), currency: 'JPY' });
+          cards.push({ emoji: '📌', label: 'Interest', value: fmt.jpy(totals.sdgInterest), currency: 'JPY' });
         }
-
-        const getIcon = (label: string) => {
-          switch (label) {
-            case 'Commitment': return <LockIcon />;
-            case 'Distribution': return <DistributionIcon />;
-            case 'Interest': return <PercentIcon />;
-            default: return null;
-          }
-        };
 
         return (
           <div>
@@ -404,7 +383,7 @@ export default function Dashboard() {
                   }}>
                   <div className="flex items-start gap-2">
                     <div className="rounded-lg p-2 flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100" style={{ boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)' }}>
-                      {getIcon(card.label)}
+                      <span className="text-xl">{card.emoji}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[8px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">
