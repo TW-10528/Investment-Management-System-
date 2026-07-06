@@ -18,8 +18,8 @@ const NAV_ITEMS: {
   { to: '/funds',      key: 'nav.funds',     icon: '🏦', end: false, adminOnly: false, badge: 'none',
     children: [
       { to: '/funds',                      section: 'manage',      label: 'Manage Funds',      labelKey: 'manageFunds.manageFunds' },
-      { to: '/funds?section=comparison',   section: 'comparison',   label: 'Funds Comparison',  labelKey: 'nav.comparison' },
       { to: '/funds?section=reports',      section: 'reports',     label: 'Reports',           labelKey: 'nav.reports' },
+      { to: '/funds?section=comparison',   section: 'comparison',   label: 'Comparison',        labelKey: '' },
     ] },
   { to: '/fx-rates',     key: 'nav.fxRates',   icon: '💱', end: false, adminOnly: false, badge: 'none' },
   { to: '/notifications',key: 'nav.alertsNotifications', labelKey: 'nav.alertsNotifications', icon: '🔔', end: false, adminOnly: false, badge: 'none' },
