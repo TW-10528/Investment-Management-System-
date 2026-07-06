@@ -11,6 +11,8 @@ const FUND_NAME_PATTERNS: Record<string, string[]> = {
   'hamilton-strategic': ['Strategic Opportunities Fund IX'],
   'dover-street':   ['Dover Street XI', 'Dover Street XII', 'Dover Street'],
   'sdg-lps':        ['SDGs投資事業有限責任組合', 'SDG'],
+  'sdg-jpy':        ['SDGs投資事業有限責任組合', 'SDG'],  // sdgExtractor returns sdg-jpy
+  'SDG':            ['SDGs投資事業有限責任組合', 'SDG'],  // detector returns SDG
   'goldman-sachs':  ['Vintage X(Flagship)', 'Vintage X'],
   'siguler-guff':   ['Small Buyout Opportunities Fund VI'],
   'capula-grv':     ['Capula Global Relative Fund', 'Capula'],

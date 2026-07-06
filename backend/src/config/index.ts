@@ -48,7 +48,7 @@ export const config = {
 
   // AI extraction
   aiModelUrl:  get('AI_MODEL_URL',  'https://tw-gateway.twave.co.jp'),
-  aiModelName: get('AI_MODEL_NAME', 'Qwen/Qwen3.6-35B-A3B-FP8'),
+  aiModelName: get('AI_MODEL_NAME', 'Qwen/Qwen-AgentWorld-35B-A3B'),
   aiApiKey:    get('AI_API_KEY',    ''),
 
   // Misc

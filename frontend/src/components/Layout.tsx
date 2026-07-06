@@ -6,6 +6,7 @@ import { usersAPI } from '../services/api';
 import { usePreferences } from '../contexts/usePreferences';
 import { LANGUAGES } from '../i18n';
 import SettingsModal from './SettingsModal';
+import FloatingCalculator from './FloatingCalculator';
 
 /* ── Nav items ─────────────────────────────────────────────────────────────── */
 type SubItem = { to: string; section: string; label: string; labelKey?: string };
@@ -16,9 +17,9 @@ const NAV_ITEMS: {
   { to: '/',           key: 'nav.dashboard', icon: '⊞',  end: true,  adminOnly: false, badge: 'none' },
   { to: '/funds',      key: 'nav.funds',     icon: '🏦', end: false, adminOnly: false, badge: 'none',
     children: [
-      { to: '/funds',                  section: 'manage',   label: 'Manage Funds',      labelKey: 'manageFunds.manageFunds' },
-      { to: '/funds?section=reports',  section: 'reports',  label: 'Reports',          labelKey: 'nav.reports' },
-      { to: '/funds?section=cashflow', section: 'cashflow', label: 'Cashflow',         labelKey: 'nav.cashflow' },
+      { to: '/funds',                      section: 'manage',      label: 'Manage Funds',      labelKey: 'manageFunds.manageFunds' },
+      { to: '/funds?section=comparison',   section: 'comparison',   label: 'Funds Comparison',  labelKey: 'nav.comparison' },
+      { to: '/funds?section=reports',      section: 'reports',     label: 'Reports',           labelKey: 'nav.reports' },
     ] },
   { to: '/fx-rates',     key: 'nav.fxRates',   icon: '💱', end: false, adminOnly: false, badge: 'none' },
   { to: '/notifications',key: 'nav.alertsNotifications', labelKey: 'nav.alertsNotifications', icon: '🔔', end: false, adminOnly: false, badge: 'none' },
@@ -288,6 +289,9 @@ export default function Layout() {
       {/* Modals & overlays */}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showLangMenu && <div className="fixed inset-0 z-40" onClick={() => setShowLangMenu(false)} />}
+
+      {/* Floating Calculator */}
+      <FloatingCalculator />
     </div>
   );
 }

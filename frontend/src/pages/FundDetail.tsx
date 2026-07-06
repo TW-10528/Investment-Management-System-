@@ -145,18 +145,27 @@ export default function FundDetail() {
       </div>
 
       {/* Snapshot metrics */}
-      {snap && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-          <Snap label="Commitment"     value={fmt.usd(snap.commitment_usd, true)} />
-          <Snap label="Total Called"   value={fmt.usd(snap.total_called_usd, true)} />
-          <Snap label="Total Received" value={fmt.usd(snap.total_received_usd, true)} />
-          <Snap label="Drawn %"        value={fmt.pct(snap.drawn_pct)} />
-          <Snap label="Unfunded"       value={fmt.usd(snap.unfunded_usd, true)} />
-          <Snap label="Inv. Capacity"  value={fmt.usd(snap.investment_capacity, true)} />
-          <Snap label="Net Cash"       value={fmt.usd(snap.net_cash_position, true)} sub={snap.net_cash_position < 0 ? 'Net outflow' : 'Net inflow'} />
-          <Snap label="DPI"            value={snap.dpi.toFixed(2) + 'x'} />
-        </div>
-      )}
+      {snap && (() => {
+        const totalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
+        const totalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
+        const totalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
+
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            <Snap label="Commitment"     value={fmt.usd(snap.commitment_usd, true)} />
+            <Snap label="Total Called"   value={fmt.usd(snap.total_called_usd, true)} />
+            <Snap label="Total Received" value={fmt.usd(snap.total_received_usd, true)} />
+            <Snap label="Drawn %"        value={fmt.pct(snap.drawn_pct)} />
+            <Snap label="Unfunded"       value={fmt.usd(snap.unfunded_usd, true)} />
+            <Snap label="Inv. Capacity"  value={fmt.usd(snap.investment_capacity, true)} />
+            <Snap label="Net Cash"       value={fmt.usd(snap.net_cash_position, true)} sub={snap.net_cash_position < 0 ? 'Net outflow' : 'Net inflow'} />
+            <Snap label="DPI"            value={snap.dpi.toFixed(2) + 'x'} />
+            <Snap label="Return of Capital" value={fmt.usd(totalReturnOfCapital, true)} />
+            <Snap label="Gain" value={fmt.usd(totalGain, true)} />
+            <Snap label="Interest" value={fmt.usd(totalInterest, true)} />
+          </div>
+        );
+      })()}
 
       {/* Tabs + New Call button */}
       <div className="flex items-center justify-between">

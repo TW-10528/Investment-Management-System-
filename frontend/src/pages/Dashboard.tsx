@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { dashboardAPI, fxRatesAPI } from '../services/api';
-import type { DashboardData } from '../types/index';
+import { dashboardAPI, fxRatesAPI, fundsAPI } from '../services/api';
+import type { DashboardData, LedgerRow } from '../types/index';
 import { fmt } from '../lib/format';
 import toast from 'react-hot-toast';
 
@@ -54,13 +54,60 @@ function FxWidget({ prevRate, prevDate, t, i18n }:
 
   return (
     <div className="theme-card border rounded-xl px-5 py-4">
-      <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{t('usdJpy.label')}</p>
-      <p className="text-3xl font-bold tabular-nums mt-1" style={{ color: prevRate ? C.indigo : C.slate }}>
-        {prevRate ? `¥${prevRate.toFixed(2)}` : '—'}
-      </p>
-      <p className="text-[10px] theme-text-muted mt-1">
-        {prevDate ? formatDate(prevDate) : 'Rate unavailable'}
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{t('usdJpy.label')}</p>
+          <p className="text-3xl font-bold tabular-nums mt-1" style={{ color: prevRate ? C.indigo : C.slate }}>
+            {prevRate ? `¥${prevRate.toFixed(2)}` : '—'}
+          </p>
+          <p className="text-[10px] theme-text-muted mt-1">
+            {prevDate ? formatDate(prevDate) : 'Rate unavailable'}
+          </p>
+        </div>
+        <div className="flex-shrink-0">
+          <svg width="140" height="60" viewBox="0 0 140 60" className="text-indigo-500" style={{ filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.4))' }}>
+            <defs>
+              <linearGradient id="sparkGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="rgb(59, 130, 246)" stopOpacity="0" />
+              </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            {/* Filled area under the line */}
+            <path
+              d="M 5,48 Q 20,42 35,38 T 65,30 T 95,18 T 135,8 L 135,60 L 5,60 Z"
+              fill="url(#sparkGradient)"
+              opacity="0.4"
+            />
+            {/* Main line with glow */}
+            <path
+              d="M 5,48 Q 20,42 35,38 T 65,30 T 95,18 T 135,8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              filter="url(#glow)"
+              opacity="0.8"
+            />
+            {/* Highlighted line on top */}
+            <path
+              d="M 5,48 Q 20,42 35,38 T 65,30 T 95,18 T 135,8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      </div>
     </div>
   );
 }
@@ -99,6 +146,10 @@ export default function Dashboard() {
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [totals, setTotals] = useState<{
+    regularReturnOfCapital: number; regularGain: number; regularInterest: number;
+    sdgReturnOfCapital: number; sdgGain: number; sdgInterest: number;
+  }>({ regularReturnOfCapital: 0, regularGain: 0, regularInterest: 0, sdgReturnOfCapital: 0, sdgGain: 0, sdgInterest: 0 });
 
   const loadDashboard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
@@ -117,6 +168,44 @@ export default function Dashboard() {
       ]);
       setData(r.data);
       setLastUpdated(new Date());
+
+      // Fetch ledger data for all active funds to calculate totals
+      if (r.data?.fund_summaries) {
+        const activeFunds = r.data.fund_summaries.filter((f: any) => f.is_active !== false);
+        const regularFundIds = activeFunds.filter((f: any) => !/sdg/i.test(f.fund_name ?? '')).map((f: any) => f.fund_id);
+        const sdgFundId = activeFunds.find((f: any) => /sdg/i.test(f.fund_name ?? ''))?.fund_id;
+
+        let regularReturnOfCapital = 0, regularGain = 0, regularInterest = 0;
+        let sdgReturnOfCapital = 0, sdgGain = 0, sdgInterest = 0;
+
+        try {
+          const ledgers = await Promise.all(activeFunds.map((f: any) =>
+            fundsAPI.ledger(f.fund_id)
+              .then(res => ({ rows: (res.data?.rows ?? []) as LedgerRow[] }))
+              .catch(() => ({ rows: [] as LedgerRow[] }))
+          ));
+
+          ledgers.forEach((ledger: any, idx: number) => {
+            const fund = activeFunds[idx];
+            const isRegular = regularFundIds.includes(fund.fund_id);
+            ledger.rows.forEach((r: any) => {
+              if (isRegular) {
+                regularReturnOfCapital += r.return_of_capital ?? 0;
+                regularGain += r.gain ?? 0;
+                regularInterest += r.interest ?? 0;
+              } else if (fund.fund_id === sdgFundId) {
+                sdgReturnOfCapital += r.return_of_capital ?? 0;
+                sdgGain += r.gain ?? 0;
+                sdgInterest += r.interest ?? 0;
+              }
+            });
+          });
+
+          setTotals({ regularReturnOfCapital, regularGain, regularInterest, sdgReturnOfCapital, sdgGain, sdgInterest });
+        } catch {
+          // Silently fail — use zero totals if ledger fetch fails
+        }
+      }
 
       if (fxPrev.data?.usd_jpy) {
         setLatestSaved(fxPrev.data.usd_jpy);
@@ -171,7 +260,7 @@ export default function Dashboard() {
   const agoSec = lastUpdated ? Math.floor((Date.now() - lastUpdated.getTime()) / 1000) : 0;
 
   return (
-    <div className="p-5 space-y-5 animate-fade-in">
+    <div className="p-5 space-y-3 animate-fade-in">
 
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -204,6 +293,9 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border theme-divider theme-text-muted hover:theme-text transition-colors">
+            ⬇️ Export
+          </button>
           <button onClick={() => window.location.reload()} disabled={refreshing}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border theme-divider theme-text-muted hover:theme-text transition-colors disabled:opacity-40">
             🔄 {t('common.refresh')}
@@ -214,141 +306,144 @@ export default function Dashboard() {
       {/* ── Overdue alert ── */}
       <OverdueAlert calls={data.overdue_calls ?? []} />
 
-      {/* ── 7 Regular Funds (USD) vs SDG (JPY) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* Left: 7 Regular Funds in USD */}
-        <div className="grid grid-cols-2 gap-2">
+      {/* ── Overview (USD) ── */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider theme-text-muted mb-2">Overview (USD)</h3>
+        <div className="grid grid-cols-5 gap-4">
           {(() => {
-            const regularFunds = activeFunds.filter(f => !/sdg/i.test(f.fund_name ?? ''));
-            const regularCommit = regularFunds.reduce((sum, f) => sum + (f.commitment_usd ?? 0), 0);
-            const regularDist = regularFunds.reduce((sum, f) => sum + (f.total_received_usd ?? 0), 0);
+            const regularFunds = activeFunds.filter((f: any) => !/sdg/i.test(f.fund_name ?? ''));
+            const regularCommit = regularFunds.reduce((sum: number, f: any) => sum + (f.commitment_usd ?? 0), 0);
+            const regularDist = regularFunds.reduce((sum: number, f: any) => sum + (f.total_received_usd ?? 0), 0);
 
-            return (
-              <>
-                <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '100px' }}>
-                  <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{i18n.language === 'ja' ? '7ファンド\nコミットメント' : '7 Funds\nCommitment'}</p>
-                  <p className="text-lg font-bold tabular-nums theme-text text-center">{fmt.usdFull(regularCommit)}</p>
-                  <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
-                </div>
-                <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '100px' }}>
-                  <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{i18n.language === 'ja' ? '7ファンド\n分配金' : '7 Funds\nDistribution'}</p>
-                  <p className="text-lg font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.usdFull(regularDist)}</p>
-                  <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
-                </div>
-              </>
-            );
-          })()}
-        </div>
+            const cards = [
+              { iconEmoji: '📋', iconColor: '#3b82f6', label: 'Commitment', value: fmt.usdFull(regularCommit), currency: 'USD' },
+              { iconEmoji: '📈', iconColor: '#22c55e', label: 'Distribution', value: fmt.usdFull(regularDist), currency: 'USD' },
+            ];
 
-        {/* Right: SDG Fund in JPY */}
-        <div className="grid grid-cols-2 gap-2">
-          {(() => {
-            const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
-            if (!sdgFund) return null;
+            if (totals.regularReturnOfCapital !== 0) {
+              cards.push({ iconEmoji: '💸', iconColor: '#a855f7', label: 'Return of Capital', value: fmt.usdFull(totals.regularReturnOfCapital), currency: 'USD' });
+            }
+            if (totals.regularGain !== 0) {
+              cards.push({ iconEmoji: '📊', iconColor: '#fb923c', label: 'Gain', value: fmt.usdFull(totals.regularGain), currency: 'USD' });
+            }
+            if (totals.regularInterest !== 0) {
+              cards.push({ iconEmoji: '📌', iconColor: '#0ea5e9', label: 'Interest', value: fmt.usdFull(totals.regularInterest), currency: 'USD' });
+            }
 
-            const sdgCommit = sdgFund.contract_commitment_jpy ?? sdgFund.commitment_usd ?? 0;
-            const sdgDist = sdgFund.total_received_usd ?? 0;
-
-            return (
-              <>
-                <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '100px' }}>
-                  <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{i18n.language === 'ja' ? 'SDG\nコミットメント' : 'SDG\nCommitment'}</p>
-                  <p className="text-lg font-bold tabular-nums theme-text text-center">{fmt.jpy(sdgCommit)}</p>
-                  <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
+            return cards.map(card => (
+              <div key={card.label} className="border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all bg-white">
+                <div className="flex items-start gap-2">
+                  <div className="rounded p-1 flex-shrink-0">
+                    <span className="text-lg" style={{ color: card.iconColor }}>
+                      {card.iconEmoji}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">
+                      {card.label}
+                    </p>
+                    <p className="text-base font-bold tabular-nums text-gray-900">{card.value}</p>
+                    <p className="text-[8px] text-gray-500 mt-0.5">{card.currency}</p>
+                  </div>
                 </div>
-                <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '100px' }}>
-                  <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{i18n.language === 'ja' ? 'SDG\n分配金' : 'SDG\nDistribution'}</p>
-                  <p className="text-lg font-bold tabular-nums text-center" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgDist * latestSaved) : fmt.usdFull(sdgDist)}</p>
-                  <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
-                </div>
-              </>
-            );
+              </div>
+            ));
           })()}
         </div>
       </div>
 
-      {/* ── Additional metrics (MOIC, NET IRR, DRY POWDER, NAV) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* Left: 7 Funds metrics */}
-        <div className="grid grid-cols-4 gap-2">
-          {(() => {
-            const regularFunds = activeFunds.filter(f => !/sdg/i.test(f.fund_name ?? ''));
-            const regularCalled = regularFunds.reduce((sum, f) => sum + (f.total_called_usd ?? 0), 0);
-            const regularDist = regularFunds.reduce((sum, f) => sum + (f.total_received_usd ?? 0), 0);
-            const regularNav = regularFunds.reduce((sum, f) => sum + (f.nav_usd ?? 0), 0);
-            const regularCommit = regularFunds.reduce((sum, f) => sum + (f.commitment_usd ?? 0), 0);
-            const regularValue = regularFunds.reduce((sum, f) => sum + (f.total_value_usd ?? (f.total_received_usd + (f.nav_usd ?? 0))), 0);
-            const dpi = regularCalled > 0 ? regularDist / regularCalled : 0;
-            const tvpi = regularCalled > 0 ? regularValue / regularCalled : 0;
-            const moic = dpi * tvpi;
-            const dryPowder = regularCommit - regularCalled;
+      {/* ── SDG Fund (JPY) ── */}
+      {(() => {
+        const sdgFund = activeFunds.find((f: any) => /sdg/i.test(f.fund_name ?? ''));
+        if (!sdgFund) return null;
 
-            return (
-              <>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: 'rgba(30, 64, 175, 0.12)', border: '1px solid rgba(30, 64, 175, 0.3)' }}>
-                  <p className="text-[7px] font-bold uppercase tracking-widest text-blue-600 mb-1">{t('manageFunds.moic')}</p>
-                  <p className="text-base font-bold" style={{ color: '#1e40af' }}>{moic.toFixed(2)}×</p>
-                  <p className="text-[7px] text-blue-600 mt-1">DPI {dpi.toFixed(2)}× · TVPI {tvpi.toFixed(2)}×</p>
-                </div>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: 'rgba(30, 64, 175, 0.12)', border: '1px solid rgba(30, 64, 175, 0.3)' }}>
-                  <p className="text-[7px] font-bold uppercase tracking-widest text-blue-600 mb-1">{t('manageFunds.netIRR')}</p>
-                  <p className="text-base font-bold" style={{ color: '#1e40af' }}>{data.irr != null ? `${data.irr.toFixed(1)}%` : '—'}</p>
-                  <p className="text-[7px] text-blue-600 mt-1">Since Inception</p>
-                </div>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: 'rgba(30, 64, 175, 0.12)', border: '1px solid rgba(30, 64, 175, 0.3)' }}>
-                  <p className="text-[7px] font-bold uppercase tracking-widest text-blue-600 mb-1">{t('manageFunds.dryPowder')}</p>
-                  <p className="text-xs font-bold break-words" style={{ color: '#1e40af' }}>{fmt.usdFull(dryPowder)}</p>
-                  <p className="text-[7px] text-blue-600 mt-1">{((dryPowder/regularCommit)*100).toFixed(2)}% Available</p>
-                </div>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: 'rgba(30, 64, 175, 0.12)', border: '1px solid rgba(30, 64, 175, 0.3)' }}>
-                  <p className="text-[7px] font-bold uppercase tracking-widest text-blue-600 mb-1">{t('manageFunds.totalNAV')}</p>
-                  <p className="text-xs font-bold break-words" style={{ color: '#1e40af' }}>{fmt.usdFull(regularNav)}</p>
-                  <p className="text-[7px] text-blue-600 mt-1">Latest Reported</p>
-                </div>
-              </>
-            );
-          })()}
-        </div>
+        const sdgCommit = sdgFund.contract_commitment_jpy ?? sdgFund.commitment_jpy ?? 0;
+        const sdgDist = sdgFund.total_received_usd ?? 0;
 
-        {/* Right: SDG metrics */}
-        <div className="grid grid-cols-4 gap-2">
-          {(() => {
-            const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
-            const sdgCalled = sdgFund ? (sdgFund.total_called_usd ?? 0) : 0;
-            const sdgDist = sdgFund ? (sdgFund.total_received_usd ?? 0) : 0;
-            const sdgNav = sdgFund ? (sdgFund.nav_usd ?? 0) : 0;
-            const sdgCommit = sdgFund ? (sdgFund.contract_commitment_jpy ?? sdgFund.commitment_usd ?? 0) : 0;
-            const sdgValue = sdgFund ? (sdgFund.total_value_usd ?? (sdgFund.total_received_usd + (sdgFund.nav_usd ?? 0))) : 0;
-            const sdgDpi = sdgCalled > 0 ? sdgDist / sdgCalled : 0;
-            const sdgTvpi = sdgCalled > 0 ? sdgValue / sdgCalled : 0;
-            const sdgMoic = sdgDpi * sdgTvpi;
-            const sdgDryPowder = sdgCommit - sdgCalled;
+        const cards = [
+          { iconEmoji: '📋', iconColor: '#3b82f6', label: 'Commitment', value: fmt.jpy(sdgCommit), currency: 'JPY' },
+          { iconEmoji: '📈', iconColor: '#22c55e', label: 'Distribution', value: latestSaved ? fmt.jpy(sdgDist * latestSaved) : fmt.jpy(sdgDist), currency: 'JPY' },
+        ];
 
-            return (
-              <>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: 'rgba(30, 64, 175, 0.12)', border: '1px solid rgba(30, 64, 175, 0.3)' }}>
-                  <p className="text-[7px] font-bold uppercase tracking-widest text-blue-600 mb-1">{t('manageFunds.moic')}</p>
-                  <p className="text-base font-bold" style={{ color: '#1e40af' }}>{sdgMoic.toFixed(2)}×</p>
-                  <p className="text-[7px] text-blue-600 mt-1">DPI {sdgDpi.toFixed(2)}× · TVPI {sdgTvpi.toFixed(2)}×</p>
+        if (totals.sdgInterest !== 0) {
+          cards.push({ iconEmoji: '📌', iconColor: '#0ea5e9', label: 'Interest', value: fmt.jpy(totals.sdgInterest), currency: 'JPY' });
+        }
+
+        return (
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider theme-text-muted mb-2">SDG Fund (JPY)</h3>
+            <div className="grid grid-cols-3 gap-4">
+              {cards.map(card => (
+                <div key={card.label} className="border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all bg-white">
+                  <div className="flex items-start gap-2">
+                    <div className="rounded p-1 flex-shrink-0">
+                      <span className="text-lg" style={{ color: card.iconColor }}>
+                        {card.iconEmoji}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[8px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">
+                        {card.label}
+                      </p>
+                      <p className="text-base font-bold tabular-nums text-gray-900">{card.value}</p>
+                      <p className="text-[8px] text-gray-500 mt-0.5">{card.currency}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: 'rgba(30, 64, 175, 0.12)', border: '1px solid rgba(30, 64, 175, 0.3)' }}>
-                  <p className="text-[7px] font-bold uppercase tracking-widest text-blue-600 mb-1">{t('manageFunds.netIRR')}</p>
-                  <p className="text-base font-bold" style={{ color: '#1e40af' }}>—</p>
-                  <p className="text-[7px] text-blue-600 mt-1">Since Inception</p>
-                </div>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: 'rgba(30, 64, 175, 0.12)', border: '1px solid rgba(30, 64, 175, 0.3)' }}>
-                  <p className="text-[7px] font-bold uppercase tracking-widest text-blue-600 mb-1">{t('manageFunds.dryPowder')}</p>
-                  <p className="text-xs font-bold break-words" style={{ color: '#1e40af' }}>{latestSaved ? fmt.jpy(sdgDryPowder * latestSaved) : fmt.jpy(sdgDryPowder)}</p>
-                  <p className="text-[7px] text-blue-600 mt-1">{((sdgDryPowder/sdgCommit)*100).toFixed(2)}% Available</p>
-                </div>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: 'rgba(30, 64, 175, 0.12)', border: '1px solid rgba(30, 64, 175, 0.3)' }}>
-                  <p className="text-[7px] font-bold uppercase tracking-widest text-blue-600 mb-1">{t('manageFunds.totalNAV')}</p>
-                  <p className="text-xs font-bold break-words" style={{ color: '#1e40af' }}>{latestSaved ? fmt.jpy(sdgNav * latestSaved) : fmt.jpy(sdgNav)}</p>
-                  <p className="text-[7px] text-blue-600 mt-1">Latest Reported</p>
-                </div>
-              </>
-            );
-          })()}
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── KPI Metrics Row ── */}
+      <div className="border-t border-gray-200 pt-4 mt-2">
+        <div className="flex gap-2 overflow-x-auto pb-2">
+        {(() => {
+          const regularFunds = activeFunds.filter(f => !/sdg/i.test(f.fund_name ?? ''));
+          const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
+          const regularCalled = regularFunds.reduce((sum, f) => sum + (f.total_called_usd ?? 0), 0);
+          const regularDist = regularFunds.reduce((sum, f) => sum + (f.total_received_usd ?? 0), 0);
+          const regularNav = regularFunds.reduce((sum, f) => sum + (f.nav_usd ?? 0), 0);
+          const regularCommit = regularFunds.reduce((sum, f) => sum + (f.commitment_usd ?? 0), 0);
+          const regularValue = regularFunds.reduce((sum, f) => sum + (f.total_value_usd ?? (f.total_received_usd + (f.nav_usd ?? 0))), 0);
+          const dpi = regularCalled > 0 ? regularDist / regularCalled : 0;
+          const tvpi = regularCalled > 0 ? regularValue / regularCalled : 0;
+          const moic = 1 + dpi;
+          const dryPowder = regularCommit - regularCalled;
+
+          const sdgCalled = sdgFund ? (sdgFund.total_called_usd ?? 0) : 0;
+          const sdgDist = sdgFund ? (sdgFund.total_received_usd ?? 0) : 0;
+          const sdgNav = sdgFund ? (sdgFund.nav_usd ?? 0) : 0;
+          const sdgCommit = sdgFund ? (sdgFund.contract_commitment_jpy ?? sdgFund.commitment_usd ?? 0) : 0;
+          const sdgValue = sdgFund ? (sdgFund.total_value_usd ?? (sdgFund.total_received_usd + (sdgFund.nav_usd ?? 0))) : 0;
+          const sdgDpi = sdgCalled > 0 ? sdgDist / sdgCalled : 0;
+          const sdgTvpi = sdgCalled > 0 ? sdgValue / sdgCalled : 0;
+          const sdgMoic = sdgDpi * sdgTvpi;
+          const sdgDryPowder = sdgCommit - sdgCalled;
+
+          const kpis = [
+            { icon: '🎯', label: 'MOIC', value: moic.toFixed(2) + '×', subtitle: `DPI ${dpi.toFixed(2)}× · TVPI ${tvpi.toFixed(2)}×` },
+            { icon: '📊', label: 'NET IRR', value: data.irr != null ? `${data.irr.toFixed(1)}%` : '—', subtitle: 'Since Inception' },
+            { icon: '💰', label: 'DRY POWDER', value: fmt.usdFull(dryPowder), subtitle: `${((dryPowder/regularCommit)*100).toFixed(2)}% Available` },
+            { icon: '🏦', label: 'TOTAL NAV (UNREAL.)', value: fmt.usdFull(regularNav), subtitle: 'Latest Reported' },
+            { icon: '🎯', label: 'MOIC (JPY)', value: sdgMoic.toFixed(2) + '×', subtitle: `DPI ${sdgDpi.toFixed(2)}× · TVPI ${sdgTvpi.toFixed(2)}×` },
+            { icon: '📊', label: 'NET IRR (JPY)', value: '—', subtitle: 'Since Inception' },
+            { icon: '💰', label: 'DRY POWDER', value: latestSaved ? fmt.jpy(sdgDryPowder * latestSaved) : fmt.jpy(sdgDryPowder), subtitle: `${((sdgDryPowder/sdgCommit)*100).toFixed(2)}% Available` },
+            { icon: '🏦', label: 'TOTAL NAV (UNREAL.)', value: latestSaved ? fmt.jpy(sdgNav * latestSaved) : fmt.jpy(sdgNav), subtitle: 'Latest Reported' },
+          ];
+
+          return kpis.map(kpi => (
+            <div key={kpi.label + kpi.value} className="flex-shrink-0 bg-white border border-gray-200 rounded-lg p-2.5 min-w-max shadow-sm hover:shadow-md transition-shadow" style={{ width: '160px' }}>
+              <div className="flex items-start gap-1.5 mb-0.5">
+                <span className="text-base">{kpi.icon}</span>
+                <p className="text-[7px] font-bold uppercase tracking-widest" style={{ color: '#3b82f6' }}>{kpi.label}</p>
+              </div>
+              <p className="text-base font-bold mb-0.5" style={{ color: '#1e40af' }}>{kpi.value}</p>
+              <p className="text-[7px] text-gray-500">{kpi.subtitle}</p>
+            </div>
+          ));
+        })()}
         </div>
       </div>
 
@@ -391,17 +486,17 @@ export default function Dashboard() {
 
                   return (
                     <tr key={f.fund_id} className="theme-row-hover transition-colors">
-                      <td className="px-5 py-3">
+                      <td className="px-4 py-2.5">
                         <Link to={`/funds?fund=${f.fund_id}`} className="font-semibold theme-text hover:text-indigo-600 text-sm transition-colors">
                           {fundNameKey ? t(fundNameKey) : f.fund_name}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-sm theme-text">{f.manager || '—'}</td>
-                      <td className="px-4 py-3 text-right tabular-nums theme-text">{fmt.usdFull(f.contract_commitment_usd ?? f.commitment_usd)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.indigo }}>{fmt.usdFull(f.total_called_usd)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.indigo }}>{fmt.usdFull(f.total_received_usd)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums" style={{ color: C.violet }}>{fmt.usdFull(navUsd)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold theme-text">{fmt.usdFull(valueUsd)}</td>
+                      <td className="px-3 py-2.5 text-sm theme-text">{f.manager || '—'}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums theme-text text-sm font-semibold">{fmt.usdFull(f.contract_commitment_usd ?? f.commitment_usd)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-sm" style={{ color: C.indigo }}>{fmt.usdFull(f.total_called_usd)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-sm" style={{ color: C.indigo }}>{fmt.usdFull(f.total_received_usd)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-sm font-semibold" style={{ color: C.violet }}>{fmt.usdFull(navUsd)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-base theme-text">{fmt.usdFull(valueUsd)}</td>
                     </tr>
                   );
                 })}
@@ -416,15 +511,15 @@ export default function Dashboard() {
 
                   return (
                     <tr key={sdgFund.fund_id} className="theme-row-hover transition-colors" style={{ borderTop: '2px solid rgba(99,102,241,0.2)' }}>
-                      <td className="px-5 py-3">
+                      <td className="px-4 py-2.5">
                         <span className="font-semibold theme-text text-sm">{fundNameKey ? t(fundNameKey) : sdgFund.fund_name}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm theme-text">{sdgFund.manager || '—'}</td>
-                      <td className="px-4 py-3 text-right tabular-nums theme-text">{latestSaved ? fmt.jpy(sdgFund.commitment_usd * latestSaved) : '—'}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgFund.total_called_usd * latestSaved) : '—'}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgFund.total_received_usd * latestSaved) : '—'}</td>
-                      <td className="px-4 py-3 text-right tabular-nums" style={{ color: C.violet }}>{latestSaved ? fmt.jpy(navUsd * latestSaved) : '—'}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(valueUsd * latestSaved) : '—'}</td>
+                      <td className="px-3 py-2.5 text-sm theme-text">{sdgFund.manager || '—'}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums theme-text text-sm font-semibold">{fmt.jpy(sdgFund.contract_commitment_jpy ?? sdgFund.commitment_jpy ?? 0)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-sm" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgFund.total_called_usd * latestSaved) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-sm" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgFund.total_received_usd * latestSaved) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-sm font-semibold" style={{ color: C.violet }}>{latestSaved ? fmt.jpy(navUsd * latestSaved) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-base" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(valueUsd * latestSaved) : '—'}</td>
                     </tr>
                   );
                 })()}
@@ -441,13 +536,13 @@ export default function Dashboard() {
 
                   return (
                     <tr>
-                      <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">{t('manageFunds.dollarTotal')}</td>
-                      <td className="px-4 py-2.5"></td>
-                      <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{fmt.usdFull(regCommit)}</td>
-                      <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{fmt.usdFull(regCalled)}</td>
-                      <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{fmt.usdFull(regDist)}</td>
-                      <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }}>{fmt.usdFull(regNav)}</td>
-                      <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{fmt.usdFull(regValue)}</td>
+                      <td className="px-4 py-2.5 text-xs font-bold theme-text-muted uppercase">{t('manageFunds.dollarTotal')}</td>
+                      <td className="px-3 py-2.5"></td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold theme-text">{fmt.usdFull(regCommit)}</td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{fmt.usdFull(regCalled)}</td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{fmt.usdFull(regDist)}</td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }}>{fmt.usdFull(regNav)}</td>
+                      <td className="px-3 py-2.5 text-right text-base font-bold theme-text">{fmt.usdFull(regValue)}</td>
                     </tr>
                   );
                 })()}
@@ -461,13 +556,13 @@ export default function Dashboard() {
 
                   return (
                     <tr>
-                      <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">{t('manageFunds.yenTotal')}</td>
-                      <td className="px-4 py-2.5"></td>
-                      <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{latestSaved ? fmt.jpy(sdgFund.commitment_usd * latestSaved) : '—'}</td>
-                      <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgFund.total_called_usd * latestSaved) : '—'}</td>
-                      <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgFund.total_received_usd * latestSaved) : '—'}</td>
-                      <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }}>{latestSaved ? fmt.jpy(navUsd * latestSaved) : '—'}</td>
-                      <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{latestSaved ? fmt.jpy(valueUsd * latestSaved) : '—'}</td>
+                      <td className="px-4 py-2.5 text-xs font-bold theme-text-muted uppercase">{t('manageFunds.yenTotal')}</td>
+                      <td className="px-3 py-2.5"></td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold theme-text">{fmt.jpy(sdgFund.contract_commitment_jpy ?? sdgFund.commitment_jpy ?? 0)}</td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgFund.total_called_usd * latestSaved) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgFund.total_received_usd * latestSaved) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }}>{latestSaved ? fmt.jpy(navUsd * latestSaved) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right text-base font-bold theme-text">{latestSaved ? fmt.jpy(valueUsd * latestSaved) : '—'}</td>
                     </tr>
                   );
                 })()}

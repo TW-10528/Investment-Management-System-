@@ -10,11 +10,11 @@ import { useTranslation } from 'react-i18next';
 import { fundsAPI, fxRatesAPI, fundReportsAPI } from '../services/api';
 import type { FundDetail, FundSummary, LedgerRow, LedgerSnapshot } from '../types/index';
 import { fmt, strategyBg, strategyColor } from '../lib/format';
-import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AddFundWizard from '../components/AddFundWizard';
 import FundDocuments from '../components/FundDocuments';
 import FundUploadBar from '../components/FundUploadBar';
 import PortfolioOverview from '../components/PortfolioOverview';
+import ComparisonSection from '../components/ComparisonSection';
 import toast from 'react-hot-toast';
 
 // ── Edit access — every signed-in user can edit (no role differentiation) ───────
@@ -91,38 +91,19 @@ function DelBtn({ onClick }: { onClick: () => void }) {
   );
 }
 
-function PenIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-    </svg>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CAPITAL CALLS TAB
 // ─────────────────────────────────────────────────────────────────────────────
-function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boolean; onChanged:()=>void }) {
+function CallsTab({ fundId, canEdit, onChanged, currency: fundCurrency }: { fundId:string; canEdit:boolean; onChanged:()=>void; currency?:string }) {
   const [calls, setCalls] = useState<any[]>([]);
   const [form,  setForm]  = useState<any|null>(null);
   const [saving, setSaving] = useState(false);
-  const [currency, setCurrency] = useState<'USD'|'JPY'>('USD');
-  const [murcRate, setMurcRate] = useState<number>(() => {
+  const [currency] = useState<'USD'|'JPY'>(fundCurrency === 'JPY' ? 'JPY' : 'USD');
+  const [murcRate] = useState<number>(() => {
     const s = localStorage.getItem('murc_fx_rate');
     return s ? Number(s) : 0;
   });
-  const [murcEditing, setMurcEditing] = useState(false);
-  const [murcInput, setMurcInput] = useState('');
-
-  function saveMurcRate() {
-    const val = Number(murcInput);
-    if (val > 0) {
-      setMurcRate(val);
-      localStorage.setItem('murc_fx_rate', String(val));
-      toast.success('MURC rate saved');
-    }
-    setMurcEditing(false);
-  }
 
   function fmtCallAmt(usd: number, rowFx?: number | string | null) {
     if (currency === 'JPY') {
@@ -174,43 +155,6 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
           <span className="ml-2 text-xs font-normal theme-text-muted">{calls.length} records</span>
         </p>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* MURC rate editor */}
-          {murcEditing ? (
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs theme-text-muted whitespace-nowrap">MURC Rate (¥/USD):</span>
-              <input
-                type="number"
-                className="theme-input rounded px-2 py-1 text-xs w-24 border theme-border"
-                placeholder="154.20"
-                step="0.01"
-                value={murcInput}
-                onChange={e => setMurcInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') saveMurcRate(); if (e.key === 'Escape') setMurcEditing(false); }}
-                autoFocus
-              />
-              <button onClick={saveMurcRate}
-                className="px-2 py-1 rounded text-xs bg-indigo-600 text-white font-semibold">Save</button>
-              <button onClick={() => setMurcEditing(false)}
-                className="text-xs theme-text-muted px-1 hover:text-red-400">✕</button>
-            </div>
-          ) : (
-            <button
-              onClick={() => { setMurcInput(murcRate > 0 ? String(murcRate) : ''); setMurcEditing(true); }}
-              className="p-1.5 rounded hover:bg-white/10 transition-colors theme-text-muted hover:text-amber-400"
-              title={murcRate > 0 ? `MURC Rate: ¥${murcRate.toFixed(2)} / USD — click to edit` : 'Set MURC FX Rate'}>
-              <PenIcon />
-            </button>
-          )}
-          {/* Currency toggle */}
-          <button
-            onClick={() => setCurrency(c => c === 'USD' ? 'JPY' : 'USD')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors ${
-              currency === 'JPY'
-                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25 hover:bg-indigo-500/20'
-            }`}>
-            {currency === 'USD' ? 'USD → JPY' : 'JPY → USD'}
-          </button>
           {canEdit && !form && (
             <button onClick={() => setForm({ status: 'pending' })}
               className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
@@ -351,27 +295,15 @@ function CallsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
 // ─────────────────────────────────────────────────────────────────────────────
 // DISTRIBUTIONS TAB
 // ─────────────────────────────────────────────────────────────────────────────
-function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boolean; onChanged:()=>void }) {
+function DistsTab({ fundId, canEdit, onChanged, currency: fundCurrency }: { fundId:string; canEdit:boolean; onChanged:()=>void; currency?:string }) {
   const [dists, setDists] = useState<any[]>([]);
   const [form,  setForm]  = useState<any|null>(null);
   const [saving, setSaving] = useState(false);
-  const [currency, setCurrency] = useState<'USD'|'JPY'>('USD');
-  const [murcRate, setMurcRate] = useState<number>(() => {
+  const [currency] = useState<'USD'|'JPY'>(fundCurrency === 'JPY' ? 'JPY' : 'USD');
+  const [murcRate] = useState<number>(() => {
     const s = localStorage.getItem('murc_fx_rate');
     return s ? Number(s) : 0;
   });
-  const [murcEditing, setMurcEditing] = useState(false);
-  const [murcInput, setMurcInput] = useState('');
-
-  function saveMurcRate() {
-    const val = Number(murcInput);
-    if (val > 0) {
-      setMurcRate(val);
-      localStorage.setItem('murc_fx_rate', String(val));
-      toast.success('MURC rate saved');
-    }
-    setMurcEditing(false);
-  }
 
   function fmtDistAmt(d: any) {
     if (currency === 'JPY') {
@@ -388,7 +320,6 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
   useEffect(() => { load(); }, [load]);
 
   const sf = (k:string, v:any) => setForm((f:any)=>({...f,[k]:v}));
-  const total = dists.reduce((s,d) => s + Number(d.amount_usd??0), 0);
 
   async function submit() {
     setSaving(true);
@@ -412,46 +343,8 @@ function DistsTab({ fundId, canEdit, onChanged }: { fundId:string; canEdit:boole
         <p className="text-sm font-semibold theme-text">
           Distributions
           <span className="ml-2 text-xs font-normal theme-text-muted">{dists.length} records</span>
-          {total > 0 && <span className="ml-3 font-semibold" style={{color:C.emerald}}>{fmt.usd(total)}</span>}
         </p>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* MURC rate editor */}
-          {murcEditing ? (
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs theme-text-muted whitespace-nowrap">MURC Rate (¥/USD):</span>
-              <input
-                type="number"
-                className="theme-input rounded px-2 py-1 text-xs w-24 border theme-border"
-                placeholder="154.20"
-                step="0.01"
-                value={murcInput}
-                onChange={e => setMurcInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') saveMurcRate(); if (e.key === 'Escape') setMurcEditing(false); }}
-                autoFocus
-              />
-              <button onClick={saveMurcRate}
-                className="px-2 py-1 rounded text-xs bg-indigo-600 text-white font-semibold">Save</button>
-              <button onClick={() => setMurcEditing(false)}
-                className="text-xs theme-text-muted px-1 hover:text-red-400">✕</button>
-            </div>
-          ) : (
-            <button
-              onClick={() => { setMurcInput(murcRate > 0 ? String(murcRate) : ''); setMurcEditing(true); }}
-              className="p-1.5 rounded hover:bg-white/10 transition-colors theme-text-muted hover:text-amber-400"
-              title={murcRate > 0 ? `MURC Rate: ¥${murcRate.toFixed(2)} / USD — click to edit` : 'Set MURC FX Rate'}>
-              <PenIcon />
-            </button>
-          )}
-          {/* Currency toggle */}
-          <button
-            onClick={() => setCurrency(c => c === 'USD' ? 'JPY' : 'USD')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors ${
-              currency === 'JPY'
-                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/20'
-            }`}>
-            {currency === 'USD' ? 'USD → JPY' : 'JPY → USD'}
-          </button>
           {canEdit && !form && (
             <button onClick={() => setForm({dist_type:'Income'})}
               className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
@@ -654,112 +547,6 @@ function shiftDate(dateStr: string, days: number): string {
 
 // CASH FLOW TAB — period cash flow (G) bars + cumulative net cash (H) line + table
 // ─────────────────────────────────────────────────────────────────────────────
-function CashFlowTab({ fundId, currency }: { fundId: string; currency?: string }) {
-  const [rows, setRows] = useState<LedgerRow[]>([]);
-  const [snap, setSnap] = useState<LedgerSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const money = (n: any) =>
-    n == null ? '—'
-    : currency === 'JPY' ? '¥' + Math.round(Number(n)).toLocaleString('en-US')
-    : fmt.usd(Number(n));
-
-  useEffect(() => {
-    setLoading(true);
-    fundsAPI.ledger(fundId)
-      .then(r => { setRows(r.data.rows ?? []); setSnap(r.data.snapshot ?? null); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [fundId]);
-
-  if (loading) return <p className="px-5 py-8 text-sm theme-text-muted">Loading cash flow…</p>;
-  if (rows.length === 0) return (
-    <div className="px-5 py-12 text-center">
-      <p className="text-3xl mb-3 opacity-20">💸</p>
-      <p className="text-sm theme-text-muted">No cash flow yet — add capital calls or distributions.</p>
-    </div>
-  );
-
-  const totalOut = rows.reduce((s, r) => s + (r.capital_paid_in || 0), 0);
-  const totalIn  = rows.reduce((s, r) => s + (r.capital_received || 0), 0);
-  const net      = totalIn - totalOut;
-
-  // One point per transaction date: contributions (−B), distributions (+C), cumulative net (H).
-  const chartData = rows.map(r => ({
-    date:        fmt.date(r.date),
-    contributions: -(r.capital_paid_in || 0),
-    distributions: r.capital_received || 0,
-    cumulative:  r.net_cash_position,
-  }));
-
-  return (
-    <div className="p-5 space-y-5">
-      {/* summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Total Contributions (out)', val: money(totalOut),       color: C.red },
-          { label: 'Total Distributions (in)',  val: money(totalIn),        color: C.emerald },
-          { label: 'Net Cash Flow',             val: money(net),            color: net < 0 ? C.red : C.emerald },
-          { label: 'Net Cash Position (H)',     val: money(snap?.net_cash_position ?? net), color: (snap?.net_cash_position ?? net) < 0 ? C.red : C.emerald },
-        ].map(m => (
-          <div key={m.label} className="theme-card border theme-border rounded-xl p-3">
-            <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted">{m.label}</p>
-            <p className="text-lg font-bold tabular-nums mt-1" style={{ color: m.color }}>{m.val}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* chart */}
-      <div className="theme-card border theme-border rounded-xl p-4">
-        <p className="text-xs font-bold theme-text mb-3">Cash Flow Overview — contributions vs distributions, with cumulative net</p>
-        <div style={{ width: '100%', height: 280 }}>
-          <ResponsiveContainer>
-            <ComposedChart data={chartData} margin={{ top: 8, right: 12, bottom: 4, left: 12 }}>
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
-              <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
-                     tickFormatter={(v: number) => (currency === 'JPY' ? '¥' : '$') + (Math.abs(v) >= 1e6 ? (v/1e6).toFixed(0)+'M' : (v/1e3).toFixed(0)+'k')} />
-              <Tooltip formatter={(v: any) => money(v)} contentStyle={{ fontSize: 12 }} />
-              <ReferenceLine y={0} stroke="var(--color-card-border)" />
-              <Bar dataKey="contributions" name="Contributions" fill={C.red} radius={[2,2,0,0]} />
-              <Bar dataKey="distributions" name="Distributions" fill={C.emerald} radius={[2,2,0,0]} />
-              <Line dataKey="cumulative" name="Cumulative net" stroke={C.indigo} strokeWidth={2} dot={false} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* period table (G / H) */}
-      <div className="overflow-x-auto rounded-xl border theme-border">
-        <table className="w-full text-xs">
-          <thead style={{ background: 'var(--color-header-bg)' }}>
-            <tr className="border-b theme-border text-[10px] uppercase tracking-wide theme-text-muted">
-              {['Date','Type','Contribution (B)','Distribution (C)','Cash Flow (G)','Net Position (H)'].map((h, i) => (
-                <th key={h} className={`px-3 py-2 font-semibold whitespace-nowrap ${i<2?'text-left':'text-right'}`}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y theme-border">
-            {rows.map((r, i) => (
-              <tr key={i} className="theme-row-hover">
-                <td className="px-3 py-2 theme-text-muted whitespace-nowrap">{fmt.date(r.date)}</td>
-                <td className="px-3 py-2">
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${r.tx_type==='distribution'?'text-emerald-400 border-emerald-500/25 bg-emerald-500/10':'text-indigo-400 border-indigo-500/25 bg-indigo-500/10'}`}>
-                    {r.tx_type==='distribution'?'Distribution':'Capital Call'}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums" style={{ color: r.capital_paid_in?C.red:undefined }}>{r.capital_paid_in?money(r.capital_paid_in):'—'}</td>
-                <td className="px-3 py-2 text-right tabular-nums" style={{ color: r.capital_received?C.emerald:undefined }}>{r.capital_received?money(r.capital_received):'—'}</td>
-                <td className="px-3 py-2 text-right tabular-nums" style={{ color: r.cash_flow<0?C.red:C.emerald }}>{money(r.cash_flow)}</td>
-                <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: r.net_cash_position<0?C.red:C.emerald }}>{money(r.net_cash_position)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 // LEDGER TAB — B Called / B (¥) / C Received / C (¥) adjacent columns, notes edit
 // FX column shows the MURC TTM rate for each transaction date (auto-fetched)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -907,13 +694,16 @@ function LedgerTab({ fundId, canEdit, currency }: { fundId:string; canEdit:boole
             const commitmentValue = isSdg && fundDetail?.contract_commitment_jpy
               ? fundDetail.contract_commitment_jpy
               : snap.commitment_usd;
+            const commitmentLabel = isSdg ? 'Commitment (JPY)' : 'Commitment';
+            const commitmentFormatted = isSdg && fundDetail?.contract_commitment_jpy
+              ? fmt.jpy(Number(fundDetail.contract_commitment_jpy))
+              : fmtAmt(commitmentValue);
             return [
-              ['Commitment',  fmtAmt(commitmentValue)],
+              [commitmentLabel, commitmentFormatted],
               ['Paid-in',     fmtAmt(snap.total_called_usd)],
               ['Received',    fmtAmt(snap.total_received_usd)],
               ['Drawn %',     fmt.pct(snap.drawn_pct)],
               ['Unfunded',    fmtAmt(snap.unfunded_usd)],
-              ['F Inv.Cap',   fmtAmt(snap.investment_capacity)],
               ['H Net Cash',  fmtAmt(snap.net_cash_position)],
               ['DPI',         snap.dpi.toFixed(3)+'×'],
             ];
@@ -1694,7 +1484,7 @@ function DetailsTab({ detail, canEdit, fundId, onSaved }: { detail: FundDetail; 
 // ─────────────────────────────────────────────────────────────────────────────
 // FULL FUND SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-type TabKey = 'overview' | 'cashflow' | 'documents' | 'calls' | 'distributions' | 'nav' | 'ledger' | 'details' | 'commitments';
+type TabKey = 'overview' | 'documents' | 'calls' | 'distributions' | 'nav' | 'ledger' | 'details' | 'commitments';
 
 function FundSection({
   fund, detail, canEdit, onChanged, initialTab,
@@ -1718,6 +1508,8 @@ function FundSection({
   // For SDG funds, commitment grows over time. Fetch the latest history entry so
   // the dashboard KPI always shows the current total commitment, not the static seed value.
   const [latestHistCommitment, setLatestHistCommitment] = useState<number | null>(null);
+  const [ledgerRows, setLedgerRows] = useState<LedgerRow[]>([]);
+
   const refreshHistCommitment = useCallback(() => {
     if (!isSdg) return;
     fundsAPI.getCommitmentHistory(fundId)
@@ -1728,6 +1520,15 @@ function FundSection({
       })
       .catch(() => {});
   }, [fundId, isSdg]);
+
+  useEffect(() => {
+    fundsAPI.ledger(fundId)
+      .then((res: any) => {
+        setLedgerRows(res.data?.rows ?? []);
+      })
+      .catch(() => {});
+  }, [fundId]);
+
   useEffect(() => { refreshHistCommitment(); }, [refreshHistCommitment]);
 
   // For commitments page: show contract_commitment_jpy for SDG, commitment_usd for others
@@ -1749,7 +1550,6 @@ function FundSection({
 
   const TABS: { key: TabKey; label: string }[] = [
     { key:'ledger',        label:t('manageFunds.ledgerTab')         },
-    { key:'cashflow',      label:t('manageFunds.cashFlowTab')      },
     { key:'calls',         label:t('manageFunds.capitalCallsTab')  },
     { key:'distributions', label:t('manageFunds.distributionsTab')  },
     { key:'nav',           label:t('manageFunds.navRecordsTab')    },
@@ -1802,13 +1602,25 @@ function FundSection({
       </div>
 
       {/* ── KPIs ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 border-t theme-border divide-x theme-border">
-        {[
-          { label:t('manageFunds.totalCommitment'), value: fmtMoney(displayCommitment), note: isSdg && latestHistCommitment ? `${latestHistCommitment > 0 ? (paidIn / latestHistCommitment * 100).toFixed(2) : '0.00'}% ${t('manageFunds.drawn')}` : t('manageFunds.gross') },
-          { label:t('manageFunds.paidInE'),      value: fmtMoney(paidIn),          note:`${drawn.toFixed(2)}% ${t('manageFunds.drawn')}` },
-          { label:t('manageFunds.dryPowderF'),   value: fmtMoney(powder),          note:t('manageFunds.unfunded') },
-          { label:t('manageFunds.dpi'),             value: `${Number(summary.dpi??0).toFixed(3)}×`, note:t('manageFunds.distPaidIn') },
-        ].map(m=>(
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 border-t theme-border divide-x theme-border">
+        {(() => {
+          const totalReturnOfCapital = ledgerRows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
+          const totalGain = ledgerRows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
+          const totalInterest = ledgerRows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
+
+          const boxes = [
+            { label:t('manageFunds.totalCommitment'), value: fmtMoney(displayCommitment), note: isSdg && latestHistCommitment ? `${latestHistCommitment > 0 ? (paidIn / latestHistCommitment * 100).toFixed(2) : '0.00'}% ${t('manageFunds.drawn')}` : t('manageFunds.gross') },
+            { label:t('manageFunds.paidInE'),      value: fmtMoney(paidIn),          note:`${drawn.toFixed(2)}% ${t('manageFunds.drawn')}` },
+            { label:t('manageFunds.dryPowderF'),   value: fmtMoney(powder),          note:t('manageFunds.unfunded') },
+            { label:t('manageFunds.dpi'),             value: `${Number(summary.dpi??0).toFixed(3)}×`, note:t('manageFunds.distPaidIn') },
+          ];
+
+          if (totalReturnOfCapital !== 0) boxes.push({ label: 'Return of Capital', value: fmtMoney(totalReturnOfCapital), note: '' });
+          if (totalGain !== 0) boxes.push({ label: 'Gain', value: fmtMoney(totalGain), note: '' });
+          if (totalInterest !== 0) boxes.push({ label: 'Interest', value: fmtMoney(totalInterest), note: '' });
+
+          return boxes;
+        })().map(m=>(
           <div key={m.label} className="px-5 py-4">
             <p className="text-[10px] font-bold uppercase tracking-widest theme-text-muted">{m.label}</p>
             <p className="text-lg font-bold tabular-nums theme-text mt-1">{m.value}</p>
@@ -1844,10 +1656,9 @@ function FundSection({
           ))}
         </div>
 
-        {tab==='cashflow'      && <CashFlowTab  fundId={fundId} currency={detail.currency} />}
         {tab==='documents'     && <FundDocuments fundId={fundId} canEdit={canEdit} onChanged={onChanged} currency={detail.currency} />}
-        {tab==='calls'         && <CallsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
-        {tab==='distributions' && <DistsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
+        {tab==='calls'         && <CallsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} currency={detail.currency} />}
+        {tab==='distributions' && <DistsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} currency={detail.currency} />}
         {tab==='nav'           && <NavTab      fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
         {tab==='ledger'        && <LedgerTab   fundId={fundId} canEdit={canEdit} currency={detail.currency} />}
         {tab==='commitments'   && <CommitmentsTab
@@ -2134,19 +1945,6 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CASHFLOW SECTION — placeholder (empty for now)
-// ─────────────────────────────────────────────────────────────────────────────
-function CashflowSection() {
-  return (
-    <div className="theme-card border theme-border rounded-2xl py-24 text-center">
-      <p className="text-5xl mb-4 opacity-20">💸</p>
-      <p className="text-base font-medium theme-text">Cashflow</p>
-      <p className="text-sm theme-text-muted mt-1">Coming soon — this section is empty for now.</p>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 export default function FundManagement() {
@@ -2162,8 +1960,8 @@ export default function FundManagement() {
   // Section is driven by the URL (?section=…) so the left sidebar controls it
   const [searchParams, setSearchParams] = useSearchParams();
   const rawSection = searchParams.get('section');
-  const section: 'manage' | 'reports' | 'cashflow' =
-    rawSection === 'reports' || rawSection === 'cashflow' ? rawSection : 'manage';
+  const section: 'manage' | 'reports' | 'comparison' =
+    rawSection === 'reports' || rawSection === 'comparison' ? rawSection : 'manage';
 
   // ?fund=<id> from dashboard fund links — auto-open that fund on mount
   const fundParam = searchParams.get('fund');
@@ -2213,7 +2011,8 @@ export default function FundManagement() {
             {section === 'manage'
               ? (selectedFund ? selectedFund.fund_name : t('funds.title'))
               : section === 'reports' ? t('manageFunds.reportsTitle')
-              : 'Cashflow'}
+              : section === 'comparison' ? 'Fund Series Comparison'
+              : 'Funds'}
           </h1>
           {section === 'manage' && !selectedFund && (
             <p className="text-sm theme-text-muted mt-0.5">
@@ -2228,6 +2027,9 @@ export default function FundManagement() {
         <div className="flex items-center gap-2 flex-wrap">
           {section === 'manage' && !selectedFund && (
             <>
+              <button className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5">
+                ⬇️ Export
+              </button>
               {canEdit && (
                 <button onClick={() => setShowWizard(true)}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
@@ -2250,9 +2052,9 @@ export default function FundManagement() {
       {section === 'reports' ? (
         /* ── REPORTS SECTION — upload / edit / delete documents ── */
         <ReportsSection funds={funds} canEdit={canEdit} onChanged={loadFunds} onOpenLedger={fundId => { setOpenAtTab('ledger'); setSelectedFundId(fundId); setSearchParams(p => { const n = new URLSearchParams(p); n.delete('section'); return n; }); }} />
-      ) : section === 'cashflow' ? (
-        /* ── CASHFLOW SECTION — empty for now ── */
-        <CashflowSection />
+      ) : section === 'comparison' ? (
+        /* ── COMPARISON SECTION — fund series comparison ── */
+        <ComparisonSection funds={funds} />
       ) : selectedFund ? (
         /* ── DETAIL VIEW — one fund's full sections ── */
         selectedDetail ? (
@@ -2270,13 +2072,9 @@ export default function FundManagement() {
           </div>
         )
       ) : (
-        /* ── MANAGE FUNDS — overall totals + in-detail calculations + fund cards ── */
+        /* ── MANAGE FUNDS — Use PortfolioOverview for full layout ── */
         <>
-          {/* Portfolio-wide overall totals, per-fund table & analysis */}
           <PortfolioOverview onSelectFund={setSelectedFundId} />
-
-          {/* Document upload lives in the Reports section — not here */}
-
         </>
       )}
 

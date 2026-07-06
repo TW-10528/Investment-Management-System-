@@ -23,14 +23,14 @@ ABSOLUTE RULES:
 exports.CLASSIFIER_PROMPT = `TASK: Identify which fund issued this report and what type of report it is.
 
 KNOWN FUNDS (return the exact key on the left):
-  NB_REAL_ESTATE   → "Real Estate Secondary Opportunities Fund II", "Neuberger Berman"
-  HAMILTON_SEC     → "Secondary Fund VI-B"
-  HAMILTON_STRAT   → "Strategic Opportunities Fund IX"
-  SDG              → "SDGs投資事業有限責任組合", "AFM株式会社"
-  DOVER            → "Dover Street XI", "Dover Street XII", "HarbourVest"
-  GOLDMAN          → "Vintage X(Flagship)", "Goldman Sachs"
-  SIGULER_GUFF     → "Small Buyout Opportunities Fund VI"
-  CAPULA           → "Capula Global Relative Fund"
+  NB_REAL_ESTATE   → "NB Real Estate Secondary Opportunities", "Neuberger Berman"
+  HAMILTON_SEC     → "Hamilton Lane Secondary Fund VI-B"
+  HAMILTON_STRAT   → "Hamilton Lane Strategic Opportunities Fund IX-B"
+  SDG              → "SDGｓ投資事業有限責任組合", "SDG", Japanese AFM report
+  DOVER            → "Dover Street XI Feeder Fund", "HarbourVest"
+  GOLDMAN          → "Vintage", "Goldman Sachs Asset Management", "SCSp"
+  SIGULER_GUFF     → "Siguler Guff Small Buyout Opportunities Fund"
+  CAPULA           → "Capula Global Relative Value", "CGRV"
 
 REPORT TYPES — transaction documents (will be calculated and added to ledger):
   CAPITAL_CALL          → calls capital only (B>0, C=0)
@@ -47,6 +47,16 @@ REPORT TYPES — reference documents (stored for viewing, no ledger calculation)
   AUDIT_REPORT          → auditor's report, independent audit
   COMMITMENT_NOTICE     → subscription/investment agreement, 出資契約書, 匿名組合契約書, 有限責任組合契約書, commitment letter — documents that state the LP's total commitment amount but are NOT capital calls or distributions
   OTHER                 → any other fund-related document not matching above
+
+NB REAL ESTATE DOCUMENT TYPE GUIDE (critical):
+  Analyze the document content to determine the actual type:
+  - Look for "Limited Partner's Share of Capital Contribution" → indicates B (capital call)
+  - Look for "Limited Partner's Share of Distributable Proceeds" → indicates C (distribution)
+  - IF both sections are present with non-zero amounts → NETTED_CALL
+  - IF only capital contribution section present → CAPITAL_CALL
+  - IF only distribution section present → DISTRIBUTION
+  Do NOT assume all NB Real Estate docs are the same type. Check what's actually in
+  the document text before classifying.
 
 SDG DOCUMENT TYPE GUIDE (critical — SDG notices use investment terms that can mislead):
   CAPITAL_CALL  → SDG 払込通知書: contains "払込み頂く金額" (amount to pay in).
@@ -98,24 +108,34 @@ Return ONLY this JSON shape (common output schema):
 exports.EXTRACTOR_PROMPTS = {
     NB_REAL_ESTATE: `You are extracting from an NB Real Estate Secondary Opportunities notice.
 
-FIELD MAPPING (verified rules):
+DATE EXTRACTION (CRITICAL):
+- Look for "Payment Date:" or "payment date" in the document → USE THIS DATE
+- Fallback: Use "Total Net Cash Distribution:" date if available
+- DO NOT use the letter date or today's date. Find the actual payment/execution date.
+
+FIELD MAPPING (handles all three formats):
+
+IF CAPITAL CALL ONLY (no distribution):
 - B = "Limited Partner's Share of Capital Contribution" + Net Management Fee
-     Net Management Fee = Management Fee Amount - Management Fee Rebate
-     DO NOT include Tax expense in B.
-     DO NOT use "Amount Due From Limited Partner" for B.
-- C = "Limited Partner's Share of Distributable Proceeds" + Additional Payment Received
-     Include Additional Payment in C ONLY when it is negative / in parentheses
-     (meaning received/offset). If Additional Payment is positive (payable by
-     investor), it is NOT included in C.
-- D = "Limited Partner's Share of Distributable Proceeds"  (Additional Payment NOT in D)
+     (Net Management Fee = Management Fee Amount - Management Fee Rebate)
+- C = 0, D = 0
+
+IF DISTRIBUTION ONLY (no capital call, or capital call is deemed/negative):
+- B = "Capital Contributions Required for Partnership Management Fees" if present
+     (if shown in parentheses/negative, this is a deduction from C, so B = 0)
+- C = "Limited Partner's Share of Distributable Proceeds"
+- D = "Limited Partner's Share of Distributable Proceeds" (same as C)
+
+IF CAPITAL CALL + DISTRIBUTION (NETTED):
+- B = "Limited Partner's Share of Capital Contribution"
+- C = "Limited Partner's Share of Distributable Proceeds"
+- D = "Limited Partner's Share of Distributable Proceeds"
 
 FINANCE DETAIL:
 - return_of_capital = Limited Partner's Share of Distributable Proceeds
 - gain = 0
-- interest = Additional Payment Received ONLY when it is negative/received
-- total_commitment_amount = The LP's total commitment to this fund (often found as "Commitment Amount" or "Initial Commitment" or "Total Commitment"). Extract if visible.
-- If the report is only a capital contribution with no distribution:
-    return_of_capital = 0, gain = 0, interest = 0
+- interest = 0
+- total_commitment_amount = Original Commitment or "Commitment" amount if shown
 ${COMMON_SCHEMA}
 
 DOCUMENT TEXT:

@@ -125,6 +125,16 @@ export default function SettingsModal({ onClose }: Props) {
             </Chip>
           </Row>
 
+          {/* ── Calculator ── */}
+          <Row label="Calculator">
+            <Chip active={prefs.showCalculator} onClick={() => prefs.setShowCalculator(true)}>
+              Enable
+            </Chip>
+            <Chip active={!prefs.showCalculator} onClick={() => prefs.setShowCalculator(false)}>
+              Disable
+            </Chip>
+          </Row>
+
         </div>
 
         {/* Footer */}

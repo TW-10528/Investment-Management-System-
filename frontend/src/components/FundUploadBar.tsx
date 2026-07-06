@@ -81,9 +81,9 @@ const REPORT_TYPE_MAP: Record<string, string> = {
 };
 
 function matchFund(_fundKey: string, displayName: string, funds: FundOption[]): FundOption | null {
-  // STRICT MATCHING: Match exact extracted name or exact AI-detected name
-  // First, try exact match with extracted display name
   const normalizedDisplay = displayName?.toLowerCase().trim();
+
+  // 1. Try exact match
   if (normalizedDisplay) {
     const exactMatch = funds.find(f =>
       f.fund_name.toLowerCase().trim() === normalizedDisplay
@@ -91,17 +91,41 @@ function matchFund(_fundKey: string, displayName: string, funds: FundOption[]): 
     if (exactMatch) return exactMatch;
   }
 
-  // Then try partial match if fund name contains extracted name or vice versa
-  // but only if it's a clear match (not just a keyword)
+  // 2. Try substring match (fund name in display name or vice versa)
   if (normalizedDisplay && normalizedDisplay.length > 5) {
-    const partialMatch = funds.find(f => {
+    const substringMatch = funds.find(f => {
       const dbName = f.fund_name.toLowerCase();
       return dbName.includes(normalizedDisplay) || normalizedDisplay.includes(dbName);
     });
-    if (partialMatch) return partialMatch;
+    if (substringMatch) return substringMatch;
   }
 
-  // No match found
+  // 3. Keyword scoring: Score each fund based on how many significant keywords match
+  if (normalizedDisplay && normalizedDisplay.length > 3) {
+    const displayKeywords = normalizedDisplay
+      .split(/[\s\-\.(),]+/)
+      .filter(w => w.length > 2);
+
+    const scored = funds
+      .map(f => {
+        const fundKeywords = f.fund_name
+          .toLowerCase()
+          .split(/[\s\-\.(),]+/)
+          .filter(w => w.length > 2);
+
+        // Score: count how many display keywords appear in fund keywords
+        const matchCount = displayKeywords.filter(dk =>
+          fundKeywords.some(fk => fk === dk || fk.includes(dk) || dk.includes(fk))
+        ).length;
+
+        return { fund: f, score: matchCount };
+      })
+      .filter(({ score }) => score >= 2)
+      .sort((a, b) => b.score - a.score); // Highest score first
+
+    if (scored.length > 0) return scored[0].fund;
+  }
+
   return null;
 }
 
@@ -164,8 +188,14 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
       })
       const d = res.data
       setDetection(d)
-      const m = matchFund(d.classification?.fund_key, d.classification?.fund_display_name, funds)
-      setMatched(m)
+      // For SDG fund, match directly by database fund name (no character encoding issues)
+      let m = null
+      if (d.classification?.fund_key === 'SDG' || /sdg/i.test(d.classification?.fund_key ?? '')) {
+        m = funds.find(f => /sdg/i.test(f.fund_name ?? ''))
+      } else {
+        m = matchFund(d.classification?.fund_key, d.classification?.fund_display_name, funds)
+      }
+      setMatched(m || null)
       if (m) setOverrideFund(m.fund_id)
     } catch (err: any) {
       // Check if the error is from cancellation
@@ -511,7 +541,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                 <span className="text-[10px] font-bold uppercase tracking-widest theme-text-muted w-28 shrink-0">Fund</span>
                 <div className="flex-1">
                   {matched ? (
-                    <p className="font-semibold theme-text">{cls.fund_display_name || cls.fund_key}</p>
+                    <p className="font-semibold theme-text">{matched.fund_name}</p>
                   ) : (
                     <div className="flex items-center gap-2">
                       <select
@@ -644,10 +674,25 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
             {/* Confirm button */}
             <div className="px-5 py-4 border-t theme-border flex items-center justify-between gap-4"
                  style={{ background: 'rgba(99,102,241,0.03)' }}>
-              <button onClick={reset}
-                className="text-sm theme-text-muted hover:theme-text transition-colors">
-                Cancel
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={reset}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors">
+                  Cancel
+                </button>
+                {file && (
+                  <button
+                    onClick={() => {
+                      const url = URL.createObjectURL(file);
+                      window.open(url, '_blank');
+                      setTimeout(() => URL.revokeObjectURL(url), 100);
+                    }}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                    title="Preview PDF"
+                  >
+                    👁️ View PDF
+                  </button>
+                )}
+              </div>
               <button
                 onClick={upload}
                 disabled={uploading || !overrideFund}

@@ -20,6 +20,7 @@ interface Prefs {
   dateFormat:     DateFmt;
   landingPage:    LandingPage;
   showAnalysis:   boolean;
+  showCalculator: boolean;
 }
 
 interface PrefsCtx extends Prefs {
@@ -30,6 +31,7 @@ interface PrefsCtx extends Prefs {
   setDateFormat:     (f: DateFmt)      => void;
   setLandingPage:    (p: LandingPage)  => void;
   setShowAnalysis:   (v: boolean)      => void;
+  setShowCalculator: (v: boolean)      => void;
   resetAll:          ()                => void;
 }
 
@@ -41,6 +43,7 @@ const DEFAULTS: Prefs = {
   dateFormat:     'US',
   landingPage:    'dashboard',
   showAnalysis:   true,
+  showCalculator: true,
 };
 
 const VALID_LANGS: LangCode[] = ['en', 'ja'];
@@ -111,6 +114,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       setDateFormat:     f => update({ dateFormat: f }),
       setLandingPage:    p => update({ landingPage: p }),
       setShowAnalysis:   v => update({ showAnalysis: v }),
+      setShowCalculator: v => update({ showCalculator: v }),
       resetAll:          () => { save(DEFAULTS); setPrefs({ ...DEFAULTS }); },
     }}>
       {children}

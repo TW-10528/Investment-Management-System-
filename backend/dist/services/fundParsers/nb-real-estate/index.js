@@ -30,8 +30,9 @@ function parseNbRealEstate(rawText, previousState = null) {
     const totalCalledUsd = a.inception_to_date_contributions ?? 0; // E (report cumulative)
     const unfundedUsd = f.remaining_commitment ?? (commitmentUsd > 0 ? commitmentUsd - totalCalledUsd : 0); // F
     const callPct = a.percent_of_capital_commitment_called ?? 0; // e.g. 5.00 → "5.00%"
-    const noticeDate = a.notice_date ?? new Date().toISOString().slice(0, 10);
-    const dueDate = a.payment_date ?? noticeDate;
+    // Use payment_date as primary date (when LP actually receives/pays), fall back to notice_date
+    const noticeDate = a.payment_date ?? a.notice_date ?? new Date().toISOString().slice(0, 10);
+    const dueDate = a.payment_date ?? a.notice_date ?? noticeDate;
     // ── Confidence scoring (mirrors the previous parser's heuristic) ──────────────
     let score = 0;
     if (a.payment_date)

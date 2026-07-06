@@ -162,6 +162,10 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
   const [loading, setLoading]   = useState(true);
   const [reports, setReports]       = useState<ReportRow[]>([]);
   const [reportsLoading, setReportsLoading] = useState(true);
+  const [totals, setTotals] = useState<{
+    regularReturnOfCapital: number; regularGain: number; regularInterest: number;
+    sdgReturnOfCapital: number; sdgGain: number; sdgInterest: number;
+  }>({ regularReturnOfCapital: 0, regularGain: 0, regularInterest: 0, sdgReturnOfCapital: 0, sdgGain: 0, sdgInterest: 0 });
 
   // Refs for horizontal drag scrolling on tables
   const table1Ref = useRef<HTMLDivElement>(null);
@@ -199,6 +203,30 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
           .then(r => ({ f, rows: (r.data.rows ?? []) as LedgerRow[] }))
           .catch(() => ({ f, rows: [] as LedgerRow[] }))
       ));
+
+      // Calculate totals from all ledger rows
+      const regularFundIds = funds.filter(f => !/sdg/i.test(f.fund_name ?? '')).map(f => f.fund_id);
+      const sdgFundId = funds.find(f => /sdg/i.test(f.fund_name ?? ''))?.fund_id;
+
+      let regularReturnOfCapital = 0, regularGain = 0, regularInterest = 0;
+      let sdgReturnOfCapital = 0, sdgGain = 0, sdgInterest = 0;
+
+      ledgers.forEach(({ f, rows }) => {
+        const isRegular = regularFundIds.includes(f.fund_id);
+        rows.forEach(r => {
+          if (isRegular) {
+            regularReturnOfCapital += r.return_of_capital ?? 0;
+            regularGain += r.gain ?? 0;
+            regularInterest += r.interest ?? 0;
+          } else if (f.fund_id === sdgFundId) {
+            sdgReturnOfCapital += r.return_of_capital ?? 0;
+            sdgGain += r.gain ?? 0;
+            sdgInterest += r.interest ?? 0;
+          }
+        });
+      });
+
+      setTotals({ regularReturnOfCapital, regularGain, regularInterest, sdgReturnOfCapital, sdgGain, sdgInterest });
 
       const base: ReportRow[] = ledgers.map(({ f, rows }) => {
         const calls = rows.filter(r => r.tx_type === 'capital_call'  && r.capital_paid_in  > 0);
@@ -259,55 +287,103 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
       {/* ── Portfolio summary — metric tiles ── */}
       <div>
         <h2 className="text-sm font-bold theme-text mb-3">{t('manageFunds.portfolioSummary')}</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {/* Left: 7 Regular Funds in USD */}
-          <div className="grid grid-cols-2 gap-2">
-            {(() => {
-              const regularFunds = activeFunds.filter(f => !/sdg/i.test(f.fund_name ?? ''));
-              const regularCommit = regularFunds.reduce((sum, f) => sum + (f.commitment_usd ?? 0), 0);
-              const regularDist = regularFunds.reduce((sum, f) => sum + (f.total_received_usd ?? 0), 0);
+        <div className="space-y-4">
+          {/* 7 Regular Funds in USD */}
+          <div>
+            <h3 className="text-xs font-semibold theme-text-muted uppercase tracking-wide mb-2">7 Funds (USD)</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {(() => {
+                const regularFunds = activeFunds.filter(f => !/sdg/i.test(f.fund_name ?? ''));
+                const regularCommit = regularFunds.reduce((sum, f) => sum + (f.commitment_usd ?? 0), 0);
+                const regularDist = regularFunds.reduce((sum, f) => sum + (f.total_received_usd ?? 0), 0);
 
-              return (
-                <>
-                  <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '120px' }}>
-                    <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{prefs.language === 'ja' ? '7ファンド\nコミットメント' : '7 Funds\nCommitment'}</p>
-                    <p className="text-lg font-bold tabular-nums theme-text text-center">{fmt.usdFull(regularCommit)}</p>
-                    <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
-                  </div>
-                  <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '120px' }}>
-                    <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{prefs.language === 'ja' ? '7ファンド\n分配金' : '7 Funds\nDistribution'}</p>
-                    <p className="text-lg font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.usdFull(regularDist)}</p>
-                    <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
-                  </div>
-                </>
-              );
-            })()}
+                return (
+                  <>
+                    <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
+                      <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Commitment</p>
+                      <p className="text-xl font-bold tabular-nums theme-text text-center">{fmt.usdFull(regularCommit)}</p>
+                      <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
+                    </div>
+                    <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
+                      <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Distribution</p>
+                      <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.usdFull(regularDist)}</p>
+                      <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
+                    </div>
+                    {totals.regularReturnOfCapital !== 0 && (
+                      <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
+                        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Return of Capital</p>
+                        <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.usdFull(totals.regularReturnOfCapital)}</p>
+                        <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
+                      </div>
+                    )}
+                    {totals.regularGain !== 0 && (
+                      <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
+                        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Gain</p>
+                        <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.usdFull(totals.regularGain)}</p>
+                        <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
+                      </div>
+                    )}
+                    {totals.regularInterest !== 0 && (
+                      <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
+                        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Interest</p>
+                        <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.usdFull(totals.regularInterest)}</p>
+                        <p className="text-[10px] theme-text-muted mt-2 text-center">USD</p>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
           </div>
 
-          {/* Right: SDG Fund in JPY */}
-          <div className="grid grid-cols-2 gap-2">
-            {(() => {
-              const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
-              if (!sdgFund) return null;
+          {/* SDG Fund in JPY */}
+          <div>
+            <h3 className="text-xs font-semibold theme-text-muted uppercase tracking-wide mb-2">SDG Fund (JPY)</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {(() => {
+                const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
+                if (!sdgFund) return null;
 
-              const sdgCommit = (sdgFund as any).contract_commitment_jpy ?? (sdgFund as any).commitment_jpy ?? 0;
-              const sdgDist = sdgFund.total_received_usd ?? 0;
+                const sdgCommit = (sdgFund as any).contract_commitment_jpy ?? (sdgFund as any).commitment_jpy ?? 0;
+                const sdgDist = sdgFund.total_received_usd ?? 0;
 
-              return (
-                <>
-                  <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '120px' }}>
-                    <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{prefs.language === 'ja' ? 'SDG\n契約コミットメント' : 'SDG\nContract Commitment'}</p>
-                    <p className="text-lg font-bold tabular-nums theme-text text-center">{fmt.jpy(sdgCommit)}</p>
-                    <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
-                  </div>
-                  <div className="theme-card border theme-border rounded-lg p-3" style={{ minHeight: '120px' }}>
-                    <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">{prefs.language === 'ja' ? 'SDG\n分配金' : 'SDG\nDistribution'}</p>
-                    <p className="text-lg font-bold tabular-nums text-center" style={{ color: C.indigo }}>{rate ? fmt.jpy(sdgDist * rate) : fmt.usdFull(sdgDist)}</p>
-                    <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
-                  </div>
-                </>
-              );
-            })()}
+                return (
+                  <>
+                    <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
+                      <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Commitment</p>
+                      <p className="text-xl font-bold tabular-nums theme-text text-center">{fmt.jpy(sdgCommit)}</p>
+                      <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
+                    </div>
+                    <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
+                      <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Distribution</p>
+                      <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{rate ? fmt.jpy(sdgDist * rate) : fmt.usdFull(sdgDist)}</p>
+                      <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
+                    </div>
+                    {totals.sdgReturnOfCapital !== 0 && (
+                      <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
+                        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Return of Capital</p>
+                        <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.jpy(totals.sdgReturnOfCapital)}</p>
+                        <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
+                      </div>
+                    )}
+                    {totals.sdgGain !== 0 && (
+                      <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
+                        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Gain</p>
+                        <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.jpy(totals.sdgGain)}</p>
+                        <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
+                      </div>
+                    )}
+                    {totals.sdgInterest !== 0 && (
+                      <div className="theme-card border theme-border rounded-lg p-4" style={{ minHeight: '140px' }}>
+                        <p className="text-[9px] font-bold uppercase tracking-widest theme-text-muted mb-2 text-center">Interest</p>
+                        <p className="text-xl font-bold tabular-nums text-center" style={{ color: C.indigo }}>{fmt.jpy(totals.sdgInterest)}</p>
+                        <p className="text-[10px] theme-text-muted mt-2 text-center">JPY</p>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
           </div>
         </div>
       </div>
@@ -348,15 +424,15 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
               <div className="theme-card border theme-border rounded-2xl p-4">
                 <p className="text-sm font-bold theme-text mb-1">{t('manageFunds.sevenFundsDollar')}</p>
                 <p className="text-[10px] theme-text-muted mb-3">{i18n.language === 'ja' ? 'USD · ファンド別' : 'USD · per fund'}</p>
-                <div style={{ width: '100%', height: 300 }}>
+                <div style={{ width: '100%', height: 350 }}>
                   <ResponsiveContainer>
-                    <BarChart data={barDataUsd} margin={{ top: 4, right: 8, bottom: 4, left: 4 }}>
+                    <BarChart data={barDataUsd} margin={{ top: 20, right: 8, bottom: 60, left: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-card-border)" vertical={false} />
-                      <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} interval={0} angle={-20} textAnchor="end" height={60} />
+                      <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} interval={0} angle={-20} textAnchor="end" height={80} />
                       <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.usdAbbr(v)} width={56} />
                       <Tooltip formatter={(v: any) => fmt.usdFull(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="Commitment"   fill="#1e40af" radius={[3,3,0,0]} />
+                      <Bar dataKey="Commitment" fill="#1e40af" radius={[3,3,0,0]} />
                       <Bar dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} />
                       <Bar dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} />
                     </BarChart>
@@ -371,7 +447,17 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                 <div style={{ width: '100%', height: 300 }}>
                   <ResponsiveContainer>
                     <PieChart>
-                      <Pie data={pieDataUsd} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={95} innerRadius={48} paddingAngle={2}>
+                      <Pie
+                        data={pieDataUsd}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={95}
+                        innerRadius={48}
+                        paddingAngle={2}
+                        label={({ percent }: any) => `${(percent * 100).toFixed(0)}%`}
+                      >
                         {pieDataUsd.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
                       </Pie>
                       <Tooltip formatter={(v: any) => fmt.usdFull(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
@@ -386,15 +472,15 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                 <div className="theme-card border theme-border rounded-2xl p-4">
                   <p className="text-sm font-bold theme-text mb-1">{t('manageFunds.sdgFundYen')}</p>
                   <p className="text-[10px] theme-text-muted mb-3">{i18n.language === 'ja' ? 'JPY · ファンド別' : 'JPY · per fund'}</p>
-                  <div style={{ width: '100%', height: 300 }}>
+                  <div style={{ width: '100%', height: 350 }}>
                     <ResponsiveContainer>
-                      <BarChart data={barDataJpy} margin={{ top: 4, right: 8, bottom: 4, left: 4 }}>
+                      <BarChart data={barDataJpy} margin={{ top: 20, right: 8, bottom: 60, left: 4 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-card-border)" vertical={false} />
-                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} interval={0} angle={-20} textAnchor="end" height={60} />
+                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} interval={0} angle={-20} textAnchor="end" height={80} />
                         <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.jpy(v)} width={80} />
                         <Tooltip formatter={(v: any) => fmt.jpy(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="Commitment"   fill="#1e40af" radius={[3,3,0,0]} />
+                        <Bar dataKey="Commitment" fill="#1e40af" radius={[3,3,0,0]} />
                         <Bar dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} />
                         <Bar dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} />
                       </BarChart>
@@ -411,7 +497,17 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                   <div style={{ width: '100%', height: 300 }}>
                     <ResponsiveContainer>
                       <PieChart>
-                        <Pie data={pieDataJpy} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={95} innerRadius={48} paddingAngle={2}>
+                        <Pie
+                          data={pieDataJpy}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={95}
+                          innerRadius={48}
+                          paddingAngle={2}
+                          label={({ percent }: any) => `${(percent * 100).toFixed(0)}%`}
+                        >
                           {pieDataJpy.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
                         </Pie>
                         <Tooltip formatter={(v: any) => fmt.jpy(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
@@ -451,7 +547,6 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                   { key: 'fundOverview.contribution',  label: t('fundOverview.contribution'),  left: false },
                   { key: 'fundOverview.distribution',  label: t('fundOverview.distribution'),  left: false },
                   { key: 'fundOverview.navUnreal',     label: t('fundOverview.navUnreal'),     left: false },
-                  { key: 'manageFunds.totalValue',     label: t('manageFunds.totalValue'),     left: false },
                   { key: 'metrics.moic',               label: t('metrics.moic'),               left: false },
                   { key: 'manageFunds.netIRR',         label: t('manageFunds.netIRR'),         left: false },
                   { key: 'fundOverview.status',        label: t('fundOverview.status'),        left: false },
@@ -464,7 +559,6 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
               {/* 7 Funds rows (USD) */}
               {activeFunds.map(f => {
                 const navUsd   = f.nav_usd ?? 0;
-                const valueUsd = f.total_value_usd ?? (f.total_received_usd + navUsd);
                 const fundNameKey = getFundNameTranslationKey(f.fund_name);
                 const isSdg = /sdg/i.test(f.fund_name ?? '');
 
@@ -483,7 +577,6 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                     <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{fmt.usdFull(f.total_called_usd ?? 0)}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{fmt.usdFull(f.total_received_usd ?? 0)}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums" style={{ color: C.violet }}>{fmt.usdFull(navUsd)}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold theme-text">{fmt.usdFull(valueUsd)}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{(f.moic ?? f.tvpi ?? 0).toFixed(2)}×</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold"
                         style={{ color: (f.irr ?? 0) < 0 ? C.red : C.indigo }}>
@@ -499,7 +592,6 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                 if (!sdgFund) return null;
 
                 const navUsd   = sdgFund.nav_usd ?? 0;
-                const valueUsd = sdgFund.total_value_usd ?? (sdgFund.total_received_usd + navUsd);
                 const fundNameKey = getFundNameTranslationKey(sdgFund.fund_name);
 
                 return (
@@ -511,11 +603,10 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                       </button>
                     </td>
                     <td className="px-4 py-3 text-sm theme-text">{sdgFund.manager || '—'}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{yen(jpy(sdgFund.commitment_usd))}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{yen((sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0))}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{yen(jpy(sdgFund.total_called_usd))}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{yen(jpy(sdgFund.total_received_usd))}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums" style={{ color: C.violet }}>{yen(jpy(navUsd))}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold theme-text">{yen(jpy(valueUsd))}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{(sdgFund.moic ?? sdgFund.tvpi ?? 0).toFixed(2)}×</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold"
                         style={{ color: (sdgFund.irr ?? 0) < 0 ? C.red : C.indigo }}>
@@ -534,7 +625,6 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                 const regContrib = regularFunds.reduce((sum, f) => sum + (f.total_called_usd ?? 0), 0);
                 const regDist = regularFunds.reduce((sum, f) => sum + (f.total_received_usd ?? 0), 0);
                 const regNav = regularFunds.reduce((sum, f) => sum + (f.nav_usd ?? 0), 0);
-                const regValue = regularFunds.reduce((sum, f) => sum + (f.total_value_usd ?? (f.total_received_usd + (f.nav_usd ?? 0))), 0);
                 const regMoic = regularFunds.reduce((sum, f) => sum + (f.moic ?? f.tvpi ?? 0), 0) / regularFunds.length;
                 const regIrr = regularFunds.reduce((sum, f) => sum + (f.irr ?? 0), 0) / regularFunds.length;
 
@@ -546,7 +636,6 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                     <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{fmt.usdFull(regContrib)}</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{fmt.usdFull(regDist)}</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }}>{fmt.usdFull(regNav)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{fmt.usdFull(regValue)}</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{regMoic.toFixed(2)}×</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: regIrr < 0 ? C.red : C.indigo }}>{regIrr.toFixed(1)}%</td>
                     <td className="px-4 py-2.5"></td>
@@ -558,11 +647,10 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                 const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
                 if (!sdgFund) return null;
 
-                const sdgCommit = jpy(sdgFund.commitment_usd ?? 0);
+                const sdgCommit = (sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0);
                 const sdgContrib = jpy(sdgFund.total_called_usd ?? 0);
                 const sdgDist = jpy(sdgFund.total_received_usd ?? 0);
                 const sdgNav = jpy(sdgFund.nav_usd ?? 0);
-                const sdgValue = jpy(sdgFund.total_value_usd ?? ((sdgFund.total_received_usd ?? 0) + (sdgFund.nav_usd ?? 0)));
 
                 return (
                   <tr>
@@ -572,7 +660,6 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                     <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{yen(sdgContrib)}</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{yen(sdgDist)}</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }}>{yen(sdgNav)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{yen(sdgValue)}</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{(sdgFund.moic ?? sdgFund.tvpi ?? 0).toFixed(2)}×</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: (sdgFund.irr ?? 0) < 0 ? C.red : C.indigo }}>{sdgFund.irr != null ? `${sdgFund.irr.toFixed(1)}%` : '—'}</td>
                     <td className="px-4 py-2.5"></td>
@@ -615,16 +702,25 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
               ) : reports.length === 0 ? (
                 <tr><td colSpan={10} className="px-5 py-8 text-center text-sm theme-text-muted">No reports yet.</td></tr>
               ) : reports.map(r => {
-                const contribJpy = r.contribUsd != null && r.ttmDue  ? r.contribUsd * r.ttmDue  : null;
-                const distJpy    = r.distUsd    != null && r.ttmDist ? r.distUsd    * r.ttmDist : null;
+                const isSdg = /sdg/i.test(r.fund_name ?? '');
+                // For SDG, find latest capital call and latest distribution from all reports (positive amounts only)
+                const latestSdgCall = isSdg ? reports.filter(rp => /sdg/i.test(rp.fund_name ?? '') && rp.contribUsd != null && rp.contribUsd > 0).sort((a, b) => new Date(b.dueDate || 0).getTime() - new Date(a.dueDate || 0).getTime())[0] : null;
+                const latestSdgDist = isSdg ? reports.filter(rp => /sdg/i.test(rp.fund_name ?? '') && rp.distUsd != null && rp.distUsd > 0).sort((a, b) => new Date(b.distDate || 0).getTime() - new Date(a.distDate || 0).getTime())[0] : null;
+                // For SDG, substitute latest values only when the current report matches the transaction type
+                const displayCall = isSdg && latestSdgCall && r.contribUsd != null && r.contribUsd > 0 ? latestSdgCall : r;
+                const displayDist = isSdg && latestSdgDist && r.distUsd != null && r.distUsd > 0 ? latestSdgDist : r;
+                const contribJpy = !isSdg && displayCall.contribUsd != null && displayCall.ttmDue ? displayCall.contribUsd * displayCall.ttmDue : (isSdg && displayCall.contribUsd != null ? displayCall.contribUsd : null);
+                const distJpy = !isSdg && displayDist.distUsd != null && displayDist.ttmDist ? displayDist.distUsd * displayDist.ttmDist : (isSdg && displayDist.distUsd != null ? displayDist.distUsd : null);
                 // FX gain/loss = net USD position revalued at current rate vs each transaction's booked rate
-                const glContrib  = r.contribUsd != null && r.ttmDue  && rate ? r.contribUsd * (rate - r.ttmDue)  : 0;
-                const glDist     = r.distUsd    != null && r.ttmDist && rate ? r.distUsd    * (rate - r.ttmDist) : 0;
-                const fxGL       = glDist - glContrib;
-                const hasGL      = (r.contribUsd != null && r.ttmDue) || (r.distUsd != null && r.ttmDist);
+                const glContrib = displayCall.contribUsd != null && displayCall.ttmDue && rate ? displayCall.contribUsd * (rate - displayCall.ttmDue) : 0;
+                const glDist = displayDist.distUsd != null && displayDist.ttmDist && rate ? displayDist.distUsd * (rate - displayDist.ttmDist) : 0;
+                const fxGL = glDist - glContrib;
+                const hasGL = (displayCall.contribUsd != null && displayCall.ttmDue) || (displayDist.distUsd != null && displayDist.ttmDist);
                 const fundNameKey = getFundNameTranslationKey(r.fund_name);
+                // Skip non-latest SDG rows to show only the latest capital call and latest distribution
+                if (isSdg && r !== latestSdgCall && r !== latestSdgDist) return null;
                 return (
-                  <tr key={r.fund_id} className="theme-row-hover transition-colors">
+                  <tr key={`${r.fund_id}-${r.dueDate || r.distDate}`} className="theme-row-hover transition-colors">
                     <td className="px-5 py-3">
                       <button onClick={() => onSelectFund?.(r.fund_id)}
                         className="font-semibold theme-text hover:text-indigo-600 text-sm transition-colors text-left">
@@ -633,14 +729,14 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                     </td>
                     <td className="px-4 py-3 text-sm theme-text-muted">{r.manager || '—'}</td>
                     {/* Capital call */}
-                    <td className="px-4 py-3 text-left theme-text-muted whitespace-nowrap border-l theme-divider">{r.dueDate ? fmt.date(r.dueDate) : '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums theme-text-muted">{r.ttmDue ? r.ttmDue.toFixed(2) : '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: r.contribUsd ? C.indigo : undefined }}>{r.contribUsd != null ? usd(r.contribUsd) : '—'}</td>
+                    <td className="px-4 py-3 text-left theme-text-muted whitespace-nowrap border-l theme-divider">{displayCall.dueDate ? fmt.date(displayCall.dueDate) : '—'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums theme-text-muted">{displayCall.ttmDue ? displayCall.ttmDue.toFixed(2) : '—'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: displayCall.contribUsd ? C.indigo : undefined }}>{isSdg ? '—' : (displayCall.contribUsd != null ? usd(displayCall.contribUsd) : '—')}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{yen(contribJpy)}</td>
                     {/* Distribution */}
-                    <td className="px-4 py-3 text-left theme-text-muted whitespace-nowrap border-l theme-divider">{r.distDate ? fmt.date(r.distDate) : '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums theme-text-muted">{r.ttmDist ? r.ttmDist.toFixed(2) : '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: r.distUsd ? C.indigo : undefined }}>{r.distUsd != null ? usd(r.distUsd) : '—'}</td>
+                    <td className="px-4 py-3 text-left theme-text-muted whitespace-nowrap border-l theme-divider">{displayDist.distDate ? fmt.date(displayDist.distDate) : '—'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums theme-text-muted">{displayDist.ttmDist ? displayDist.ttmDist.toFixed(2) : '—'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold" style={{ color: displayDist.distUsd ? C.indigo : undefined }}>{isSdg ? '—' : (displayDist.distUsd != null ? usd(displayDist.distUsd) : '—')}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{yen(distJpy)}</td>
                     {/* FX gain/loss */}
                     <td className="px-4 py-3 text-right tabular-nums font-semibold border-l theme-divider"
@@ -653,8 +749,14 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
             </tbody>
             {!reportsLoading && reports.length > 0 && (() => {
               let cUsd = 0, cJpy = 0, dUsd = 0, dJpy = 0, gl = 0;
+              const sdgFund = activeFunds.find(f => /sdg/i.test(f.fund_name ?? ''));
+              const sdgCommitment = sdgFund ? ((sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0)) : 0;
               reports.forEach(r => {
-                if (r.contribUsd != null && r.ttmDue)  { cUsd += r.contribUsd; cJpy += r.contribUsd * r.ttmDue; }
+                const isSdg = /sdg/i.test(r.fund_name ?? '');
+                // Exclude SDG from USD totals (shown in yen only)
+                if (!isSdg && r.contribUsd != null && r.ttmDue)  { cUsd += r.contribUsd; cJpy += r.contribUsd * r.ttmDue; }
+                // For SDG, add commitment to yen total
+                if (isSdg) { cJpy += sdgCommitment; }
                 if (r.distUsd    != null && r.ttmDist) { dUsd += r.distUsd;    dJpy += r.distUsd    * r.ttmDist; }
                 const glC = r.contribUsd != null && r.ttmDue  && rate ? r.contribUsd * (rate - r.ttmDue)  : 0;
                 const glD = r.distUsd    != null && r.ttmDist && rate ? r.distUsd    * (rate - r.ttmDist) : 0;
@@ -662,16 +764,31 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
               });
               return (
                 <tfoot className="border-t theme-divider" style={{ background: 'rgba(30,64,175,0.03)' }}>
+                  {/* Dollar Total (Non-SDG funds in USD) */}
                   <tr>
-                    <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">All Funds · {t('fundNames.total')}</td>
+                    <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">{t('manageFunds.dollarTotal')}</td>
                     <td className="px-4 py-2.5"></td>
                     <td className="px-4 py-2.5 border-l theme-divider"></td>
                     <td className="px-4 py-2.5"></td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{usd(cUsd)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{yen(cJpy)}</td>
+                    <td className="px-4 py-2.5"></td>
                     <td className="px-4 py-2.5 border-l theme-divider"></td>
                     <td className="px-4 py-2.5"></td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{usd(dUsd)}</td>
+                    <td className="px-4 py-2.5"></td>
+                    <td className="px-4 py-2.5 border-l theme-divider"></td>
+                  </tr>
+                  {/* Yen Total (All funds in JPY) */}
+                  <tr>
+                    <td className="px-5 py-2.5 text-xs font-bold theme-text-muted uppercase">{t('manageFunds.yenTotal')}</td>
+                    <td className="px-4 py-2.5"></td>
+                    <td className="px-4 py-2.5 border-l theme-divider"></td>
+                    <td className="px-4 py-2.5"></td>
+                    <td className="px-4 py-2.5"></td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{yen(cJpy)}</td>
+                    <td className="px-4 py-2.5 border-l theme-divider"></td>
+                    <td className="px-4 py-2.5"></td>
+                    <td className="px-4 py-2.5"></td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold theme-text">{yen(dJpy)}</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold border-l theme-divider"
                         style={{ color: gl < 0 ? C.red : C.indigo }}>

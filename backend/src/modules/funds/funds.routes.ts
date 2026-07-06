@@ -584,7 +584,7 @@ router.put('/:id', async (c) => {
     }
   }
   if (body.contract_commitment_usd !== undefined && body.contract_commitment_usd !== '' && body.contract_commitment_usd !== null) data.contractCommitmentUsd = new Decimal(body.contract_commitment_usd)
-  if (body.contract_commitment_jpy !== undefined && body.contract_commitment_jpy !== '' && body.contract_commitment_jpy !== null) data.contractCommitmentJpy = new Decimal(body.contract_commitment_jpy)
+  if (body.contract_commitment_jpy !== undefined && body.contract_commitment_jpy !== '' && body.contract_commitment_jpy !== null) data.contractCommitmentJpy = BigInt(body.contract_commitment_jpy.toString())
   if (body.entry_fx_rate           !== undefined && body.entry_fx_rate !== '' && body.entry_fx_rate !== null) data.entryFxRate           = new Decimal(body.entry_fx_rate)
   if (body.contract_date         !== undefined) data.contractDate        = body.contract_date ? new Date(body.contract_date) : null
   if (body.investment_period_start !== undefined) data.investmentPeriodStart = body.investment_period_start ? new Date(body.investment_period_start) : null
