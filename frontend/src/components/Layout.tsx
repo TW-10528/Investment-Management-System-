@@ -96,20 +96,28 @@ export default function Layout() {
       }}>
 
         {/* Brand */}
-        <div className="px-4 py-4" style={{
+        <div className="px-3 py-3" style={{
           background: 'linear-gradient(135deg, rgba(30,64,175,0.08) 0%, rgba(15,118,110,0.04) 100%)',
           borderBottom: '1px solid var(--color-card-border)',
         }}>
-          <div className="flex items-center gap-2.5">
-            <div className="w-16 h-12 flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 186" className="w-full h-full object-contain" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Thirdwave logo">
+          <div className="flex flex-col gap-2">
+            <div className="w-full h-14 flex-shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 186" className="w-full h-full object-contain" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Thirdwave Group logo">
                 <path fill="#2735b3" d="M84 106 104 78h43L127 124z"/>
                 <path fill="#2735b3" d="M131 124 163 66h49L178 116z"/>
                 <path fill="#2735b3" d="M185 122 218 66 273 30 230 136z"/>
+                <text x="286" y="95" fill="currentColor" fontFamily="Arial Black, Arial, Helvetica, sans-serif" fontSize="52" fontWeight="900" letterSpacing="0.8">
+                  THIRDWAVE
+                </text>
+                <text x="286" y="138" fill="currentColor" fontFamily="Arial Black, Arial, Helvetica, sans-serif" fontSize="52" fontWeight="900" letterSpacing="0.8">
+                  GROUP
+                </text>
               </svg>
             </div>
-            <div>
-              <p className="font-bold text-base theme-text leading-tight">{i18n.language === 'ja' ? 'サードウェーブ' : 'Thirdwave'}</p>
+            <div className="px-1">
+              <p className="text-xs font-semibold theme-text-muted leading-tight">
+                {i18n.language === 'ja' ? '土地管理システム' : 'Investment Management System'}
+              </p>
             </div>
           </div>
         </div>

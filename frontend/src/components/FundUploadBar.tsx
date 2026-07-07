@@ -5,12 +5,13 @@
  * is entered manually in fund settings.
  *
  * NEW: If fund is unknown, user can create a new fund from extracted data.
+ * EXACT ROMAN NUMERAL MATCHING: Prevents Dover XII from matching Dover XI, etc.
  */
 import { useEffect, useRef, useState } from 'react';
 import api, { fundReportsAPI } from '../services/api';
-import { fundExtractionAPI } from '../services/fundExtractionAPI';
 import toast from 'react-hot-toast';
 import ExtractedDataReviewForm from './ExtractedDataReviewForm';
+import { fundNamesMatchExact, isNewFundVariant } from '../utils/fundNameParser';
 
 function DuplicateModal({ fileName, uploadedAt, onClose }: { fileName: string; uploadedAt: string; onClose: () => void }) {
   return (
@@ -81,7 +82,24 @@ const REPORT_TYPE_MAP: Record<string, string> = {
 };
 
 function matchFund(_fundKey: string, displayName: string, funds: FundOption[]): FundOption | null {
-  const normalizedDisplay = displayName?.toLowerCase().trim();
+  if (!displayName) return null;
+
+  // EXACT ROMAN NUMERAL MATCHING:
+  // Check if extracted fund name is a variant (e.g., "Dover Street XII")
+  // If so, ONLY match to funds with exact same family + sequence number
+  if (isNewFundVariant(displayName)) {
+    // This is a new fund variant (has Roman numeral or number at end)
+    // Try exact match first: "Dover Street XII" must match exactly to "Dover Street XII", never to "Dover Street XI"
+    const exactMatch = funds.find(f => fundNamesMatchExact(displayName, f.fund_name));
+    if (exactMatch) return exactMatch;
+
+    // If no exact match found for a variant fund, return null
+    // This forces the user to create it as a new fund (with human-in-the-loop correction)
+    return null;
+  }
+
+  // For non-variant funds (no Roman numeral/number at end), use fuzzy matching
+  const normalizedDisplay = displayName.toLowerCase().trim();
 
   // 1. Try exact match
   if (normalizedDisplay) {
@@ -91,16 +109,20 @@ function matchFund(_fundKey: string, displayName: string, funds: FundOption[]): 
     if (exactMatch) return exactMatch;
   }
 
-  // 2. Try substring match (fund name in display name or vice versa)
+  // 2. Try substring match for non-variant funds
   if (normalizedDisplay && normalizedDisplay.length > 5) {
     const substringMatch = funds.find(f => {
       const dbName = f.fund_name.toLowerCase();
+      const nameSimilarity = Math.abs(dbName.length - normalizedDisplay.length);
+      if (nameSimilarity > 10 && !dbName.includes(normalizedDisplay) && !normalizedDisplay.includes(dbName)) {
+        return false;
+      }
       return dbName.includes(normalizedDisplay) || normalizedDisplay.includes(dbName);
     });
     if (substringMatch) return substringMatch;
   }
 
-  // 3. Keyword scoring: Score each fund based on how many significant keywords match
+  // 3. Keyword scoring for non-variant funds
   if (normalizedDisplay && normalizedDisplay.length > 3) {
     const displayKeywords = normalizedDisplay
       .split(/[\s\-\.(),]+/)
@@ -113,7 +135,6 @@ function matchFund(_fundKey: string, displayName: string, funds: FundOption[]): 
           .split(/[\s\-\.(),]+/)
           .filter(w => w.length > 2);
 
-        // Score: count how many display keywords appear in fund keywords
         const matchCount = displayKeywords.filter(dk =>
           fundKeywords.some(fk => fk === dk || fk.includes(dk) || dk.includes(fk))
         ).length;
@@ -121,7 +142,7 @@ function matchFund(_fundKey: string, displayName: string, funds: FundOption[]): 
         return { fund: f, score: matchCount };
       })
       .filter(({ score }) => score >= 2)
-      .sort((a, b) => b.score - a.score); // Highest score first
+      .sort((a, b) => b.score - a.score);
 
     if (scored.length > 0) return scored[0].fund;
   }
@@ -222,37 +243,52 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   async function handleCreateFund(
     fundData: any,
     documentData: any,
-    correctedFields: string[]
+    _correctedFields: string[]
   ) {
     if (!file || !detection) return
 
     setCreatingFund(true)
     try {
-      // Extract unknown fund data from PDF
-      const extracted = await fundExtractionAPI.extractUnknownFund(file)
+      // Extract family name from fund name using simple pattern matching
+      // E.g., "Dover Street XII" → family: "Dover Street"
+      const fundName = fundData.fundName.trim()
+      let familyName = fundName
+      const romanMatch = fundName.match(/^(.+)\s+X{1,3}(IX|IV|V?I{0,3})$/i)
+      const numberMatch = fundName.match(/^(.+)\s+(\d+)$/i)
+      if (romanMatch) {
+        familyName = romanMatch[1].trim()
+      } else if (numberMatch) {
+        familyName = numberMatch[1].trim()
+      }
 
-      // Create fund from extracted data
-      const result = await fundExtractionAPI.createFromExtraction({
-        extractedData: extracted.extractedData,
-        userEditedFundData: fundData,
-        userEditedDocumentData: documentData,
-        pdfData: {
-          fileName: file.name,
-          fileHash: '', // Will be generated on backend
-          filePath: `uploads/fund-onboarding/${Date.now()}_${file.name}`,
-        },
-        userCorrectedFields: correctedFields,
+      // Create new fund via fund-family API
+      const response = await fetch('/api/v1/fund-families/add-fund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fundName,
+          familyName,
+          manager: fundData.manager || '',
+          strategy: fundData.strategy || '',
+          currency: fundData.currency || 'USD',
+          commitmentUsd: fundData.commitmentUsd || 0,
+        }),
       })
 
-      toast.success(`New fund "${fundData.fundName}" created!`)
-      const newFundName = fundData.fundName
-      const docType = documentData.documentType
+      if (!response.ok) {
+        throw new Error('Failed to create fund')
+      }
+
+      const newFundResult = await response.json()
+      const newFundId = newFundResult.data.id
+
+      toast.success(`New fund "${fundName}" created!`)
 
       setDone({
-        fundId: result.fund.id,
-        docType,
+        fundId: newFundId,
+        docType: documentData.documentType,
         displayType: documentData.documentType,
-        fundName: newFundName,
+        fundName,
       })
 
       setShowCreateFundForm(false)
@@ -261,7 +297,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
       setMatched(null)
 
       // Refresh funds list (parent will handle this)
-      onUploaded(result.fund.id, docType)
+      onUploaded(newFundId, documentData.documentType)
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || err.message || 'Fund creation failed')
     } finally {
@@ -425,6 +461,75 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   // Otherwise (AUDIT, FINANCIAL_STATEMENT, etc.) → show viewing UI
   const isTransaction = typeMeta.isTransaction
 
+  // Direct save for new funds (extracted name without editing)
+  async function saveNewFundDirect() {
+    if (!file || !detection || !cls.fund_display_name) return
+
+    const fundName = cls.fund_display_name.trim()
+    let familyName = fundName
+    const romanMatch = fundName.match(/^(.+)\s+X{1,3}(IX|IV|V?I{0,3})$/i)
+    const numberMatch = fundName.match(/^(.+)\s+(\d+)$/i)
+    if (romanMatch) {
+      familyName = romanMatch[1].trim()
+    } else if (numberMatch) {
+      familyName = numberMatch[1].trim()
+    }
+
+    setCreatingFund(true)
+    try {
+      const response = await fetch('/api/v1/fund-families/add-fund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fundName,
+          familyName,
+          manager: '',
+          strategy: '',
+          currency: cls.currency || 'USD',
+          commitmentUsd: 0,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create fund')
+      }
+
+      const newFundResult = await response.json()
+      const newFundId = newFundResult.data.id
+
+      // Now upload the document to this new fund
+      const docType = REPORT_TYPE_MAP[cls?.report_type] ?? 'capital_call'
+      setUploading(true)
+      try {
+        const form = new FormData()
+        form.append('file', file)
+        if (detection.extraction) {
+          const minimal = {
+            B_capital_contribution: detection.extraction.B_capital_contribution,
+            C_distribution_received: detection.extraction.C_distribution_received,
+            D_reinvestable: detection.extraction.D_reinvestable,
+            transaction_date: detection.extraction.transaction_date,
+            currency: detection.extraction.currency,
+          }
+          form.append('extraction_data', JSON.stringify(minimal))
+        }
+        await fundReportsAPI.upload(newFundId, form, docType)
+
+        const displayType = DOC_TYPE_LABELS[cls?.report_type]?.label || 'Document'
+        setDone({ fundId: newFundId, docType, displayType, fundName })
+        setFile(null); setDetection(null); setMatched(null)
+        toast.success(`New fund "${fundName}" created and saved!`)
+        onUploaded(newFundId, docType)
+      } finally {
+        setUploading(false)
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || err.message || 'Failed to create and save fund')
+    } finally {
+      setCreatingFund(false)
+    }
+  }
+
   return (
     <>
     {duplicate && (
@@ -454,7 +559,9 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
               ${dragging ? 'border-indigo-400 bg-indigo-50/40' : 'hover:border-indigo-400/60'}`}
             style={{ borderColor: dragging ? undefined : 'rgba(99,102,241,0.3)', background: dragging ? undefined : 'rgba(99,102,241,0.02)' }}
           >
-            <p className="text-2xl mb-2">📄</p>
+            <svg className="w-12 h-12 mx-auto mb-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
             <p className="text-sm font-semibold theme-text">{file ? file.name : 'Drop a fund PDF here or click to browse'}</p>
             <p className="text-xs theme-text-muted mt-1">Capital calls · Distributions · Contract / Commitment documents</p>
             <input ref={inputRef} type="file" accept=".pdf" className="hidden" onChange={onPick} />
@@ -537,38 +644,51 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
             <div className="divide-y theme-border">
 
               {/* Fund name */}
-              <div className="flex items-center px-5 py-3 gap-4">
-                <span className="text-[10px] font-bold uppercase tracking-widest theme-text-muted w-28 shrink-0">Fund</span>
-                <div className="flex-1">
-                  {matched ? (
-                    <p className="font-semibold theme-text">{matched.fund_name}</p>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={overrideFund}
-                        onChange={e => setOverrideFund(e.target.value)}
-                        className="theme-input rounded-lg px-3 py-1.5 text-sm flex-1 border theme-border"
-                      >
-                        <option value="">— select fund —</option>
-                        {funds.map(f => (
-                          <option key={f.fund_id} value={f.fund_id}>
-                            {f.fund_name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => setShowCreateFundForm(true)}
-                        title="Create new fund from this PDF"
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors border border-indigo-500/30"
-                      >
-                        + New
-                      </button>
-                    </div>
-                  )}
+              <div className="flex items-center px-5 py-3 gap-4 justify-between">
+                <div className="flex items-center gap-4 flex-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest theme-text-muted w-28 shrink-0">Fund</span>
+                  <div className="flex-1">
+                    {matched ? (
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold theme-text">{matched.fund_name}</p>
+                        <button
+                          onClick={() => { setMatched(null); setOverrideFund(''); }}
+                          title="AI detected this as an existing fund, but you can correct it to create as new"
+                          className="px-2 py-1 rounded text-xs font-medium text-indigo-600 hover:bg-indigo-100/50 transition-colors"
+                        >
+                          ✎ Correct
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold theme-text">{cls.fund_display_name || '—'}</p>
+                        <button
+                          onClick={() => setShowCreateFundForm(true)}
+                          title="Edit or confirm this fund name"
+                          className="px-2 py-1 rounded text-xs font-medium text-indigo-600 hover:bg-indigo-100/50 transition-colors"
+                        >
+                          ✎ Edit
+                        </button>
+                        <button
+                          onClick={saveNewFundDirect}
+                          disabled={creatingFund || uploading}
+                          title="Save this fund with the extracted name"
+                          className="px-2 py-1 rounded text-xs font-medium text-emerald-600 hover:bg-emerald-100/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          ✓ Save
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {matched && (
                   <span className={`text-xs font-semibold shrink-0 ${confColor(cls.confidence_score)}`}>
                     {cls.confidence_score}% match
+                  </span>
+                )}
+                {!matched && (
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-300 dark:border-emerald-700 shrink-0">
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">🆕 NEW FUND</span>
                   </span>
                 )}
               </div>
