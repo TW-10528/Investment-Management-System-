@@ -51,7 +51,6 @@ export default function ExtractedDataReviewForm({
   const [fundData, setFundData] = useState(extractedData.fundData);
   const [documentData, setDocumentData] = useState(extractedData.documentData);
   const [correctedFields, setCorrectedFields] = useState<string[]>([]);
-  const [customDocType, setCustomDocType] = useState('');
 
   const handleFundFieldChange = (field: string, value: any) => {
     setFundData(prev => ({ ...prev, [field]: value }));
@@ -86,19 +85,8 @@ export default function ExtractedDataReviewForm({
       return;
     }
 
-    // If "OTHER" is selected, custom type must be provided
-    if (documentData.documentType === 'OTHER' && !customDocType?.trim()) {
-      toast.error('Please specify the document type (e.g., Subscription Agreement)');
-      return;
-    }
-
     try {
-      // Pass custom document type along with the data
-      const finalDocumentData = { ...documentData };
-      if (customDocType?.trim()) {
-        (finalDocumentData as any).customDocType = customDocType.trim();
-      }
-      await onSave(fundData, finalDocumentData, correctedFields);
+      await onSave(fundData, documentData, correctedFields);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create fund');
     }
@@ -106,286 +94,132 @@ export default function ExtractedDataReviewForm({
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="theme-card border theme-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="theme-card border theme-border rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b theme-border flex items-center justify-between flex-shrink-0">
-          <div>
-            <h2 className="text-lg font-semibold theme-text">⚠️ New Fund Detected</h2>
-            <p className="text-xs theme-text-muted mt-1">Review extracted data • Edit if needed • Click Save</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs theme-text-muted">📄 {pdfFileName}</p>
-            <p className="text-xs theme-text-muted">Confidence: {extractedData.extractionConfidence}%</p>
+        <div className="px-6 py-4 border-b theme-border flex-shrink-0">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold theme-text">Detected Document</h2>
+              <p className="text-xs theme-text-muted mt-1">📄 {pdfFileName}</p>
+            </div>
           </div>
         </div>
 
-        {/* Content - Scrollable */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
-          {/* Fund Details Section */}
-          <div className="mb-8">
-            <h3 className="text-sm font-semibold theme-text mb-4 pb-2 border-b theme-border">
-              📋 {t('funds.title')} (AI Extracted)
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Fund Name */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('funds.fundName')}
-                </label>
-                <input
-                  type="text"
-                  value={fundData.fundName}
-                  onChange={(e) => handleFundFieldChange('fundName', e.target.value)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                  placeholder="Fund name"
-                />
-              </div>
-
-              {/* Manager */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('funds.manager')}
-                </label>
-                <input
-                  type="text"
-                  value={fundData.manager || ''}
-                  onChange={(e) => handleFundFieldChange('manager', e.target.value)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                  placeholder="Fund manager"
-                />
-              </div>
-
-              {/* Strategy */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('funds.strategy')}
-                </label>
-                <input
-                  type="text"
-                  value={fundData.strategy || ''}
-                  onChange={(e) => handleFundFieldChange('strategy', e.target.value)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                  placeholder="Strategy"
-                />
-              </div>
-
-              {/* Vintage Year */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('funds.vintageYear')}
-                </label>
-                <input
-                  type="number"
-                  value={fundData.vintageYear || ''}
-                  onChange={(e) => handleFundFieldChange('vintageYear', e.target.value ? parseInt(e.target.value) : null)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                  placeholder="Year"
-                />
-              </div>
-
-              {/* Commitment (USD) */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('funds.commitment')}
-                </label>
-                <input
-                  type="number"
-                  value={fundData.commitmentUsd || ''}
-                  onChange={(e) => handleFundFieldChange('commitmentUsd', e.target.value ? parseFloat(e.target.value) : null)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                  placeholder="Amount in USD"
-                />
-              </div>
-
-              {/* Currency */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('funds.currency')}
-                </label>
-                <select
-                  value={fundData.currency}
-                  onChange={(e) => handleFundFieldChange('currency', e.target.value)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                >
-                  <option value="USD">USD</option>
-                  <option value="JPY">JPY</option>
-                </select>
-              </div>
-
-              {/* Entry FX Rate */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('funds.entryFx')}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={fundData.entryFxRate || ''}
-                  onChange={(e) => handleFundFieldChange('entryFxRate', e.target.value ? parseFloat(e.target.value) : null)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                  placeholder="FX Rate"
-                />
-              </div>
-
-              {/* Mgmt Fee */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('funds.mgmtFee')}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={fundData.managementFeePct || ''}
-                  onChange={(e) => handleFundFieldChange('managementFeePct', e.target.value ? parseFloat(e.target.value) : null)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                  placeholder="%"
-                />
-              </div>
-
-              {/* Carry */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('funds.carry')}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={fundData.carryPct || ''}
-                  onChange={(e) => handleFundFieldChange('carryPct', e.target.value ? parseFloat(e.target.value) : null)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                  placeholder="%"
-                />
-              </div>
-
-              {/* Hurdle Rate */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('funds.hurdle')}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={fundData.hurdleRatePct || ''}
-                  onChange={(e) => handleFundFieldChange('hurdleRatePct', e.target.value ? parseFloat(e.target.value) : null)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                  placeholder="%"
-                />
-              </div>
+        {/* Content - Simplified Display */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
+          {/* Fund Section */}
+          <div className="space-y-3">
+            <label className="block text-[10px] font-bold uppercase tracking-widest theme-text-muted">Fund</label>
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="text-base font-semibold theme-text">{fundData.fundName}</h3>
+              <span className="text-sm font-semibold px-2.5 py-1 rounded-full text-emerald-600" style={{ background: 'rgba(16, 185, 129, 0.12)' }}>
+                {extractedData.extractionConfidence}% match
+              </span>
             </div>
           </div>
 
-          {/* Document Details Section */}
-          <div>
-            <h3 className="text-sm font-semibold theme-text mb-4 pb-2 border-b theme-border">
-              📄 {t('notices.title')} (Detected)
-            </h3>
+          {/* Document Type */}
+          <div className="space-y-3">
+            <label className="block text-[10px] font-bold uppercase tracking-widest theme-text-muted">Document Type</label>
+            <div className="theme-text text-sm font-medium">{documentData.documentType}</div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Document Type */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('notices.noticeType')}
-                </label>
-                <select
-                  value={documentData.documentType}
-                  onChange={(e) => handleDocumentFieldChange('documentType', e.target.value)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                >
-                  <option value="CAPITAL_CALL">{t('documentTypes.capital_call')}</option>
-                  <option value="DISTRIBUTION">{t('documentTypes.distribution')}</option>
-                  <option value="FINANCIAL_STATEMENT">{t('documentTypes.financial_statement')}</option>
-                  <option value="NAV_REPORT">{t('documentTypes.nav_report')}</option>
-                  <option value="QUARTERLY_REPORT">{t('documentTypes.quarterly_report')}</option>
-                  <option value="ANNUAL_REPORT">{t('documentTypes.annual_report')}</option>
-                  <option value="TAX_DOCUMENT">{t('documentTypes.tax_document')}</option>
-                  <option value="AUDIT_REPORT">{t('documentTypes.audit_report')}</option>
-                  <option value="COMMITMENT_NOTICE">{t('documentTypes.commitment_notice')}</option>
-                  <option value="OTHER">{t('documentTypes.other_document')}</option>
-                </select>
-              </div>
+          {/* Date */}
+          <div className="space-y-3">
+            <label className="block text-[10px] font-bold uppercase tracking-widest theme-text-muted">Date</label>
+            <div className="theme-text text-sm font-medium">{documentData.noticeDate || '—'}</div>
+          </div>
 
-              {/* Custom Document Type (if "OTHER" is selected) */}
-              {documentData.documentType === 'OTHER' && (
+          {/* Optional: Show extraction details if needed */}
+          {extractedData.extractionConfidence < 80 && (
+            <div className="p-3 rounded-lg border theme-border" style={{ background: 'rgba(245, 158, 11, 0.08)' }}>
+              <p className="text-xs theme-text-muted">
+                ⚠️ Lower confidence detection. Review and edit below if needed.
+              </p>
+            </div>
+          )}
+
+          {/* Expandable Edit Section */}
+          <details className="border theme-border rounded-lg p-4">
+            <summary className="cursor-pointer text-sm font-semibold theme-text hover:text-indigo-600 transition-colors">
+              ✏️ Edit Details
+            </summary>
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Fund Name */}
                 <div>
-                  <label className="block text-xs font-semibold theme-text-muted mb-1">
-                    Specify Document Type (e.g., Subscription, Investment Agreement)
-                  </label>
+                  <label className="block text-xs font-semibold theme-text-muted mb-1">Fund Name</label>
                   <input
                     type="text"
-                    value={customDocType}
-                    onChange={(e) => setCustomDocType(e.target.value)}
-                    placeholder="e.g., Subscription Agreement, Side Letter"
+                    value={fundData.fundName}
+                    onChange={(e) => handleFundFieldChange('fundName', e.target.value)}
                     className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
                   />
                 </div>
-              )}
 
-              {/* Amount */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('common.amount')} (USD)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={documentData.amount || ''}
-                  onChange={(e) => handleDocumentFieldChange('amount', e.target.value ? parseFloat(e.target.value) : null)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                  placeholder="Amount"
-                />
-              </div>
+                {/* Manager */}
+                <div>
+                  <label className="block text-xs font-semibold theme-text-muted mb-1">Manager</label>
+                  <input
+                    type="text"
+                    value={fundData.manager || ''}
+                    onChange={(e) => handleFundFieldChange('manager', e.target.value)}
+                    className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
+                  />
+                </div>
 
-              {/* Notice Date */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('capitalCalls.noticeDate')}
-                </label>
-                <input
-                  type="date"
-                  value={documentData.noticeDate || ''}
-                  onChange={(e) => handleDocumentFieldChange('noticeDate', e.target.value)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                />
-              </div>
+                {/* Document Type */}
+                <div>
+                  <label className="block text-xs font-semibold theme-text-muted mb-1">Document Type</label>
+                  <select
+                    value={documentData.documentType}
+                    onChange={(e) => handleDocumentFieldChange('documentType', e.target.value)}
+                    className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
+                  >
+                    <option value="CAPITAL_CALL">{t('documentTypes.capital_call')}</option>
+                    <option value="DISTRIBUTION">{t('documentTypes.distribution')}</option>
+                    <option value="FINANCIAL_STATEMENT">{t('documentTypes.financial_statement')}</option>
+                    <option value="NAV_REPORT">{t('documentTypes.nav_report')}</option>
+                    <option value="QUARTERLY_REPORT">{t('documentTypes.quarterly_report')}</option>
+                    <option value="ANNUAL_REPORT">{t('documentTypes.annual_report')}</option>
+                    <option value="TAX_DOCUMENT">{t('documentTypes.tax_document')}</option>
+                    <option value="AUDIT_REPORT">{t('documentTypes.audit_report')}</option>
+                    <option value="COMMITMENT_NOTICE">{t('documentTypes.commitment_notice')}</option>
+                    <option value="OTHER">{t('documentTypes.other_document')}</option>
+                  </select>
+                </div>
 
-              {/* Due Date */}
-              <div>
-                <label className="block text-xs font-semibold theme-text-muted mb-1">
-                  {t('capitalCalls.dueDate')}
-                </label>
-                <input
-                  type="date"
-                  value={documentData.dueDate || ''}
-                  onChange={(e) => handleDocumentFieldChange('dueDate', e.target.value)}
-                  className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
-                />
+                {/* Notice Date */}
+                <div>
+                  <label className="block text-xs font-semibold theme-text-muted mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={documentData.noticeDate || ''}
+                    onChange={(e) => handleDocumentFieldChange('noticeDate', e.target.value)}
+                    className="w-full px-3 py-2 rounded border theme-border bg-transparent theme-text text-sm"
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          </details>
         </div>
 
         {/* Footer - Actions */}
-        <div className="px-6 py-4 border-t theme-border flex items-center justify-between flex-shrink-0 bg-opacity-50">
-          <div className="text-xs theme-text-muted">
-            {correctedFields.length > 0 && (
-              <span>✏️ {correctedFields.length} field(s) edited</span>
-            )}
-          </div>
+        <div className="px-6 py-4 border-t theme-border flex items-center justify-between flex-shrink-0">
+          <button
+            onClick={onCancel}
+            disabled={isLoading}
+            className="px-4 py-2 rounded text-sm font-medium theme-text-muted hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            Cancel
+          </button>
           <div className="flex items-center gap-3">
-            <button
-              onClick={onCancel}
-              disabled={isLoading}
-              className="px-4 py-2 rounded text-sm font-medium border theme-border theme-text-muted hover:theme-text transition-colors"
-            >
-              {t('common.cancel')}
-            </button>
             <button
               onClick={handleSave}
               disabled={isLoading}
-              className="px-4 py-2 rounded text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              className="px-6 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
             >
-              {isLoading ? 'Creating...' : 'Create Fund & Save'}
+              {isLoading ? '...' : 'Save'}
             </button>
           </div>
         </div>

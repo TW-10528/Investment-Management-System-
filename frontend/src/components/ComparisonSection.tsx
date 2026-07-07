@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import type { FundSummary } from '../types/index';
 import { fmt } from '../lib/format';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import AddRemoveFundsModal from './AddRemoveFundsModal';
+import api from '../services/api';
 
 const C = {
   indigo:  '#1e40af',
@@ -46,23 +47,54 @@ function extractSeries(fundName: string): string | null {
 
 export default function ComparisonSection({ funds }: { funds: FundSummary[] }) {
   const activeFunds = useMemo(() => funds.filter(f => f.is_active !== false), [funds]);
+  const [familiesData, setFamiliesData] = useState<any[]>([]);
+
+  // Fetch fund families from API
+  useEffect(() => {
+    const fetchFamilies = async () => {
+      try {
+        const response = await api.get('/fund-families/with-members');
+        setFamiliesData(response.data?.data || []);
+      } catch (error) {
+        console.error('Failed to fetch fund families:', error);
+        // Fall back to empty array - will use pattern matching below
+        setFamiliesData([]);
+      }
+    };
+    fetchFamilies();
+  }, []);
 
   const seriesGroups = useMemo(() => {
     const groups: Record<string, FundSummary[]> = {};
 
-    activeFunds.forEach(fund => {
-      const series = extractSeries(fund.fund_name);
-      if (series) {
-        if (!groups[series]) groups[series] = [];
-        groups[series].push(fund);
-      }
-    });
+    // If we have families from API, use them
+    if (familiesData.length > 0) {
+      familiesData.forEach((family: any) => {
+        const familyFunds = activeFunds.filter(fund => {
+          // Check if fund is in this family by matching fund_id
+          return family.funds?.some((f: any) => f.fund_id === fund.fund_id);
+        });
+
+        if (familyFunds.length > 1) {
+          groups[family.familyName] = familyFunds;
+        }
+      });
+    } else {
+      // Fall back to pattern-based extraction for backward compatibility
+      activeFunds.forEach(fund => {
+        const series = extractSeries(fund.fund_name);
+        if (series) {
+          if (!groups[series]) groups[series] = [];
+          groups[series].push(fund);
+        }
+      });
+    }
 
     return Object.entries(groups)
       .filter(([_, groupFunds]) => groupFunds.length > 1)
       .map(([series, groupFunds]) => ({ series, funds: groupFunds }))
       .sort((a, b) => a.series.localeCompare(b.series));
-  }, [activeFunds]);
+  }, [activeFunds, familiesData]);
 
   const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
   const [asOfDate] = useState<string>(new Date().toISOString().split('T')[0]);

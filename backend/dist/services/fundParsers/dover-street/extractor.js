@@ -130,7 +130,7 @@ function normalizeText(text) {
         .trim();
 }
 function detectCurrency(text) {
-    if (text.toLowerCase().includes('dover street xi feeder fund'))
+    if (text.toLowerCase().includes('dover street'))
         return 'USD';
     if (text.includes('$') || /\bUSD\b/i.test(text))
         return 'USD';
@@ -139,6 +139,16 @@ function detectCurrency(text) {
     if (text.includes('€') || text.toUpperCase().includes('EUR'))
         return 'EUR';
     return 'unknown';
+}
+function detectDoverStreetFundName(text) {
+    // Extract exact Roman numeral from document
+    // Examples: "Dover Street XII Feeder Fund", "Dover Street XI Feeder Fund", etc.
+    const match = text.match(/Dover\s+Street\s+(X{1,3}(IX|IV|V?I{0,3})|CM|CD|C{1,3})\s+(?:Feeder\s+)?Fund/i);
+    if (match) {
+        return `Dover Street ${match[1].toUpperCase()}`;
+    }
+    // Fallback to XI if exact match not found
+    return 'Dover Street XI';
 }
 function findCompanyName(text) {
     const m = text.match(/To our Limited Partner:\s*([^\n]+)/i);
@@ -642,7 +652,7 @@ function extractDoverStreetReport(rawText, fileName = '', previousState = null) 
         module_name: 'dover_street_xi_feeder_fund',
         document_type: documentType,
         company_name: findCompanyName(text),
-        fund_name: 'Dover Street XI',
+        fund_name: detectDoverStreetFundName(text),
         currency: detectCurrency(text),
         excel_fields: excelFields,
         all_extracted_fields: allFields,

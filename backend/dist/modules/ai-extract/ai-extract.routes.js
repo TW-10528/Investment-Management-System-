@@ -75,8 +75,11 @@ router.post('/test', async (c) => {
         // If no amount was found (confidence = 0.3) the frontend shows 0 with a low
         // gate score so the user knows to review — still better than a 500 error.
         console.log('[ai-extract] Checking if document is SDG...');
-        const sdgDet = (0, sdgExtractor_1.extractSdgNotice)(pdfText, file.name);
-        if (sdgDet) {
+        // Pre-check: verify document contains SDG-specific keywords before running SDG extractor
+        const isSdgDocument = /SDG|投資事業有限責任組合|払込み|振込送金のご請求/.test(pdfText);
+        console.log(`[ai-extract] SDG pre-check: ${isSdgDocument ? 'likely SDG' : 'not likely SDG'}`);
+        const sdgDet = isSdgDocument ? (0, sdgExtractor_1.extractSdgNotice)(pdfText, file.name) : null;
+        if (sdgDet && sdgDet.confidence >= 0.8) {
             console.log(`[ai-extract] ✓ SDG document detected: ${sdgDet.fundName}, confidence: ${sdgDet.confidence}`);
             const detReportType = sdgDet.noticeType === 'distribution' ? 'DISTRIBUTION' : 'CAPITAL_CALL';
             const detExtraction = {
@@ -117,7 +120,7 @@ router.post('/test', async (c) => {
         // ── Stage 1: Classify ─────────────────────────────────────────────────
         console.log(`[ai-extract] SDG not detected, proceeding to AI classification using model: ${modelName}`);
         console.log(`[ai-extract] Stage 1: Classifying document...`);
-        const classifyPrompt = prompts_1.CLASSIFIER_PROMPT.replace('{{DOCUMENT_TEXT}}', truncate(pdfText, 6000));
+        const classifyPrompt = prompts_1.CLASSIFIER_PROMPT.replace('{{DOCUMENT_TEXT}}', truncate(pdfText, 3000));
         const stage1Raw = await callModel(modelUrl, modelName, prompts_1.SYSTEM_PROMPT, classifyPrompt);
         const classification = parseJSON(stage1Raw);
         console.log(`[ai-extract] Stage 1 classification: ${classification?.fund_key ?? 'unknown'}, confidence: ${classification?.confidence_score ?? 0}`);
@@ -134,7 +137,7 @@ router.post('/test', async (c) => {
         // ── Stage 2: Extract ──────────────────────────────────────────────────
         console.log(`[ai-extract] Stage 2: Extracting data for fund: ${fund_display_name}`);
         const extractorTemplate = prompts_1.EXTRACTOR_PROMPTS[fund_key] ?? prompts_1.EXTRACTOR_PROMPTS['UNKNOWN'];
-        const extractPrompt = extractorTemplate.replace('{{DOCUMENT_TEXT}}', truncate(pdfText, 8000));
+        const extractPrompt = extractorTemplate.replace('{{DOCUMENT_TEXT}}', truncate(pdfText, 4000));
         const stage2Raw = await callModel(modelUrl, modelName, prompts_1.SYSTEM_PROMPT, extractPrompt);
         const extraction = parseJSON(stage2Raw);
         console.log(`[ai-extract] Stage 2 extraction result:`, extraction);

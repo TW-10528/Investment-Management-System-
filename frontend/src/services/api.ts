@@ -57,6 +57,13 @@ export const fundsAPI = {
   update:     (id: string, data: any)    => api.put(`/funds/${id}`, data),
   deactivate:  (id: string)              => api.delete(`/funds/${id}`),
   reactivate:  (id: string)              => api.patch(`/funds/${id}/reactivate`),
+  permanentDelete: (id: string)          => {
+    return api.request({
+      method: 'DELETE',
+      url: `/funds/${id}`,
+      params: { permanent: 'true' }
+    });
+  },
   // Capital calls
   getCalls:       (id: string)           => api.get(`/funds/${id}/capital-calls`),
   createCall:     (id: string, d: any)   => api.post(`/funds/${id}/capital-calls`, d),

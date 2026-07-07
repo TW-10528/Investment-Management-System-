@@ -133,4 +133,15 @@ app.get('/list/existing-funds', async (c) => {
   }
 });
 
+// GET /api/fund-families/with-members — Get all families with their members (existing + new funds)
+app.get('/with-members', async (c) => {
+  try {
+    const familiesWithMembers = await fundFamilyService.getAllFamiliesWithMembers();
+    return c.json({ data: familiesWithMembers });
+  } catch (error) {
+    console.error('Error listing families with members:', error);
+    return c.json({ error: 'Failed to list families' }, 500);
+  }
+});
+
 export default app;

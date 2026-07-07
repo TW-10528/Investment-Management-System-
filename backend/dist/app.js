@@ -25,6 +25,7 @@ const rules_routes_1 = __importDefault(require("./modules/rules/rules.routes"));
 const fund_reports_routes_1 = __importDefault(require("./modules/fund-reports/fund-reports.routes"));
 const ai_extract_routes_1 = __importDefault(require("./modules/ai-extract/ai-extract.routes"));
 const fund_onboarding_routes_1 = __importDefault(require("./modules/fund-onboarding/fund-onboarding.routes"));
+const fund_family_routes_1 = __importDefault(require("./modules/fund-family/fund-family.routes"));
 function createApp() {
     const app = new hono_1.Hono();
     // ── Global middleware ──────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ function createApp() {
     app.route('/api/v1/fund-reports', fund_reports_routes_1.default);
     app.route('/api/v1/ai-extract', ai_extract_routes_1.default);
     app.route('/api/v1/fund-onboarding', fund_onboarding_routes_1.default);
+    app.route('/api/v1/fund-families', fund_family_routes_1.default);
     // ── 404 ────────────────────────────────────────────────────────────────────
     app.notFound((c) => c.json({ detail: `Route ${c.req.method} ${c.req.path} not found` }, 404));
     // ── Global error handler (catches HTTPError + unhandled throws) ────────────

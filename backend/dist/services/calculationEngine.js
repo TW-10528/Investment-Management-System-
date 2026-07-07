@@ -167,7 +167,13 @@ class CalculationEngine {
         ]);
         const navUsd = navRec ? parseFloat(navRec.navUsd?.toString() ?? '0') : 0;
         const navDate = navRec ? new Date(navRec.navDate) : null;
-        const commitment = new decimal_js_1.default(fund.commitmentUsd.toString());
+        // For SDG fund (JPY only), use commitmentJpy; for others use commitmentUsd
+        const isSdg = fund.fundName && /sdg/i.test(fund.fundName);
+        const commitmentValue = isSdg && fund.commitmentJpy
+            ? String(fund.commitmentJpy) // BigInt conversion
+            : fund.commitmentUsd.toString();
+        const commitment = new decimal_js_1.default(commitmentValue);
+        const f = (d) => parseFloat(d.toString());
         const txns = [
             ...paidCalls.map((c) => ({
                 date: c.executionDate ?? c.dueDate,
@@ -200,7 +206,8 @@ class CalculationEngine {
                 strategy: fund.strategy,
                 vintage_year: fund.vintageYear,
                 currency: fund.currency,
-                commitment_usd: 0,
+                commitment_usd: isSdg ? null : 0,
+                commitment_jpy: isSdg ? (fund.contractCommitmentJpy ? parseFloat(String(fund.contractCommitmentJpy)) : null) : null,
                 total_called_usd: 0,
                 total_received_usd: 0,
                 total_called_jpy: 0,
@@ -223,15 +230,15 @@ class CalculationEngine {
             effectiveDate: new Date(h.effectiveDate),
         }));
         const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new decimal_js_1.default('150'), commHistory);
-        const f = (d) => parseFloat(d.toString());
         // JPY totals (sum of each row's B×fx / C×fx) for the dashboard's per-fund view.
         const totalCalledJpy = rows.reduce((s, r) => s.plus(r.capitalPaidJpy), new decimal_js_1.default(0));
         const totalReceivedJpy = rows.reduce((s, r) => s.plus(r.capitalReceivedJpy), new decimal_js_1.default(0));
         const called = f(snapshot.totalCalledUsd);
         const received = f(snapshot.totalReceivedUsd);
         const totalValue = received + navUsd; // Distributions + NAV
-        const moic = called > 0 ? Math.round(totalValue / called * 10000) / 10000 : 0;
-        const tvpi = moic; // same metric for these funds
+        const dpiRatio = called > 0 ? received / called : 0;
+        const moic = called > 0 ? 1 + Math.round(dpiRatio * 10000) / 10000 : 0; // 1 + DPI
+        const tvpi = called > 0 ? Math.round(totalValue / called * 10000) / 10000 : 0; // (Dist + NAV) / Called
         // IRR from each row's net cash flow (G), plus the residual NAV as a terminal inflow.
         const irrFlows = rows.map(r => ({ date: r.date, amount: f(r.cashFlow) }));
         if (navUsd > 0 && navDate)
@@ -246,7 +253,8 @@ class CalculationEngine {
             strategy: fund.strategy,
             vintage_year: fund.vintageYear,
             currency: fund.currency,
-            commitment_usd: f(commitment),
+            commitment_usd: isSdg ? null : f(commitment),
+            commitment_jpy: isSdg ? (fund.contractCommitmentJpy ? parseFloat(String(fund.contractCommitmentJpy)) : null) : null,
             contract_commitment_usd: fund.contractCommitmentUsd ? f(new decimal_js_1.default(fund.contractCommitmentUsd.toString())) : null,
             total_called_usd: called,
             total_received_usd: received,

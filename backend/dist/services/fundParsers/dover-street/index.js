@@ -50,7 +50,7 @@ function parseDoverStreet(rawText, previousState = null, fileName = '') {
     const confidenceGrade = confidence >= 0.65 ? 'high' : confidence >= 0.35 ? 'medium' : 'low';
     return {
         fundKey: 'dover-street',
-        fundName: 'Dover Street XI',
+        fundName: report.fund_name || 'Dover Street XI',
         fundManager: 'HarbourVest',
         noticeType,
         noticeDate,

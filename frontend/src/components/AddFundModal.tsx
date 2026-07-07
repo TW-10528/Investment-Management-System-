@@ -8,9 +8,7 @@ interface AddFundModalProps {
 }
 
 export default function AddFundModal({ isOpen, onClose, onSuccess }: AddFundModalProps) {
-  const [tab, setTab] = useState<'upload' | 'manual'>('upload');
   const [loading, setLoading] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     fundName: '',
     familyName: '',
@@ -22,24 +20,7 @@ export default function AddFundModal({ isOpen, onClose, onSuccess }: AddFundModa
 
   if (!isOpen) return null;
 
-  const handleUpload = async () => {
-    if (!uploadFile) {
-      toast.error('Please select a PDF file');
-      return;
-    }
-    setLoading(true);
-    try {
-      toast.success('PDF uploaded successfully');
-      onSuccess();
-      onClose();
-    } catch (error: any) {
-      toast.error('Failed to upload PDF');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleManualSubmit = async () => {
+  const handleSubmit = async () => {
     if (!formData.fundName || !formData.familyName) {
       toast.error('Fund name and family name required');
       return;
@@ -55,6 +36,7 @@ export default function AddFundModal({ isOpen, onClose, onSuccess }: AddFundModa
       toast.success('Fund created successfully');
       onSuccess();
       onClose();
+      setFormData({ fundName: '', familyName: '', manager: '', strategy: '', currency: 'USD', commitmentUsd: '' });
     } catch (error: any) {
       toast.error(error?.message || 'Failed to create fund');
     } finally {
@@ -70,61 +52,89 @@ export default function AddFundModal({ isOpen, onClose, onSuccess }: AddFundModa
           <button onClick={onClose} className="text-2xl text-gray-400 hover:text-gray-600">×</button>
         </div>
 
-        <div className="flex border-b border-gray-200 px-6 pt-4">
-          <button
-            onClick={() => setTab('upload')}
-            className={`pb-4 px-4 font-medium border-b-2 ${tab === 'upload' ? 'text-indigo-600 border-indigo-600' : 'text-gray-600 border-transparent'}`}
-          >
-            📤 Upload PDF
-          </button>
-          <button
-            onClick={() => setTab('manual')}
-            className={`pb-4 px-4 font-medium border-b-2 ${tab === 'manual' ? 'text-indigo-600 border-indigo-600' : 'text-gray-600 border-transparent'}`}
-          >
-            ✍️ Manual Entry
-          </button>
-        </div>
-
         <div className="p-6">
-          {tab === 'upload' ? (
-            <div className="space-y-4">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center"
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (e.dataTransfer.files[0]?.type === 'application/pdf') {
-                    setUploadFile(e.dataTransfer.files[0]);
-                  }
-                }}
-                onDragOver={(e) => e.preventDefault()}
-              >
-                <p className="text-4xl mb-2">📄</p>
-                <input type="file" accept="application/pdf" className="hidden" onChange={(e) => e.target.files && setUploadFile(e.target.files[0])} id="pdf-input" />
-                <label htmlFor="pdf-input" className="inline-block mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 cursor-pointer">Browse</label>
-              </div>
-              {uploadFile && <div className="bg-green-50 border border-green-200 rounded p-2"><span className="text-sm text-green-800">✓ {uploadFile.name}</span></div>}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Fund Name *</label>
+              <input
+                type="text"
+                value={formData.fundName}
+                onChange={(e) => setFormData({...formData, fundName: e.target.value})}
+                placeholder="e.g., Dover Street XII"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
             </div>
-          ) : (
-            <div className="space-y-4">
-              <input type="text" placeholder="Fund Name *" value={formData.fundName} onChange={(e) => setFormData({...formData, fundName: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-              <input type="text" placeholder="Fund Family *" value={formData.familyName} onChange={(e) => setFormData({...formData, familyName: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-              <div className="grid grid-cols-2 gap-4">
-                <input type="text" placeholder="Manager" value={formData.manager} onChange={(e) => setFormData({...formData, manager: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg" />
-                <input type="text" placeholder="Strategy" value={formData.strategy} onChange={(e) => setFormData({...formData, strategy: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg" />
+
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Fund Family *</label>
+              <input
+                type="text"
+                value={formData.familyName}
+                onChange={(e) => setFormData({...formData, familyName: e.target.value})}
+                placeholder="e.g., Dover Street"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Manager</label>
+                <input
+                  type="text"
+                  value={formData.manager}
+                  onChange={(e) => setFormData({...formData, manager: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <select value={formData.currency} onChange={(e) => setFormData({...formData, currency: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg">
-                  <option>USD</option>
-                  <option>JPY</option>
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Strategy</label>
+                <input
+                  type="text"
+                  value={formData.strategy}
+                  onChange={(e) => setFormData({...formData, strategy: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Currency</label>
+                <select
+                  value={formData.currency}
+                  onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="USD">USD</option>
+                  <option value="JPY">JPY</option>
                 </select>
-                <input type="number" placeholder="Commitment" value={formData.commitmentUsd} onChange={(e) => setFormData({...formData, commitmentUsd: e.target.value})} className="px-3 py-2 border border-gray-300 rounded-lg" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Commitment</label>
+                <input
+                  type="number"
+                  value={formData.commitmentUsd}
+                  onChange={(e) => setFormData({...formData, commitmentUsd: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex gap-3 justify-end">
-          <button onClick={onClose} disabled={loading} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
-          <button onClick={tab === 'upload' ? handleUpload : handleManualSubmit} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          >
             {loading ? 'Creating...' : 'Create Fund'}
           </button>
         </div>

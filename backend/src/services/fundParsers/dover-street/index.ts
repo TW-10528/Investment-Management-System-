@@ -55,7 +55,7 @@ export function parseDoverStreet(rawText: string, previousState: DoverPreviousSt
 
   return {
     fundKey:          'dover-street',
-    fundName:         'Dover Street XI',
+    fundName:         report.fund_name || 'Dover Street XI',
     fundManager:      'HarbourVest',
     noticeType,
     noticeDate,

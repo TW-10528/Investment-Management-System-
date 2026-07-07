@@ -1801,6 +1801,7 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('recent');
   const [currentPage, setCurrentPage] = useState(1);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const itemsPerPage = 8;
 
   const load = useCallback(() => {
@@ -1810,6 +1811,7 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
   useEffect(() => { load(); }, [load]);
 
   async function del(id: string) {
@@ -1901,15 +1903,7 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
               )}
             </div>
 
-            {/* Filter dropdowns */}
-            <select className="px-3 py-2.5 rounded-lg border theme-border bg-transparent theme-text text-sm cursor-pointer">
-              <option>All Funds</option>
-            </select>
-            <select className="px-3 py-2.5 rounded-lg border theme-border bg-transparent theme-text text-sm cursor-pointer">
-              <option>All Document Types</option>
-              <option>Capital Calls</option>
-              <option>Distributions</option>
-            </select>
+            {/* Sort dropdown only */}
             <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="px-3 py-2.5 rounded-lg border theme-border bg-transparent theme-text text-sm cursor-pointer">
               <option value="recent">Recently Updated</option>
               <option value="name">By Name</option>
@@ -1938,7 +1932,36 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
                             <p className="text-[11px] theme-text-muted mt-0.5">Updated {lastUpdated}</p>
                           </div>
                         </div>
-                        <button className="text-gray-400 hover:text-gray-600 text-lg flex-shrink-0">⋯</button>
+                        <div className="relative">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === f.fund_id ? null : f.fund_id); }}
+                            className="text-gray-400 hover:text-gray-600 text-lg flex-shrink-0">⋯</button>
+                          {openMenuId === f.fund_id && (
+                            <div className="absolute right-0 mt-1 w-48 theme-card border theme-border rounded-lg shadow-lg z-10">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`⚠️ DELETE "${f.fund_name}" PERMANENTLY?\n\nThis will delete:\n• ${list.length} document(s)\n• All capital calls & distributions\n• All ledger entries\n\nThis action CANNOT be undone!`)) {
+                                    fundsAPI.permanentDelete(f.fund_id).then(() => {
+                                      toast.success(`${f.fund_name} deleted successfully`);
+                                      setOpenMenuId(null);
+                                      // Hard reload to refresh everything
+                                      setTimeout(() => {
+                                        location.reload();
+                                      }, 500);
+                                    }).catch((e) => {
+                                      console.error('Delete error:', e);
+                                      toast.error('Failed to delete fund: ' + (e?.response?.data?.detail || e?.message || 'Unknown error'));
+                                    });
+                                  }
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                              >
+                                🗑️ Delete Fund
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* File count */}
@@ -2124,7 +2147,7 @@ export default function FundManagement() {
           {section === 'reports' && canEdit && (
             <button onClick={() => setShowAddFundModal(true)}
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
-              ⬆️ Upload Report
+              + Add Fund
             </button>
           )}
         </div>

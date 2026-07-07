@@ -607,12 +607,52 @@ router.put('/:id', async (c) => {
   return c.json({ id: fund.id, fund_name: fund.fundName })
 })
 
-// DELETE /:id  — soft delete (deactivate)
+// DELETE /:id — delete fund (permanent if permanent=true query param)
 router.delete('/:id', async (c) => {
-  const fund = await prisma.fund.findUnique({ where: { id: c.req.param('id') } })
+  const fundId = c.req.param('id')
+  const permanent = c.req.query('permanent') === 'true'
+
+  const fund = await prisma.fund.findUnique({ where: { id: fundId } })
   if (!fund) return c.json({ detail: 'Fund not found' }, 404)
-  await prisma.fund.update({ where: { id: fund.id }, data: { isActive: false } })
-  return c.json({ message: 'Fund deactivated' })
+
+  try {
+    if (permanent) {
+      // PERMANENT DELETE - remove everything
+      console.log(`[DELETE] Permanently deleting fund ${fundId}...`)
+      await prisma.$transaction([
+        // 1. Delete fund reports (notices)
+        prisma.notice.deleteMany({ where: { fundId } }),
+        // 2. Delete fund reports table
+        prisma.fundReport.deleteMany({ where: { fundId } }),
+        // 3. Delete capital calls
+        prisma.capitalCall.deleteMany({ where: { fundId } }),
+        // 4. Delete distributions
+        prisma.distribution.deleteMany({ where: { fundId } }),
+        // 5. Delete commitments
+        prisma.commitment.deleteMany({ where: { fundId } }),
+        // 6. Delete NAV records
+        prisma.navRecord.deleteMany({ where: { fundId } }),
+        // 7. Delete commitment history
+        prisma.fundCommitmentHistory.deleteMany({ where: { fundId } }),
+        // 8. Delete SigfSnapshot (if exists)
+        prisma.sigfSnapshot.deleteMany({ where: { fundId } }),
+        // 9. Delete calculation results
+        prisma.calculationResult.deleteMany({ where: { fundId } }),
+        // 10. Finally delete the fund itself
+        prisma.fund.delete({ where: { id: fundId } }),
+      ])
+      console.log(`[DELETE] Fund ${fundId} permanently deleted`)
+      return c.json({ message: 'Fund permanently deleted' })
+    } else {
+      // SOFT DELETE - just deactivate
+      console.log(`[DELETE] Deactivating fund ${fundId}...`)
+      await prisma.fund.update({ where: { id: fund.id }, data: { isActive: false } })
+      return c.json({ message: 'Fund deactivated' })
+    }
+  } catch (error: any) {
+    console.error('[DELETE] Error:', error.message)
+    return c.json({ detail: `Failed to delete fund: ${error.message}` }, 500)
+  }
 })
 
 // PATCH /:id/reactivate
@@ -621,6 +661,36 @@ router.patch('/:id/reactivate', async (c) => {
   if (!fund) return c.json({ detail: 'Fund not found' }, 404)
   await prisma.fund.update({ where: { id: fund.id }, data: { isActive: true } })
   return c.json({ message: 'Fund reactivated' })
+})
+
+// POST /:id/remove — permanently delete fund (alternative simple endpoint)
+router.post('/:id/remove', async (c) => {
+  const fundId = c.req.param('id')
+  console.log(`[REMOVE] Removing fund ${fundId}...`)
+
+  const fund = await prisma.fund.findUnique({ where: { id: fundId } })
+  if (!fund) return c.json({ detail: 'Fund not found' }, 404)
+
+  try {
+    console.log(`[REMOVE] Starting deletion of fund ${fundId}...`)
+    await prisma.$transaction([
+      prisma.notice.deleteMany({ where: { fundId } }),
+      prisma.fundReport.deleteMany({ where: { fundId } }),
+      prisma.capitalCall.deleteMany({ where: { fundId } }),
+      prisma.distribution.deleteMany({ where: { fundId } }),
+      prisma.commitment.deleteMany({ where: { fundId } }),
+      prisma.navRecord.deleteMany({ where: { fundId } }),
+      prisma.fundCommitmentHistory.deleteMany({ where: { fundId } }),
+      prisma.sigfSnapshot.deleteMany({ where: { fundId } }),
+      prisma.calculationResult.deleteMany({ where: { fundId } }),
+      prisma.fund.delete({ where: { id: fundId } }),
+    ])
+    console.log(`[REMOVE] Fund ${fundId} successfully deleted`)
+    return c.json({ message: 'Fund removed' })
+  } catch (error: any) {
+    console.error(`[REMOVE] Error deleting fund ${fundId}:`, error.message)
+    return c.json({ detail: error.message }, 500)
+  }
 })
 
 // ── Capital calls per fund ────────────────────────────────────────────────────

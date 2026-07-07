@@ -161,6 +161,63 @@ class FundFamilyService {
 
     return existingFunds;
   }
+
+  /**
+   * Get all families with their members (existing + new funds)
+   * Groups existing funds by extracted family name and includes new funds in their families
+   */
+  async getAllFamiliesWithMembers() {
+    // Get all families from database (new funds only)
+    const families = await prisma.fundFamily.findMany({
+      include: {
+        funds: {
+          where: { isNewFund: true },
+          orderBy: { familySequence: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Get existing funds
+    const existingFunds = await this.getExistingFunds();
+
+    // Group existing funds by extracted family name
+    const familiesByName: Record<string, any> = {};
+
+    existingFunds.forEach(fund => {
+      const detected = this.detectFundFamily(fund.fundName);
+      const familyName = detected?.familyName || fund.fundName;
+
+      if (!familiesByName[familyName]) {
+        familiesByName[familyName] = {
+          id: `existing_${familyName.replace(/\s+/g, '_')}`, // Pseudo ID for existing families
+          familyName,
+          familyCode: null,
+          strategy: null,
+          manager: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          funds: [],
+        };
+      }
+      familiesByName[familyName].funds.push(fund);
+    });
+
+    // Merge new families with existing families
+    const allFamilies = families.map(f => ({
+      ...f,
+      funds: [...(familiesByName[f.familyName]?.funds || []), ...f.funds],
+    }));
+
+    // Add existing families that don't have new funds
+    Object.values(familiesByName).forEach(existingFamily => {
+      if (!allFamilies.find(f => f.familyName === existingFamily.familyName)) {
+        allFamilies.push(existingFamily);
+      }
+    });
+
+    return allFamilies;
+  }
 }
 
 export const fundFamilyService = new FundFamilyService();

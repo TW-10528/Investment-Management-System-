@@ -603,7 +603,7 @@ router.put('/:id', async (c) => {
     if (body.contract_commitment_usd !== undefined && body.contract_commitment_usd !== '' && body.contract_commitment_usd !== null)
         data.contractCommitmentUsd = new decimal_js_1.default(body.contract_commitment_usd);
     if (body.contract_commitment_jpy !== undefined && body.contract_commitment_jpy !== '' && body.contract_commitment_jpy !== null)
-        data.contractCommitmentJpy = new decimal_js_1.default(body.contract_commitment_jpy);
+        data.contractCommitmentJpy = BigInt(body.contract_commitment_jpy.toString());
     if (body.entry_fx_rate !== undefined && body.entry_fx_rate !== '' && body.entry_fx_rate !== null)
         data.entryFxRate = new decimal_js_1.default(body.entry_fx_rate);
     if (body.contract_date !== undefined)
@@ -640,13 +640,53 @@ router.put('/:id', async (c) => {
     await (0, auditService_1.logAction)('UPDATE', 'funds', user.email, user.id, fund.id);
     return c.json({ id: fund.id, fund_name: fund.fundName });
 });
-// DELETE /:id  — soft delete (deactivate)
+// DELETE /:id — delete fund (permanent if permanent=true query param)
 router.delete('/:id', async (c) => {
-    const fund = await prisma_1.prisma.fund.findUnique({ where: { id: c.req.param('id') } });
+    const fundId = c.req.param('id');
+    const permanent = c.req.query('permanent') === 'true';
+    const fund = await prisma_1.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund)
         return c.json({ detail: 'Fund not found' }, 404);
-    await prisma_1.prisma.fund.update({ where: { id: fund.id }, data: { isActive: false } });
-    return c.json({ message: 'Fund deactivated' });
+    try {
+        if (permanent) {
+            // PERMANENT DELETE - remove everything
+            console.log(`[DELETE] Permanently deleting fund ${fundId}...`);
+            await prisma_1.prisma.$transaction([
+                // 1. Delete fund reports (notices)
+                prisma_1.prisma.notice.deleteMany({ where: { fundId } }),
+                // 2. Delete fund reports table
+                prisma_1.prisma.fundReport.deleteMany({ where: { fundId } }),
+                // 3. Delete capital calls
+                prisma_1.prisma.capitalCall.deleteMany({ where: { fundId } }),
+                // 4. Delete distributions
+                prisma_1.prisma.distribution.deleteMany({ where: { fundId } }),
+                // 5. Delete commitments
+                prisma_1.prisma.commitment.deleteMany({ where: { fundId } }),
+                // 6. Delete NAV records
+                prisma_1.prisma.navRecord.deleteMany({ where: { fundId } }),
+                // 7. Delete commitment history
+                prisma_1.prisma.fundCommitmentHistory.deleteMany({ where: { fundId } }),
+                // 8. Delete SigfSnapshot (if exists)
+                prisma_1.prisma.sigfSnapshot.deleteMany({ where: { fundId } }),
+                // 9. Delete calculation results
+                prisma_1.prisma.calculationResult.deleteMany({ where: { fundId } }),
+                // 10. Finally delete the fund itself
+                prisma_1.prisma.fund.delete({ where: { id: fundId } }),
+            ]);
+            console.log(`[DELETE] Fund ${fundId} permanently deleted`);
+            return c.json({ message: 'Fund permanently deleted' });
+        }
+        else {
+            // SOFT DELETE - just deactivate
+            console.log(`[DELETE] Deactivating fund ${fundId}...`);
+            await prisma_1.prisma.fund.update({ where: { id: fund.id }, data: { isActive: false } });
+            return c.json({ message: 'Fund deactivated' });
+        }
+    }
+    catch (error) {
+        console.error('[DELETE] Error:', error.message);
+        return c.json({ detail: `Failed to delete fund: ${error.message}` }, 500);
+    }
 });
 // PATCH /:id/reactivate
 router.patch('/:id/reactivate', async (c) => {
@@ -655,6 +695,35 @@ router.patch('/:id/reactivate', async (c) => {
         return c.json({ detail: 'Fund not found' }, 404);
     await prisma_1.prisma.fund.update({ where: { id: fund.id }, data: { isActive: true } });
     return c.json({ message: 'Fund reactivated' });
+});
+// POST /:id/remove — permanently delete fund (alternative simple endpoint)
+router.post('/:id/remove', async (c) => {
+    const fundId = c.req.param('id');
+    console.log(`[REMOVE] Removing fund ${fundId}...`);
+    const fund = await prisma_1.prisma.fund.findUnique({ where: { id: fundId } });
+    if (!fund)
+        return c.json({ detail: 'Fund not found' }, 404);
+    try {
+        console.log(`[REMOVE] Starting deletion of fund ${fundId}...`);
+        await prisma_1.prisma.$transaction([
+            prisma_1.prisma.notice.deleteMany({ where: { fundId } }),
+            prisma_1.prisma.fundReport.deleteMany({ where: { fundId } }),
+            prisma_1.prisma.capitalCall.deleteMany({ where: { fundId } }),
+            prisma_1.prisma.distribution.deleteMany({ where: { fundId } }),
+            prisma_1.prisma.commitment.deleteMany({ where: { fundId } }),
+            prisma_1.prisma.navRecord.deleteMany({ where: { fundId } }),
+            prisma_1.prisma.fundCommitmentHistory.deleteMany({ where: { fundId } }),
+            prisma_1.prisma.sigfSnapshot.deleteMany({ where: { fundId } }),
+            prisma_1.prisma.calculationResult.deleteMany({ where: { fundId } }),
+            prisma_1.prisma.fund.delete({ where: { id: fundId } }),
+        ]);
+        console.log(`[REMOVE] Fund ${fundId} successfully deleted`);
+        return c.json({ message: 'Fund removed' });
+    }
+    catch (error) {
+        console.error(`[REMOVE] Error deleting fund ${fundId}:`, error.message);
+        return c.json({ detail: error.message }, 500);
+    }
 });
 // ── Capital calls per fund ────────────────────────────────────────────────────
 router.get('/:id/capital-calls', async (c) => {

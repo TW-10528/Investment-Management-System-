@@ -28,6 +28,25 @@ function normalizeText(text) {
     text = text.replace(/\n\s+/g, '\n');
     return text.trim();
 }
+// Strip every non-digit character and parse as integer (invfin1 logic).
+// Handles OCR-swapped separators: "123,456,789" / "123.456.789" / "59.527,840"
+// Also handles full-width digits (０-９) and converts them to ASCII
+function jpAmount(raw) {
+    const normalized = raw.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+    return parseInt(normalized.replace(/[^\d]/g, ''), 10) || 0;
+}
+// Amount immediately following a label with gap tolerance (invfin1 logic).
+// label may be a string (exact match) or a RegExp
+// maxGap = max non-digit characters between label and first digit (default 500)
+function amountAfter(text, label, maxGap = 500) {
+    const labelSrc = label instanceof RegExp
+        ? label.source
+        : label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Match ASCII and full-width digits (０-９) and punctuation variants
+    const re = new RegExp(labelSrc + `[^\\d０-９]{0,${maxGap}}([\\d０-９][\\d，、．。,.\\uFF0E\\uFF0C０-９]*[\\d０-９])`);
+    const m = re.exec(text);
+    return m ? jpAmount(m[1]) : null;
+}
 function cleanAmount(value) {
     if (value === null || value === undefined)
         return null;
@@ -126,18 +145,32 @@ function detectDocumentType(text) {
     return 'unknown_sdg_notice';
 }
 function extractDistributionAmount(text) {
-    let amount = findAmountAfterLabel(text, [
-        '分配金額(?:定額)?(?:と支払い期日)?',
-        '分配金額',
-        '収益分配',
-        '貴社に対して',
-    ], 220);
-    if (amount !== null)
-        return amount;
-    // Fallback: find amount near distribution
-    const match = text.match(/分配[\s\S]{0,300}?金額[\s\S]{0,80}?([0-9][0-9,\.]*)\s*円/);
-    if (match) {
-        return cleanAmount(match[1]);
+    // Ported from invfin1: Robust distribution extraction with gap tolerance (invfin1 logic).
+    // Distribution notices use "貴社への分配金額" or "貴社に帰属する金額" labels.
+    // When not found directly, look for amounts outside parentheses (net) before inside (gross).
+    let distAmount = null;
+    // Priority 1: Try "amount attributable to you" first (net amount after deductions)
+    distAmount = amountAfter(text, '貴社に帰属する金額', 500);
+    if (distAmount)
+        return distAmount;
+    // Priority 2: Try "distribution amount to your company"
+    distAmount = amountAfter(text, '貴社への分配金額', 500);
+    if (distAmount)
+        return distAmount;
+    // Priority 3: Try standard "distribution amount" label
+    distAmount = amountAfter(text, '分配金額', 500);
+    if (distAmount)
+        return distAmount;
+    // Fallback 1: Look for amount OUTSIDE parentheses (net amount, not gross)
+    // Pattern: number(larger_number-deduction)円 — extract the first number (before parens)
+    const matchOutsideParens = /([０-９\d][０-９\d,.．，]*[０-９\d])\s*\([０-９\d０-９\d,.．，−−\-\s]*\)\s*円/.exec(text);
+    if (matchOutsideParens) {
+        return jpAmount(matchOutsideParens[1]);
+    }
+    // Fallback 2: "分配" anywhere within 300 chars before a yen amount
+    const matchDistWithin = /分配[\s\S]{0,300}?([０-９\d][０-９\d,.．，]*[０-９\d])\s*円/.exec(text);
+    if (matchDistWithin) {
+        return jpAmount(matchDistWithin[1]);
     }
     return null;
 }
@@ -156,12 +189,33 @@ function extractAllFields(text, fileName = '') {
     text = normalizeText(text);
     const documentType = detectDocumentType(text);
     const filenameDate = parseFilenameDate(fileName);
-    const paymentAmount = findAmountAfterLabel(text, [
+    // Payment amount extraction with fallback logic (matching invfin1)
+    const paymentAmountLabels = [
         '払込み頂く金額',
         '払込みいただく金額',
+        '支払込み頂く金額',
+        '支払込金額',
         '払込(?:み)?頂く金額',
+        '支払\\s*込(?:み)?\\s*頂\\s*く\\s*金\\s*額',
         '払\\s*込\\s*み?\\s*頂\\s*く\\s*金\\s*額',
-    ], 180);
+    ];
+    let paymentAmount = findAmountAfterLabel(text, paymentAmountLabels, 500); // Primary: 500-char gap
+    if (!paymentAmount) {
+        paymentAmount = findAmountAfterLabel(text, paymentAmountLabels, 1000); // Fallback 1: 1000-char gap
+    }
+    if (!paymentAmount) {
+        // Fallback 2: Line-by-line search for split labels
+        const lines = text.split(/\n/);
+        for (let i = 0; i < lines.length - 1; i++) {
+            if (/払[込达]み/.test(lines[i]) && /金[額额]/.test(lines[i])) {
+                const m = /([０-９\d][０-９\d,.．，]*[０-９\d])/.exec(lines[i] + '\n' + lines[i + 1]);
+                if (m) {
+                    paymentAmount = cleanAmount(m[1]);
+                    break;
+                }
+            }
+        }
+    }
     const paymentDueDate = findDateAfterLabel(text, [
         '払込み期限',
         '払込み期日',

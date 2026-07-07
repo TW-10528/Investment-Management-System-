@@ -26,7 +26,11 @@ KNOWN FUNDS (return the exact key on the left):
   HAMILTON_SEC     → "Hamilton Lane Secondary Fund VI-B"
   HAMILTON_STRAT   → "Hamilton Lane Strategic Opportunities Fund IX-B"
   SDG              → "SDGｓ投資事業有限責任組合", "SDG", Japanese AFM report
-  DOVER            → "Dover Street XI Feeder Fund", "HarbourVest"
+  DOVER            → "Dover Street" + Roman numeral (XI, XII, XIII, etc.), "HarbourVest"
+                     ⚠️ CRITICAL: Extract the EXACT Roman numeral from document:
+                     - "Dover Street XII Feeder Fund" → report this as "Dover Street XII"
+                     - "Dover Street XI Feeder Fund" → report this as "Dover Street XI"
+                     - Compare carefully: XII ≠ XI, XIII ≠ XII
   GOLDMAN          → "Vintage", "Goldman Sachs Asset Management", "SCSp"
   SIGULER_GUFF     → "Siguler Guff Small Buyout Opportunities Fund"
   CAPULA           → "Capula Global Relative Value", "CGRV"
