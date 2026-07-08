@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# ── Start dev servers in background (non-blocking SSH) ──────────────────────────
+cd "$(dirname "$0")"
+nohup ./dev > /tmp/ims-dev-bg.log 2>&1 &
+echo "✓ Servers started in background (PID: $!)"
+echo "  Check logs: tail -f /tmp/ims-dev-bg.log"
+echo "  Stop: pkill -f 'npm run dev' && docker compose -f backend/docker-compose.yml down"

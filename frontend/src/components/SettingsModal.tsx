@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { usePreferences, type Theme, type Currency, type DateFmt, type LangCode } from '../contexts/PreferencesContext';
+import { usePreferences } from '../contexts/usePreferences';
+import type { Currency, DateFmt, LangCode } from '../contexts/PreferencesContext';
 import { LANGUAGES } from '../i18n';
 import toast from 'react-hot-toast';
 
@@ -62,16 +63,6 @@ export default function SettingsModal({ onClose }: Props) {
 
         <div className="px-6 py-4 space-y-0">
 
-          {/* ── Theme ── */}
-          <Row label={t('settings.theme')}>
-            <Chip active={prefs.theme === 'light'} onClick={() => prefs.setTheme('light' as Theme)}>
-              ☀️ {t('settings.light')}
-            </Chip>
-            <Chip active={prefs.theme === 'dark'} onClick={() => prefs.setTheme('dark' as Theme)}>
-              🌙 {t('settings.dark')}
-            </Chip>
-          </Row>
-
           {/* ── Language ── */}
           <Row label={t('settings.language')}>
             {LANGUAGES.map(lang => (
@@ -112,6 +103,36 @@ export default function SettingsModal({ onClose }: Props) {
                 {t(`settings.dateFormat${f}`)}
               </Chip>
             ))}
+          </Row>
+
+          {/* ── Default landing page ── */}
+          <Row label="Landing page">
+            <Chip active={prefs.landingPage === 'dashboard'} onClick={() => prefs.setLandingPage('dashboard')}>
+              ⊞ Dashboard
+            </Chip>
+            <Chip active={prefs.landingPage === 'funds'} onClick={() => prefs.setLandingPage('funds')}>
+              🏦 Funds
+            </Chip>
+          </Row>
+
+          {/* ── Fund analysis panels ── */}
+          <Row label="Fund analysis">
+            <Chip active={prefs.showAnalysis} onClick={() => prefs.setShowAnalysis(true)}>
+              Show
+            </Chip>
+            <Chip active={!prefs.showAnalysis} onClick={() => prefs.setShowAnalysis(false)}>
+              Hide
+            </Chip>
+          </Row>
+
+          {/* ── Calculator ── */}
+          <Row label="Calculator">
+            <Chip active={prefs.showCalculator} onClick={() => prefs.setShowCalculator(true)}>
+              Enable
+            </Chip>
+            <Chip active={!prefs.showCalculator} onClick={() => prefs.setShowCalculator(false)}>
+              Disable
+            </Chip>
           </Row>
 
         </div>

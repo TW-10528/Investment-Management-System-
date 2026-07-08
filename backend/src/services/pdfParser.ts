@@ -3,7 +3,6 @@
  * Handles: Capital Call Notices, Distribution Notices, Financial Statements,
  *          and Combined Capital Call + Distribution notices.
  *
- * Reference document: Dover Street XI Feeder Fund Capital Call and Distribution Notice
  * Key patterns learned:
  *   - "Capital Call and Deemed Distribution" → combined type
  *   - "Net Amount of Capital Call $X" → netCallUsd
@@ -479,7 +478,7 @@ function extractInvestmentTargets(text: string, dates: string[]): InvestmentTarg
 function extractCapitalCall(text: string, amounts: number[], dates: string[], combined: boolean) {
   const result: Partial<ExtractedNotice> = {}
 
-  // Gross call — look for "Amount of Capital Call" (Dover pattern)
+  // Gross call — look for "Amount of Capital Call"
   result.grossCallUsd = extractLabelledUsd(text,
     'Amount of Capital Call', 'Gross Capital Call', 'Gross Call Amount',
     'Total Capital Call', 'Capital Call Amount', '出資要請額',

@@ -1,4 +1,4 @@
-// NB Real Estate Secondary Opportunities Fund II — extraction module.
+// Real Estate Secondary Opportunities Fund II — extraction module.
 //
 // Faithful TypeScript port of the reference Python module
 // `nb_realestate_module_updated.py`.
@@ -119,9 +119,7 @@ function detectCurrency(text: string): string {
 }
 
 function detectFundName(text: string): string {
-  if (text.includes('NB Real Estate Secondary Opportunities Offshore Fund II LP'))
-    return 'NB Real Estate Secondary Opportunities Offshore Fund II LP'
-  return 'NB Real Estate Secondary Opportunities Fund II LP'
+  return 'Real Estate Secondary Opportunities Fund II'
 }
 
 // ── Extraction ─────────────────────────────────────────────────────────────────
@@ -161,7 +159,20 @@ function extractAllFields(text: string): NbAllFields {
   const annualFeeRate = findAmountByLabel(text, ['Annual Fee Rate @'], true)
 
   const fundDistributableProceeds = findAmountByLabel(text, ["Fund's Distributable Proceeds from Investments"], true)
-  const lpShareDistributableProceeds = findAmountByLabel(text, ["Limited Partner's Share of Distributable Proceeds*"], true)
+  // Try multiple label variations for LP's distributable proceeds (may have asterisk, or be split across lines)
+  let lpShareDistributableProceeds = findAmountByLabel(text, [
+    "Limited Partner's Share of Distributable Proceeds*",
+    "Limited Partner's Share of Distributable Proceeds",
+    "Limited Partner's Share of",  // fallback if split across lines
+  ], true)
+  // If still not found, look for the "LESS: DEEMED DISTRIBUTION" section and extract the amount there
+  if (lpShareDistributableProceeds == null) {
+    const deemedDistMatch = text.match(/LESS:\s*DEEMED DISTRIBUTION[\s\S]{0,500}?Limited Partner[^$]*?(\(\$?[\d,]+\.?\d*\)|\$?[\d,]+\.?\d*)/i)
+    if (deemedDistMatch) {
+      const amountStr = deemedDistMatch[1].replace(/[($)]/g, '').replace(/,/g, '')
+      lpShareDistributableProceeds = parseFloat(amountStr) || null
+    }
+  }
 
   const taxExpense = findAmountByLabel(text, ['Tax Expense'], true) ?? 0
   const originalCommitment = findAmountByLabel(text, ['Original Commitment'], true)
@@ -347,6 +358,13 @@ function mapToExcelFields(a: NbAllFields, breakdown: NbBreakdown): NbExcelFields
 
   const currentTransactionCashFlow = calculateCurrentTransactionCashFlow(capitalContributionAmount, distributionAmountReceived)
 
+  // Finance-detail columns (ported from the updated nb_realestate_logic).
+  // Return of Capital = LP share of distributable proceeds (deemed distribution).
+  // Gain = 0 for NB. Interest = additional payment received (offset, negative in report).
+  const returnOfCapital = a.limited_partner_share_of_distributable_proceeds ?? 0
+  const gain = 0
+  const interest = a.additional_payment_received ?? 0
+
   const remarksParts = ['NB Real Estate capital call/drawdown notice.']
   if (distributionAmountReceived) remarksParts.push('Includes deemed distribution subject to reinvestment.')
   if (a.management_fee_amount) remarksParts.push('Includes net management fee capital contribution.')
@@ -374,6 +392,9 @@ function mapToExcelFields(a: NbAllFields, breakdown: NbBreakdown): NbExcelFields
     net_management_fee:                           a.net_management_fee ?? 0,
     additional_payment_due_to_subsequent_closing: a.additional_payment_due_to_subsequent_closing,
     additional_payment_received:                  a.additional_payment_received ?? 0,
+    return_of_capital:                            returnOfCapital,
+    gain:                                         gain,
+    interest:                                     interest,
   }
 }
 

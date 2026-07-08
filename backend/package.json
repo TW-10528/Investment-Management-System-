@@ -18,11 +18,16 @@
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
     "decimal.js": "^10.4.3",
+    "dotenv": "^17.4.2",
     "hono": "^4.6.16",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.16",
     "pdf-parse": "^1.1.1",
+    "pdf-to-png-converter": "^3.18.0",
+    "pdf2pic": "^3.2.0",
+    "tesseract.js": "^7.0.0",
+    "undici": "^7.27.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -33,7 +38,7 @@
     "@types/nodemailer": "^6.4.17",
     "@types/pdf-parse": "^1.1.4",
     "prisma": "^5.22.0",
-    "tsx": "^4.19.2",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.2"
   }
 }

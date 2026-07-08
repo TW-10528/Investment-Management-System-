@@ -14,7 +14,7 @@ function getBool(key: string, fallback: boolean): boolean {
 }
 
 export const config = {
-  port:        getInt('PORT', 8001),
+  port:        getInt('PORT', 8005),
   environment: get('ENVIRONMENT', 'local'),
 
   // JWT
@@ -24,7 +24,7 @@ export const config = {
   // CORS
   allowedOrigins: get(
     'ALLOWED_ORIGINS',
-    'http://localhost:5173,http://localhost:5174,http://localhost:3000',
+    'http://localhost:5173,http://localhost:5174,http://localhost:3000,https://investment-mgmt.twave.co.jp',
   ).split(',').map(s => s.trim()),
 
   // Email / OTP
@@ -46,7 +46,12 @@ export const config = {
   // Storage
   uploadDir: get('UPLOAD_DIR', './uploads'),
 
+  // AI extraction
+  aiModelUrl:  get('AI_MODEL_URL',  'https://tw-gateway.twave.co.jp'),
+  aiModelName: get('AI_MODEL_NAME', 'Qwen/Qwen-AgentWorld-35B-A3B'),
+  aiApiKey:    get('AI_API_KEY',    ''),
+
   // Misc
   revealEmailNotFound: getBool('REVEAL_EMAIL_NOT_FOUND', true),
-  maxActiveUsers:      10,
+  maxActiveUsers:      5,
 }

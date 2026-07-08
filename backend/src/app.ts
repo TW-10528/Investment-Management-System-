@@ -19,28 +19,34 @@ import noticesRoutes      from './modules/notices/notices.routes'
 import notificationsRoutes from './modules/notifications/notifications.routes'
 import rulesRoutes        from './modules/rules/rules.routes'
 import fundReportsRoutes  from './modules/fund-reports/fund-reports.routes'
+import aiExtractRoutes   from './modules/ai-extract/ai-extract.routes'
+import fundOnboardingRoutes from './modules/fund-onboarding/fund-onboarding.routes'
+import fundFamilyRoutes  from './modules/fund-family/fund-family.routes'
 
 export function createApp() {
   const app = new Hono()
 
   // ── Global middleware ──────────────────────────────────────────────────────
-  app.use('*', logger())
-
-  // Normalise trailing slashes
+  // Normalise trailing slashes (before logger so re-fetched requests don't double-log)
   app.use('*', async (c, next) => {
+    if (c.req.header('x-normalized')) return next()
     const path = new URL(c.req.url).pathname
     if (path.length > 1 && path.endsWith('/')) {
       const url = new URL(c.req.url)
       url.pathname = path.slice(0, -1)
+      const headers = new Headers(c.req.raw.headers)
+      headers.set('x-normalized', '1')
       const rewritten = new Request(url.toString(), {
         method:  c.req.method,
-        headers: c.req.raw.headers,
+        headers,
         body:    ['GET', 'HEAD'].includes(c.req.method) ? undefined : c.req.raw.body,
       })
       return app.fetch(rewritten)
     }
     return next()
   })
+
+  app.use('*', logger())
 
   app.use('*', cors({
     origin:       config.allowedOrigins,
@@ -71,6 +77,9 @@ export function createApp() {
   app.route('/api/v1/notifications',  notificationsRoutes)
   app.route('/api/v1/rules',          rulesRoutes)
   app.route('/api/v1/fund-reports',   fundReportsRoutes)
+  app.route('/api/v1/ai-extract',    aiExtractRoutes)
+  app.route('/api/v1/fund-onboarding', fundOnboardingRoutes)
+  app.route('/api/v1/fund-families',  fundFamilyRoutes)
 
   // ── 404 ────────────────────────────────────────────────────────────────────
   app.notFound((c) => c.json({ detail: `Route ${c.req.method} ${c.req.path} not found` }, 404))

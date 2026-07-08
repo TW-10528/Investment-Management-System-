@@ -1,28 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
+import { LANGUAGES } from '../i18n';
 import { authAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
-/* ── Animated background orbs ──────────────────────────────────────────────── */
-function BgOrbs() {
-  return (
-    <div className="pointer-events-none fixed inset-0 overflow-hidden">
-      <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full opacity-20"
-        style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)', animation: 'float1 8s ease-in-out infinite' }} />
-      <div className="absolute -bottom-40 -right-40 w-[500px] h-[500px] rounded-full opacity-15"
-        style={{ background: 'radial-gradient(circle, #8b5cf6 0%, transparent 70%)', animation: 'float2 10s ease-in-out infinite' }} />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-5"
-        style={{ background: 'radial-gradient(circle, #06b6d4 0%, transparent 60%)' }} />
-      <style>{`
-        @keyframes float1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(30px,-30px)} }
-        @keyframes float2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-20px,20px)} }
-      `}</style>
-    </div>
-  );
-}
-
-/* ── Feature list for branding panel ──────────────────────────────────────── */
 const FEATURES = [
   { icon: '📊', text: 'Real-time portfolio dashboard with live FX rates' },
   { icon: '🏦', text: 'Capital call & distribution workflow management' },
@@ -32,7 +15,6 @@ const FEATURES = [
   { icon: '🔐', text: 'Role-based access — admin / finance / board' },
 ];
 
-/* ── Default demo credentials (visible in dev) ─────────────────────────────── */
 const DEV_ACCOUNTS = [
   { role: 'Admin',           email: 'admin@thirdwave.co.jp',   password: 'Admin123!', color: '#ef4444' },
   { role: 'Finance Manager', email: 'finance@thirdwave.co.jp', password: 'Staff123!', color: '#6366f1' },
@@ -45,27 +27,27 @@ export default function Login() {
   const { t }      = useTranslation();
   const emailRef   = useRef<HTMLInputElement>(null);
 
-  const [email,     setEmail]     = useState('');
-  const [password,  setPassword]  = useState('');
-  const [showPwd,   setShowPwd]   = useState(false);
-  const [loading,   setLoading]   = useState(false);
-  const [errMsg,    setErrMsg]    = useState('');
-  const [errType,   setErrType]   = useState<'error' | 'warning' | 'info'>('error');
-  const [showDev,   setShowDev]   = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [email,       setEmail]       = useState('');
+  const [password,    setPassword]    = useState('');
+  const [showPwd,     setShowPwd]     = useState(false);
+  const [loading,     setLoading]     = useState(false);
+  const [errMsg,      setErrMsg]      = useState('');
+  const [errType,     setErrType]     = useState<'error' | 'warning' | 'info'>('error');
+  const [showDev,     setShowDev]     = useState(false);
+  const [rememberMe,  setRememberMe]  = useState(false);
+  const [showLangMenu, setShowLangMenu] = useState(false);
 
-  /* Success toast from signup redirect */
+  const currentLang = LANGUAGES.find(l => l.code === i18n.language);
+
   useEffect(() => {
     const msg = (location.state as { message?: string } | null)?.message;
     if (msg) toast.success(msg, { duration: 5000 });
   }, [location.state]);
 
-  /* Already logged in */
   useEffect(() => {
     if (localStorage.getItem('authToken')) navigate('/', { replace: true });
   }, [navigate]);
 
-  /* Pre-fill remembered email */
   useEffect(() => {
     const saved = localStorage.getItem('rememberedEmail');
     if (saved) { setEmail(saved); setRememberMe(true); }
@@ -78,6 +60,15 @@ export default function Login() {
     setErrMsg('');
     setShowDev(false);
     toast(`Filled ${acc.role} credentials`, { icon: '🔑' });
+  }
+
+  function changeLanguage(code: string) {
+    i18n.changeLanguage(code);
+    try {
+      const prefs = JSON.parse(localStorage.getItem('ims_prefs') || '{}');
+      localStorage.setItem('ims_prefs', JSON.stringify({ ...prefs, language: code }));
+    } catch { /* ignore */ }
+    setShowLangMenu(false);
   }
 
   async function handleSubmit(e: React.SyntheticEvent) {
@@ -99,14 +90,16 @@ export default function Login() {
         name:  data.name,
       }));
       toast.success(`Welcome back, ${data.name || data.email}! 👋`);
-      navigate('/', { replace: true });
+      let landing = '/';
+      try { if (JSON.parse(localStorage.getItem('ims_prefs') || '{}').landingPage === 'funds') landing = '/funds'; } catch { /* default */ }
+      navigate(landing, { replace: true });
     } catch (err: unknown) {
       const e      = err as { response?: { data?: { detail?: string }; status?: number }; code?: string };
       const status = e.response?.status;
       const detail = e.response?.data?.detail;
 
       if (!e.response && (e.code === 'ERR_NETWORK' || e.code === 'ECONNREFUSED')) {
-        setErrMsg('Cannot connect to server. Please ensure the backend is running on port 8001.');
+        setErrMsg('Cannot connect to server. Please ensure the backend is running on port 8004.');
         setErrType('warning');
       } else if (status === 403 && detail?.includes('pending')) {
         setErrMsg('Your account is awaiting administrator approval. You will be notified once approved.');
@@ -128,33 +121,38 @@ export default function Login() {
   }
 
   const errColors = {
-    error:   { bg: 'bg-red-950/60',    border: 'border-red-800',   icon: '⚠',  text: 'text-red-300' },
-    warning: { bg: 'bg-amber-950/60',  border: 'border-amber-700', icon: '⏳', text: 'text-amber-300' },
-    info:    { bg: 'bg-blue-950/60',   border: 'border-blue-800',  icon: 'ℹ',  text: 'text-blue-300' },
+    error:   { bg: 'bg-red-100',   border: 'border-red-300',   icon: '⚠',  text: 'text-red-800' },
+    warning: { bg: 'bg-amber-100', border: 'border-amber-300', icon: '⏳', text: 'text-amber-800' },
+    info:    { bg: 'bg-blue-100',  border: 'border-blue-300',  icon: 'ℹ',  text: 'text-blue-800' },
   }[errType];
 
-  return (
-    <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #0d1117 0%, #0a0f1e 100%)' }}>
-      <BgOrbs />
+  const thirdwaveText = i18n.language === 'ja' ? 'サードウェーブ' : 'Thirdwave';
 
+  return (
+    <div className="min-h-screen flex bg-white">
       {/* ── Left branding panel ── */}
       <div className="relative hidden lg:flex lg:flex-col lg:justify-between w-[420px] xl:w-[480px] flex-shrink-0 px-10 py-12"
-           style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(20px)' }}>
+           style={{ borderRight: '1px solid #e5e7eb', background: '#f9fafb' }}>
         <div>
-          {/* Logo */}
-          <div className="bg-white rounded-2xl px-8 py-4 inline-block shadow-2xl mb-8">
-            <img src="/thirdwave-logo.png" alt="Thirdwave" className="h-10 w-auto"
-              onError={e => {
-                const t = e.target as HTMLImageElement;
-                t.style.display = 'none';
-                t.parentElement!.innerHTML = '<span style="font-size:18px;font-weight:900;color:#0d1117;letter-spacing:-0.5px">THIRDWAVE</span>';
-              }} />
+          {/* Logo + Brand */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 186" className="h-20 w-auto" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Thirdwave logo">
+                <path fill="#2735b3" d="M84 106 104 78h43L127 124z"/>
+                <path fill="#2735b3" d="M131 124 163 66h49L178 116z"/>
+                <path fill="#2735b3" d="M185 122 218 66 273 30 230 136z"/>
+              </svg>
+              <div>
+                <p className="font-bold text-lg text-gray-900">{thirdwaveText}</p>
+              </div>
+            </div>
           </div>
-          <p className="text-white/30 text-xs uppercase tracking-widest mb-3">Investment Management System</p>
-          <h2 className="text-white text-3xl font-bold leading-tight mb-2">
+
+          <p className="text-gray-400 text-xs uppercase tracking-widest mb-3">Investment Management System</p>
+          <h2 className="text-gray-900 text-3xl font-bold leading-tight mb-2">
             Enterprise-Grade<br />Portfolio Intelligence
           </h2>
-          <p className="text-white/40 text-sm leading-relaxed">
+          <p className="text-gray-600 text-sm leading-relaxed">
             Manage private equity commitments, capital calls, distributions and performance analytics from a single platform.
           </p>
         </div>
@@ -164,14 +162,52 @@ export default function Login() {
           {FEATURES.map(f => (
             <div key={f.text} className="flex items-center gap-3">
               <span className="text-lg flex-shrink-0">{f.icon}</span>
-              <p className="text-white/60 text-sm leading-snug">{f.text}</p>
+              <p className="text-gray-600 text-sm leading-snug">{f.text}</p>
             </div>
           ))}
         </div>
 
-        <p className="text-white/20 text-xs">
-          © {new Date().getFullYear()} Thirdwave Financial Inc. · Confidential &amp; Proprietary
-        </p>
+        {/* Language Selector - Bottom Left */}
+        <div>
+          <div className="relative">
+            <button
+              onClick={() => setShowLangMenu(v => !v)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-all text-sm font-medium ${
+                showLangMenu
+                  ? 'bg-blue-50 border-blue-300 text-blue-700'
+                  : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+              }`}
+            >
+              <span className="text-base">{currentLang?.flag}</span>
+              <span>{currentLang?.code.toUpperCase()}</span>
+              <span className="text-xs ml-auto">▼</span>
+            </button>
+
+            {showLangMenu && (
+              <div className="absolute bottom-full left-0 mb-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                {LANGUAGES.map((lang, idx) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => changeLanguage(lang.code)}
+                    className={`w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
+                      i18n.language === lang.code
+                        ? 'bg-blue-50 text-blue-700 font-medium'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                    style={{ borderTop: idx > 0 ? '1px solid #f0f0f0' : undefined }}
+                  >
+                    <span className="text-lg">{lang.flag}</span>
+                    <span>{lang.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <p className="text-gray-400 text-xs mt-4">
+            © {new Date().getFullYear()} Thirdwave Financial Inc. · Confidential &amp; Proprietary
+          </p>
+        </div>
       </div>
 
       {/* ── Right form panel ── */}
@@ -180,19 +216,25 @@ export default function Login() {
 
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-8">
-            <div className="inline-block bg-white rounded-2xl px-8 py-4 shadow-xl mb-3">
-              <img src="/thirdwave-logo.png" alt="Thirdwave" className="h-8 w-auto"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            <div className="flex items-center gap-2 justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 186" className="h-14 w-auto" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Thirdwave logo">
+                <path fill="#2735b3" d="M84 106 104 78h43L127 124z"/>
+                <path fill="#2735b3" d="M131 124 163 66h49L178 116z"/>
+                <path fill="#2735b3" d="M185 122 218 66 273 30 230 136z"/>
+              </svg>
+              <div>
+                <p className="font-bold text-base text-gray-900">{thirdwaveText}</p>
+              </div>
             </div>
-            <p className="text-white/30 text-xs uppercase tracking-widest">Investment Management System</p>
+            <p className="text-gray-400 text-xs uppercase tracking-widest">Investment Management System</p>
           </div>
 
           {/* Heading */}
           <div className="mb-8">
-            <h1 className="text-white text-2xl font-bold">{t('auth.login')}</h1>
-            <p className="text-white/40 text-sm mt-1">
+            <h1 className="text-gray-900 text-2xl font-bold">{t('auth.login')}</h1>
+            <p className="text-gray-600 text-sm mt-1">
               {t('auth.noAccount')}{' '}
-              <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+              <Link to="/signup" className="text-blue-600 hover:text-blue-700 font-medium transition-colors">
                 {t('auth.signUp')} →
               </Link>
             </p>
@@ -207,13 +249,11 @@ export default function Login() {
           )}
 
           {/* Form card */}
-          <div className="rounded-2xl p-8 space-y-5"
-               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)' }}>
-
+          <div className="rounded-2xl p-8 border border-gray-200 shadow-sm bg-white">
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Email */}
               <div>
-                <label className="block text-white/70 text-sm font-medium mb-2">{t('auth.email')}</label>
+                <label className="block text-gray-700 text-sm font-medium mb-2">{t('auth.email')}</label>
                 <input
                   ref={emailRef}
                   type="email"
@@ -222,16 +262,15 @@ export default function Login() {
                   required
                   autoComplete="email"
                   placeholder="you@company.com"
-                  className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                  className="w-full px-4 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
 
               {/* Password */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-white/70 text-sm font-medium">{t('auth.password')}</label>
-                  <Link to="/forgot-password" className="text-indigo-400 hover:text-indigo-300 text-xs transition-colors">
+                  <label className="text-gray-700 text-sm font-medium">{t('auth.password')}</label>
+                  <Link to="/forgot-password" className="text-blue-600 hover:text-blue-700 text-xs transition-colors">
                     {t('auth.forgotPassword')}
                   </Link>
                 </div>
@@ -243,11 +282,10 @@ export default function Login() {
                     required
                     autoComplete="current-password"
                     placeholder="••••••••"
-                    className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-16 transition-all"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                    className="w-full px-4 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-16 transition-all"
                   />
                   <button type="button" onClick={() => setShowPwd(v => !v)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 text-xs font-medium transition-colors">
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 text-xs font-medium transition-colors">
                     {showPwd ? 'Hide' : 'Show'}
                   </button>
                 </div>
@@ -256,11 +294,11 @@ export default function Login() {
               {/* Remember me */}
               <label className="flex items-center gap-2.5 cursor-pointer group">
                 <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
-                  rememberMe ? 'bg-indigo-600 border-indigo-600' : 'border-white/20 group-hover:border-white/40'
+                  rememberMe ? 'bg-blue-600 border-blue-600' : 'border-gray-300 group-hover:border-gray-400'
                 }`} onClick={() => setRememberMe(v => !v)}>
                   {rememberMe && <span className="text-white text-[10px]">✓</span>}
                 </div>
-                <span className="text-white/50 text-sm group-hover:text-white/70 transition-colors select-none"
+                <span className="text-gray-600 text-sm group-hover:text-gray-900 transition-colors select-none"
                       onClick={() => setRememberMe(v => !v)}>
                   Remember my email
                 </span>
@@ -271,7 +309,7 @@ export default function Login() {
                 type="submit"
                 disabled={loading || !email.trim() || !password}
                 className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ background: (!loading && email.trim() && password) ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.1)' }}
+                style={{ background: (!loading && email.trim() && password) ? '#2735b3' : '#e5e7eb' }}
               >
                 {loading
                   ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{t('auth.signingIn')}</>
@@ -285,37 +323,35 @@ export default function Login() {
           <div className="mt-4">
             <button
               onClick={() => setShowDev(v => !v)}
-              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs text-white/30 hover:text-white/60 transition-colors"
-              style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs text-gray-400 hover:text-gray-600 transition-colors border border-gray-200">
               <span>🔑 Development credentials (click to expand)</span>
               <span className="transition-transform" style={{ transform: showDev ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
             </button>
 
             {showDev && (
-              <div className="mt-2 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="mt-2 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
                 {DEV_ACCOUNTS.map((acc, i) => (
                   <button
                     key={acc.email}
                     onClick={() => fillDev(acc)}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
-                    style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : undefined }}>
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 transition-colors"
+                    style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : undefined }}>
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: acc.color }} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-white/70 text-xs font-semibold">{acc.role}</p>
-                      <p className="text-white/30 text-xs font-mono truncate">{acc.email}</p>
+                      <p className="text-gray-700 text-xs font-semibold">{acc.role}</p>
+                      <p className="text-gray-500 text-xs font-mono truncate">{acc.email}</p>
                     </div>
-                    <span className="text-white/20 font-mono text-xs">{acc.password}</span>
+                    <span className="text-gray-400 font-mono text-xs">{acc.password}</span>
                   </button>
                 ))}
-                <div className="px-4 py-2 text-[10px] text-white/20"
-                     style={{ background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  ⚠ Run <code className="text-indigo-400">npm run db:seed</code> in the backend directory to create these accounts
+                <div className="px-4 py-2 text-[10px] text-gray-500 bg-gray-100 border-t border-gray-200">
+                  ⚠ Run <code className="text-blue-600">npm run db:seed</code> in the backend directory to create these accounts
                 </div>
               </div>
             )}
           </div>
 
-          <p className="text-center text-white/20 text-xs mt-6">
+          <p className="text-center text-gray-400 text-xs mt-6">
             © {new Date().getFullYear()} Thirdwave Financial Inc. — Confidential &amp; Proprietary
           </p>
         </div>

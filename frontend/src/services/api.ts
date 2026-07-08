@@ -1,7 +1,7 @@
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 
-// Use Vite proxy (/api → localhost:8001) in dev; absolute URL in production
+// Use Vite proxy (/api → localhost:8004) in dev; absolute URL in production
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
 const api: AxiosInstance = axios.create({
@@ -50,13 +50,20 @@ export const dashboardAPI = {
 
 // ── Funds ────────────────────────────────────────────────────────────────────
 export const fundsAPI = {
-  list:       ()                         => api.get('/funds/'),
+  list:       ()                         => api.get('/funds'),
   get:        (id: string)               => api.get(`/funds/${id}`),
   ledger:     (id: string)               => api.get(`/funds/${id}/ledger`),
-  create:     (data: any)                => api.post('/funds/', data),
+  create:     (data: any)                => api.post('/funds', data),
   update:     (id: string, data: any)    => api.put(`/funds/${id}`, data),
   deactivate:  (id: string)              => api.delete(`/funds/${id}`),
   reactivate:  (id: string)              => api.patch(`/funds/${id}/reactivate`),
+  permanentDelete: (id: string)          => {
+    return api.request({
+      method: 'DELETE',
+      url: `/funds/${id}`,
+      params: { permanent: 'true' }
+    });
+  },
   // Capital calls
   getCalls:       (id: string)           => api.get(`/funds/${id}/capital-calls`),
   createCall:     (id: string, d: any)   => api.post(`/funds/${id}/capital-calls`, d),
@@ -72,6 +79,16 @@ export const fundsAPI = {
   createNavRecord:(id: string, d: any)   => api.post(`/funds/${id}/nav-records`, d),
   updateNavRecord:(id: string, nId: string, d: any) => api.patch(`/funds/${id}/nav-records/${nId}`, d),
   deleteNavRecord:(id: string, nId: string)         => api.delete(`/funds/${id}/nav-records/${nId}`),
+  // Commitments (per-fund sub-grouping — e.g. SDG)
+  getCommitments:   (id: string)         => api.get(`/funds/${id}/commitments`),
+  createCommitment: (id: string, d: any) => api.post(`/funds/${id}/commitments`, d),
+  updateCommitment: (id: string, cid: string, d: any) => api.patch(`/funds/${id}/commitments/${cid}`, d),
+  deleteCommitment: (id: string, cid: string)         => api.delete(`/funds/${id}/commitments/${cid}`),
+  commitmentLedger: (id: string, cid: string)         => api.get(`/funds/${id}/commitments/${cid}/ledger`),
+  // Commitment history — time-stepped commitment amounts (SDG, Siguler Guff)
+  getCommitmentHistory:    (id: string)         => api.get(`/funds/${id}/commitment-history`),
+  addCommitmentHistory:    (id: string, d: any) => api.post(`/funds/${id}/commitment-history`, d),
+  deleteCommitmentHistory: (id: string, hid: string) => api.delete(`/funds/${id}/commitment-history/${hid}`),
 };
 
 // ── Capital Calls ─────────────────────────────────────────────────────────────
@@ -80,10 +97,10 @@ export const capitalCallsAPI = {
     const p = new URLSearchParams();
     if (fundId) p.append('fund_id', fundId);
     if (status) p.append('status', status);
-    return api.get(`/capital-calls/?${p}`);
+    return api.get(`/capital-calls?${p}`);
   },
   get:      (id: string)  => api.get(`/capital-calls/${id}`),
-  create:   (data: any)   => api.post('/capital-calls/', data),
+  create:   (data: any)   => api.post('/capital-calls', data),
   approve:  (id: string)  => api.patch(`/capital-calls/${id}/approve`),
   markPaid: (id: string, data?: any) => api.patch(`/capital-calls/${id}/mark-paid`, data),
 };
@@ -92,26 +109,30 @@ export const capitalCallsAPI = {
 export const distributionsAPI = {
   list:   (fundId?: string) => {
     const p = fundId ? `?fund_id=${fundId}` : '';
-    return api.get(`/distributions/${p}`);
+    return api.get(`/distributions${p}`);
   },
-  create: (data: any)   => api.post('/distributions/', data),
+  create: (data: any)   => api.post('/distributions', data),
   delete: (id: string)  => api.delete(`/distributions/${id}`),
 };
 
 // ── FX Rates ─────────────────────────────────────────────────────────────────
 export const fxRatesAPI = {
-  list:    ()              => api.get('/fx-rates/'),
-  latest:  ()              => api.get('/fx-rates/latest'),
-  live:    ()              => api.get('/fx-rates/live'),
-  history: (days?: number) => api.get(`/fx-rates/history${days ? `?days=${days}` : ''}`),
-  create:  (data: any)     => api.post('/fx-rates/', data),
+  list:       ()                                    => api.get('/fx-rates'),
+  latest:     ()                                    => api.get('/fx-rates/latest'),
+  live:       ()                                    => api.get('/fx-rates/live'),
+  history:    (days?: number)                       => api.get(`/fx-rates/history${days ? `?days=${days}` : ''}`),
+  create:     (data: any)                           => api.post('/fx-rates', data),
+  cross:      (from: string, to: string)            => api.get(`/fx-rates/cross?from=${from}&to=${to}`),
+  historical: (date: string, from: string, to: string, fallbackLatest = false) =>
+    api.get(`/fx-rates/historical?date=${date}&from=${from}&to=${to}${fallbackLatest ? '&fallback=latest' : ''}`),
+  monthly:    (year?: number)                          => api.get(`/fx-rates/monthly${year ? `?year=${year}` : ''}`),
 };
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const usersAPI = {
-  list:         ()                      => api.get('/users/'),
+  list:         ()                      => api.get('/users'),
   pendingCount: ()                      => api.get('/users/pending-count'),
-  create:       (data: any)             => api.post('/users/', data),
+  create:       (data: any)             => api.post('/users', data),
   approve:      (id: string, role?: string) => api.post(`/users/${id}/approve`, null, {
     params: role ? { role } : {},
   }),
@@ -135,7 +156,7 @@ export const noticesAPI = {
     if (params?.notice_type) p.append('notice_type', params.notice_type);
     if (params?.status)      p.append('status',      params.status);
     if (params?.fund_id)     p.append('fund_id',     params.fund_id);
-    return api.get(`/notices/?${p}`);
+    return api.get(`/notices?${p}`);
   },
   pendingCount:    ()                        => api.get('/notices/pending-count'),
   get:             (id: string)              => api.get(`/notices/${id}`),
@@ -157,6 +178,7 @@ export const noticesAPI = {
     }),
   updateExtracted: (id: string, data: Record<string, unknown>) =>
     api.put(`/notices/${id}/extracted`, data),
+  deleteNote:      (id: string) => api.delete(`/notices/${id}/notes`),
   recentInvestments: (limit?: number) =>
     api.get('/notices/investments/recent', { params: limit ? { limit } : {} }),
   allInvestments: (params?: { fund_id?: string; sector?: string; geography?: string }) =>
@@ -167,12 +189,15 @@ export const noticesAPI = {
 // ── Fund Reports (per-fund PDF upload → auto-parse → auto-calculate) ─────────
 export const fundReportsAPI = {
   list:   (fundId: string)                  => api.get('/fund-reports', { params: { fund_id: fundId } }),
+  listAll: ()                               => api.get('/fund-reports'),
+  file:   (id: string)                      => api.get(`/fund-reports/${id}/file`, { responseType: 'blob' }),
   get:    (id: string)                      => api.get(`/fund-reports/${id}`),
-  upload: (fundId: string, formData: FormData, noticeType?: string) =>
+  upload: (fundId: string, formData: FormData, noticeType?: string, commitmentId?: string) =>
     api.post('/fund-reports/upload', formData, {
-      params:  { fund_id: fundId, ...(noticeType ? { notice_type: noticeType } : {}) },
+      params:  { fund_id: fundId, ...(noticeType ? { notice_type: noticeType } : {}), ...(commitmentId ? { commitment_id: commitmentId } : {}) },
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  update: (id: string, data: any)           => api.patch(`/fund-reports/${id}`, data),
   delete: (id: string)                      => api.delete(`/fund-reports/${id}`),
 };
 
@@ -195,28 +220,21 @@ export const rulesAPI = {
   updateExtractor:  (id: string, data: any)         => api.put(`/rules/extractors/${id}`, data),
   deleteExtractor:  (id: string)                    => api.delete(`/rules/extractors/${id}`),
   testExtractor:    (data: any)                     => api.post('/rules/extractors/test', data),
-  loadPreset:       (preset: string)                => api.post(`/rules/presets/${preset}`),
-};
-
-// ── Siguler Guff — PDF-parsed sigf.ts calculations ───────────────────────────
-export const sigulerGuffAPI = {
-  analysis: () => api.get('/siguler-guff/analysis'),
 };
 
 // ── Fund PDF — generic upload + per-fund analysis ────────────────────────────
 export const fundPdfAPI = {
-  registered:   ()                => api.get('/fund-pdf/registered'),
-  analysis:     (fundCode: string)=> api.get(`/fund-pdf/${fundCode}/analysis`),
+  registered:   ()                => api.get('/fund-reports'),
   upload:       (file: File)      => {
     const form = new FormData();
     form.append('file', file);
-    return api.post('/fund-pdf/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return api.post('/fund-reports/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
 };
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 export const notificationsAPI = {
-  list:    (unreadOnly?: boolean) => api.get(`/notifications/${unreadOnly ? '?unread=true' : ''}`),
+  list:    (unreadOnly?: boolean) => api.get(unreadOnly ? '/notifications?unread=true' : '/notifications'),
   markRead:(id: string)           => api.patch(`/notifications/${id}/read`),
   markAll: ()                     => api.patch('/notifications/read-all'),
 };

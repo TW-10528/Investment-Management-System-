@@ -1,0 +1,10 @@
+<svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+  <!-- Left chevron -->
+  <polygon points="8,10 28,30 8,50" fill="#1e3a8a" opacity="0.85"/>
+
+  <!-- Middle chevron -->
+  <polygon points="22,5 42,30 22,55" fill="#1e40af"/>
+
+  <!-- Right chevron -->
+  <polygon points="36,0 60,30 36,60" fill="#2563eb"/>
+</svg>

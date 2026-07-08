@@ -6,9 +6,7 @@ import { fmt, strategyBg } from '../lib/format';
 import CapitalCallEntry from '../components/CapitalCallEntry';
 
 function canEditRole() {
-  const raw  = localStorage.getItem('user') || '{}';
-  const user = (() => { try { return JSON.parse(raw); } catch { return {}; } })();
-  return ['admin', 'finance_manager', 'finance_staff'].includes(user.role ?? '');
+  return true;   // every signed-in user can edit (no role differentiation)
 }
 
 function Snap({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -27,9 +25,14 @@ export default function FundDetail() {
   const [rows, setRows]             = useState<LedgerRow[]>([]);
   const [snap, setSnap]             = useState<LedgerSnapshot | null>(null);
   const [loading, setLoading]       = useState(true);
-  const [tab, setTab]               = useState<'ledger' | 'info' | 'wire'>('ledger');
+  const [tab, setTab]               = useState<'ledger' | 'info' | 'wire' | 'commitments'>('ledger');
   const [showCallEntry, setShowCallEntry] = useState(false);
   const [latestFx, setLatestFx]     = useState(143.5);
+  const [commitmentHistory, setCommitmentHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [editingCommitment, setEditingCommitment] = useState(false);
+  const [commitmentJpyEdit, setCommitmentJpyEdit] = useState<string>('');
+  const [savingCommitment, setSavingCommitment] = useState(false);
 
   async function refresh() {
     if (!id) return;
@@ -37,6 +40,42 @@ export default function FundDetail() {
     setFund(fRes.data);
     setRows(lRes.data.rows ?? []);
     setSnap(lRes.data.snapshot ?? null);
+  }
+
+  async function fetchCommitmentHistory() {
+    if (!id) return;
+    setHistoryLoading(true);
+    try {
+      const res = await fundsAPI.getCommitmentHistory(id);
+      setCommitmentHistory(res.data ?? []);
+    } catch (err) {
+      console.error('Failed to fetch commitment history:', err);
+    }
+    setHistoryLoading(false);
+  }
+
+  async function saveCommitment() {
+    if (!id || !commitmentJpyEdit) return;
+    setSavingCommitment(true);
+    try {
+      const newCommitment = parseFloat(commitmentJpyEdit);
+      // Update fund commitment
+      await fundsAPI.update(id, { commitment_jpy: newCommitment });
+      // Create commitment tranche entry
+      await fundsAPI.addCommitmentHistory(id, {
+        effective_date: new Date().toISOString().split('T')[0],
+        commitment_amount: newCommitment,
+        notes: `Updated via Fund Details`
+      });
+      // Refresh data
+      await Promise.all([refresh(), fetchCommitmentHistory()]);
+      setEditingCommitment(false);
+      setCommitmentJpyEdit('');
+    } catch (err) {
+      console.error('Failed to save commitment:', err);
+      alert('Failed to save commitment');
+    }
+    setSavingCommitment(false);
   }
 
   useEffect(() => {
@@ -50,6 +89,7 @@ export default function FundDetail() {
         if (fxRes.data.usd_jpy) setLatestFx(fxRes.data.usd_jpy);
       })
       .finally(() => setLoading(false));
+    fetchCommitmentHistory();
   }, [id]);
 
   if (loading) {
@@ -105,23 +145,32 @@ export default function FundDetail() {
       </div>
 
       {/* Snapshot metrics */}
-      {snap && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-          <Snap label="Commitment"     value={fmt.usd(snap.commitment_usd, true)} />
-          <Snap label="Total Called"   value={fmt.usd(snap.total_called_usd, true)} />
-          <Snap label="Total Received" value={fmt.usd(snap.total_received_usd, true)} />
-          <Snap label="Drawn %"        value={fmt.pct(snap.drawn_pct)} />
-          <Snap label="Unfunded"       value={fmt.usd(snap.unfunded_usd, true)} />
-          <Snap label="Inv. Capacity"  value={fmt.usd(snap.investment_capacity, true)} />
-          <Snap label="Net Cash"       value={fmt.usd(snap.net_cash_position, true)} sub={snap.net_cash_position < 0 ? 'Net outflow' : 'Net inflow'} />
-          <Snap label="DPI"            value={snap.dpi.toFixed(2) + 'x'} />
-        </div>
-      )}
+      {snap && (() => {
+        const totalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
+        const totalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
+        const totalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
+
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            <Snap label="Commitment"     value={fmt.usd(snap.commitment_usd, true)} />
+            <Snap label="Total Called"   value={fmt.usd(snap.total_called_usd, true)} />
+            <Snap label="Total Received" value={fmt.usd(snap.total_received_usd, true)} />
+            <Snap label="Drawn %"        value={fmt.pct(snap.drawn_pct)} />
+            <Snap label="Unfunded"       value={fmt.usd(snap.unfunded_usd, true)} />
+            <Snap label="Inv. Capacity"  value={fmt.usd(snap.investment_capacity, true)} />
+            <Snap label="Net Cash"       value={fmt.usd(snap.net_cash_position, true)} sub={snap.net_cash_position < 0 ? 'Net outflow' : 'Net inflow'} />
+            <Snap label="DPI"            value={snap.dpi.toFixed(2) + 'x'} />
+            <Snap label="Return of Capital" value={fmt.usd(totalReturnOfCapital, true)} />
+            <Snap label="Gain" value={fmt.usd(totalGain, true)} />
+            <Snap label="Interest" value={fmt.usd(totalInterest, true)} />
+          </div>
+        );
+      })()}
 
       {/* Tabs + New Call button */}
       <div className="flex items-center justify-between">
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-          {(['ledger', 'info', 'wire'] as const).map(t => (
+          {(['ledger', 'info', 'wire', 'commitments'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -129,7 +178,7 @@ export default function FundDetail() {
                 tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t === 'ledger' ? '📊 Ledger' : t === 'info' ? '📝 Fund Info' : '🏦 Wire Instructions'}
+              {t === 'ledger' ? '📊 Ledger' : t === 'info' ? '📝 Fund Info' : t === 'wire' ? '🏦 Wire Instructions' : '📌 Commitments'}
             </button>
           ))}
         </div>
@@ -197,8 +246,12 @@ export default function FundDetail() {
                     <th className="text-right px-3 py-3 font-medium text-gray-500 bg-red-50">
                       <span title="H = running net cash position">H — Net Cash</span>
                     </th>
-                    <th className="text-right px-3 py-3 font-medium text-gray-500">JPY Called</th>
-                    <th className="text-right px-3 py-3 font-medium text-gray-500">JPY Received</th>
+                    <th className="text-right px-3 py-3 font-medium text-gray-500">
+                      <span title="L = C − D (distribution not allocated to reinvestment)">L — Dist Not Reinvested</span>
+                    </th>
+                    <th className="text-right px-3 py-3 font-medium text-gray-500">Return of Capital</th>
+                    <th className="text-right px-3 py-3 font-medium text-gray-500">Gain</th>
+                    <th className="text-right px-3 py-3 font-medium text-gray-500">Interest</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -239,10 +292,16 @@ export default function FundDetail() {
                           {fmt.usd(row.net_cash_position)}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono text-gray-500">
-                          {row.capital_paid_jpy ? fmt.jpy(row.capital_paid_jpy) : '—'}
+                          {row.capital_received ? fmt.usd(row.capital_received - (row.reinvestable ?? 0)) : '—'}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono text-gray-500">
-                          {row.capital_received_jpy ? fmt.jpy(row.capital_received_jpy) : '—'}
+                          {row.return_of_capital ? fmt.usd(row.return_of_capital) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-500">
+                          {row.gain ? fmt.usd(row.gain) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-500">
+                          {row.interest ? fmt.usd(row.interest) : '—'}
                         </td>
                       </tr>
                     );
@@ -257,6 +316,37 @@ export default function FundDetail() {
       {/* ── Fund info tab ── */}
       {tab === 'info' && (
         <div className="bg-white border border-gray-100 rounded-xl p-6">
+          {editingCommitment && /sdg/i.test(fund.fund_name) ? (
+            <div className="space-y-4 mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+              <h3 className="font-semibold text-gray-900">Edit Commitment (JPY)</h3>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-2">Commitment (JPY)</label>
+                <input
+                  type="number"
+                  value={commitmentJpyEdit}
+                  onChange={(e) => setCommitmentJpyEdit(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  placeholder="Enter commitment amount"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={saveCommitment}
+                  disabled={savingCommitment}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50"
+                >
+                  {savingCommitment ? 'Saving...' : 'Save & Create Tranche'}
+                </button>
+                <button
+                  onClick={() => setEditingCommitment(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
             {[
               ['Fund Name',          fund.fund_name],
@@ -266,7 +356,14 @@ export default function FundDetail() {
               ['Strategy',           fund.strategy],
               ['Vintage Year',       fund.vintage_year],
               ['Currency',           fund.currency],
-              ['Commitment (USD)',   fmt.usd(fund.commitment_usd ?? 0)],
+              ...((/sdg/i.test(fund.fund_name) && (fund as any).commitment_jpy) ? [
+                ['Commitment (JPY)',   `¥${((fund as any).commitment_jpy || 0).toLocaleString('ja-JP')}`]
+              ] : [
+                ['Commitment (USD)',   fmt.usd(fund.commitment_usd ?? 0)]
+              ]),
+              ...((/sdg/i.test(fund.fund_name) && (fund as any).contract_commitment_jpy) ? [
+                ['Contract Commitment (JPY)',   `¥${((fund as any).contract_commitment_jpy || 0).toLocaleString('ja-JP')}`]
+              ] : []),
               ['Entry FX Rate',      fmt.rate(fund.entry_fx_rate)],
               ['Contract Date',      fmt.date(fund.contract_date)],
               ['Inv. Period Start',  fmt.date(fund.investment_period_start)],
@@ -276,9 +373,22 @@ export default function FundDetail() {
               ['Carry',              fund.carry_pct != null ? `${fund.carry_pct}%` : '—'],
               ['Hurdle Rate',        fund.hurdle_rate_pct != null ? `${fund.hurdle_rate_pct}%` : '—'],
             ].map(([label, value]) => (
-              <div key={String(label)} className="border-b border-gray-50 pb-3">
-                <p className="text-gray-400 text-xs">{label}</p>
-                <p className="font-medium text-gray-800 mt-0.5">{value ?? '—'}</p>
+              <div key={String(label)} className="border-b border-gray-50 pb-3 flex items-center justify-between group">
+                <div>
+                  <p className="text-gray-400 text-xs">{label}</p>
+                  <p className="font-medium text-gray-800 mt-0.5">{value ?? '—'}</p>
+                </div>
+                {label === 'Commitment (JPY)' && /sdg/i.test(fund.fund_name) && canEdit && !editingCommitment && (
+                  <button
+                    onClick={() => {
+                      setCommitmentJpyEdit(String((fund as any).commitment_jpy || ''));
+                      setEditingCommitment(true);
+                    }}
+                    className="px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
             ))}
             {fund.notes && (
@@ -322,6 +432,69 @@ export default function FundDetail() {
               <p>No wire instructions on file for this fund</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Commitments tab ── */}
+      {tab === 'commitments' && (
+        <div className="bg-white border border-gray-100 rounded-xl p-6 space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-gray-900 mb-2">TOTAL COMMITMENT (JPY)</p>
+            <p className="text-2xl font-bold text-gray-900">
+              ¥{((fund as any).commitment_jpy || (fund as any).contract_commitment_jpy || 0).toLocaleString('ja-JP')}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              Current: {commitmentHistory.length > 0 ? fmt.date(commitmentHistory[commitmentHistory.length - 1].effective_date) : 'Not set'}
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Commitment Tranches</h3>
+            {historyLoading ? (
+              <p className="text-sm text-gray-400">Loading…</p>
+            ) : commitmentHistory.length === 0 ? (
+              <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg">
+                <p className="text-sm text-gray-400">No commitment history yet.</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Edit commitment in Fund Details to create tranches.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">Tranche</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">Effective Date</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-600">Commitment (¥)</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {commitmentHistory.map((h, idx) => {
+                      const isCurrent = idx === commitmentHistory.length - 1;
+                      return (
+                        <tr key={h.id} className={isCurrent ? 'bg-indigo-50' : ''}>
+                          <td className="px-4 py-3 font-medium text-gray-900">
+                            {idx + 1}{idx === commitmentHistory.length - 1 ? <span className="ml-2 text-xs font-bold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-600">Current</span> : ''}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">{fmt.date(h.effective_date)}</td>
+                          <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">
+                            ¥{h.commitment_amount.toLocaleString('ja-JP')}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-500">{h.notes || '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-gray-400 mt-4">
+            💡 Tip: Edit commitment values in the Fund Details tab to create new tranches.
+          </p>
         </div>
       )}
     </div>

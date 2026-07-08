@@ -33,7 +33,7 @@ router.get('/', async (c) => {
     include: { fund: { select: { fundName: true } } },
     orderBy: { distributionDate: 'desc' },
   })
-  return c.json(dists.map(d => distDict(d, (d as any).fund?.fundName)))
+  return c.json(dists.map((d: any) => distDict(d, (d as any).fund?.fundName)))
 })
 
 // POST /

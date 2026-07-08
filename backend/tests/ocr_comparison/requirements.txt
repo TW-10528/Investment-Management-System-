@@ -1,0 +1,29 @@
+# OCR Comparison Testing Dependencies
+
+# PDF processing
+pdfplumber>=0.10.0
+
+# Image processing
+Pillow>=10.0.0
+
+# OCR Methods
+
+# EasyOCR - Fast and accurate OCR with Japanese support
+# This is the primary Baidu-compatible method for testing
+easyocr>=1.7.0
+
+# TrOCR - Transformer-based OCR from Microsoft
+# Alternative method using transformer architecture
+transformers>=4.35.0
+torch>=2.0.0
+
+# PaddleOCR - Production baseline for comparison
+# Used to compare against the current implementation
+paddleocr>=2.7.0.3
+paddlepaddle>=2.5.0
+
+# Optional: LayoutParser for document layout analysis
+# layoutparser>=0.3.3  # Uncomment if needed
+
+# Utilities
+numpy>=1.24.0

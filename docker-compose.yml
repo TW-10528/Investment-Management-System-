@@ -1,44 +1,137 @@
-version: "3.9"
+# ── Thirdwave IMS — Docker Compose (Production Setup) ─────────────────────────
+#
+# Full stack deployment:
+#   - Backend (Hono/Node) → :8004
+#   - Frontend (React/Vite + Nginx) → :80
+#   - PostgreSQL → :5432 (internal), :6000 (host)
+#
+# Commands:
+#   docker-compose up --build       # Build and start all services
+#   docker-compose up -d            # Start in background
+#   docker-compose down             # Stop all services
+#   docker-compose logs -f backend  # View backend logs
+#   docker-compose logs -f frontend # View frontend logs
+
+version: '3.9'
 
 services:
-
+  # ── PostgreSQL Database ───────────────────────────────────────────────────
   db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: ims_db
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: ims_db
       POSTGRES_USER: ims_user
-      POSTGRES_PASSWORD: ims_pass
+      POSTGRES_PASSWORD: ims_password
+      POSTGRES_DB: ims_db
     ports:
-      - "5433:5432"
+      - "6000:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ims_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ims_user -d ims_db"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ims-network
 
+  # ── Backend (Hono + Node) ────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: ims_backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql://ims_user:ims_pass@db:5432/ims_db
-      SECRET_KEY: local-dev-secret-key-change-in-production
-      ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 480
-      ENVIRONMENT: local
-    volumes:
-      - ./backend:/app
+    restart: unless-stopped
+    env_file:
+      - .env.docker
     depends_on:
       db:
         condition: service_healthy
+    environment:
+      # Server
+      PORT: 8004
+      ENVIRONMENT: docker
+
+      # Database (use service name 'db' for Docker networking)
+      DATABASE_URL: postgresql://ims_user:ims_password@db:5432/ims_db
+
+      # JWT
+      SECRET_KEY: ${SECRET_KEY:-thirdwave-ims-hono-prod-secret-change-me}
+      ACCESS_TOKEN_EXPIRE_MINUTES: 480
+
+      # CORS (allow frontend + production domain)
+      ALLOWED_ORIGINS: http://localhost:8080,http://frontend,http://backend:8004,https://investment-mgmt.twave.co.jp
+
+      # Email / OTP
+      SMTP_HOST: ${SMTP_HOST:-smtp.office365.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-Thirdwave IMS <noreply@thirdwave.co.jp>}
+      OTP_EXPIRE_MINUTES: 10
+
+      # Login lockout
+      MAX_LOGIN_ATTEMPTS: 5
+      LOCKOUT_WINDOW_MINUTES: 10
+      LOCKOUT_MINUTES: 15
+
+      # Admin notification
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+
+      # File uploads
+      UPLOAD_DIR: ./uploads
+
+      # AI extraction (loaded from .env.docker via env_file)
+
+      # Misc
+      REVEAL_EMAIL_NOT_FOUND: "true"
+
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./backend/uploads:/app/uploads
+    networks:
+      - ims-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ── Frontend (React + Nginx) ──────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ims_frontend
     restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5176:80"
+    networks:
+      - ims-network
+    environment:
+      # These will be baked into the build
+      VITE_API_URL: /api/v1
+      VITE_APP_NAME: Investment Management System
+      VITE_APP_DESCRIPTION: Manage your investment funds and capital calls
+    labels:
+      - "com.example.domain=investment-mgmt.twave.co.jp"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 volumes:
-  pgdata:
+  ims_pgdata:
+    name: ims_pgdata
+    driver: local
+
+networks:
+  ims-network:
+    driver: bridge

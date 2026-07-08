@@ -30,9 +30,18 @@ export interface Transaction {
   capitalReceived: Decimal   // C
   reinvestable:    Decimal   // D
   manualCashFlow?: Decimal | null   // when set, overrides G (= -B + C)
+  // SDG: remaining unfunded after this call (本出資後の出資未履行金額).
+  // When set, the investment capacity F = this value directly instead of prev_F - B + D.
+  // Handles the SDG fund's per-notice remaining commitment (which accounts for commitment increases).
+  unfundedAfterCall?: Decimal | null
   callId?:         string
   distId?:         string
   wireReference?:  string | null
+  notes?:          string | null
+  // Finance-detail columns (carried through to the ledger row).
+  returnOfCapital?: Decimal | null
+  gain?:            Decimal | null
+  interest?:        Decimal | null
 }
 
 export interface LedgerRow extends Transaction {
@@ -59,17 +68,41 @@ export interface FundSnapshot {
 
 export class CalculationEngine {
 
-  /** Build a full Excel-style ledger from sorted transactions. */
+  /** Build a full Excel-style ledger from sorted transactions.
+   *
+   * `commitmentHistory` — optional sorted list of commitment step-ups (SDG).
+   * Each entry is `{ commitmentAmount, effectiveDate }`. For each transaction
+   * the engine picks the entry with the largest effectiveDate ≤ tx.date and
+   * computes F = commitment_at_date - E + D.  When no history is supplied (or
+   * no entry is found for a date) the engine falls back to unfundedAfterCall
+   * or the generic prev_F - B + D formula.
+   */
   static buildLedger(
-    commitmentUsd: Decimal,
-    transactions:  Transaction[],
-    defaultFx:     Decimal = new Decimal('150'),
+    commitmentUsd:     Decimal,
+    transactions:      Transaction[],
+    defaultFx:         Decimal = new Decimal('150'),
+    commitmentHistory: Array<{ commitmentAmount: Decimal; effectiveDate: Date }> = [],
   ): { rows: LedgerRow[]; snapshot: FundSnapshot } {
+    // Pre-sort history descending so the first match is always the latest applicable entry.
+    const histSorted = [...commitmentHistory].sort((a, b) => b.effectiveDate.getTime() - a.effectiveDate.getTime())
+    // Also get ascending sort for finding the oldest (initial) commitment
+    const histSortedAsc = [...commitmentHistory].sort((a, b) => a.effectiveDate.getTime() - b.effectiveDate.getTime())
+
+    function commitmentAt(date: Date): Decimal | null {
+      // Find latest entry with effectiveDate <= date
+      const entry = histSorted.find(h => h.effectiveDate <= date)
+      if (entry) return entry.commitmentAmount
+      // For dates before first history entry, use the oldest (initial) commitment
+      if (histSortedAsc.length > 0) return histSortedAsc[0].commitmentAmount
+      return null
+    }
+
     const sorted = [...transactions].sort((a, b) => a.date.getTime() - b.date.getTime())
 
-    let E = new Decimal(0)   // cumulative called
-    let F = commitmentUsd    // investment capacity
-    let H = new Decimal(0)   // net cash position
+    let E    = new Decimal(0)   // cumulative called (pure sum of B — D does NOT reduce E)
+    let cumD = new Decimal(0)   // cumulative reinvestable (tracked separately for F)
+    let F    = commitmentUsd    // investment capacity
+    let H    = new Decimal(0)   // net cash position
 
     const rows: LedgerRow[] = []
 
@@ -79,8 +112,18 @@ export class CalculationEngine {
       const D    = tx.reinvestable
       const rate = tx.fxRate ?? defaultFx
 
-      E = E.plus(B)                // E = prev_E + B
-      F = F.minus(B).plus(D)       // F = prev_F - B + D
+      E    = E.plus(B)        // E = prev_E + B  (cumulative capital called, D never reduces E)
+      cumD = cumD.plus(D)     // track cumulative reinvestable separately
+
+      // F — investment capacity = commitment − E + cumulative D
+      //  1. Commitment history entry available: use commitment_at_date
+      //  2. Standard: F = prev_F − B + D  (equivalent to commitment − E + cumD)
+      const histCommitment = histSorted.length > 0 ? commitmentAt(tx.date) : null
+      if (histCommitment != null && histCommitment.gt(0)) {
+        F = histCommitment.minus(E).plus(cumD)  // F = commitment − E + cumD
+      } else {
+        F = F.minus(B).plus(D)                  // F = prev_F − B + D
+      }
       // G = -B + C, unless a manual cash-flow value was entered for this row.
       const G = tx.manualCashFlow != null ? tx.manualCashFlow : new Decimal(0).minus(B).plus(C)
       H = H.plus(G)                // H = prev_H + G
@@ -98,17 +141,30 @@ export class CalculationEngine {
 
     const totalCalled    = rows.reduce((s, r) => s.plus(r.capitalPaidIn),   new Decimal(0))
     const totalReceived  = rows.reduce((s, r) => s.plus(r.capitalReceived), new Decimal(0))
-    const drawnPct       = commitmentUsd.gt(0)
-      ? totalCalled.div(commitmentUsd).mul(100).toDecimalPlaces(2)
-      : new Decimal(0)
     const lastRow        = rows[rows.length - 1]
 
+    // Snapshot commitment: prefer the most recent history entry (latest commitment step-up)
+    // over the fund-level commitmentUsd when history is present.
+    const latestHistCommitment = histSorted.length > 0 ? histSorted[0].commitmentAmount : null
+    const snapshotCommitment   = latestHistCommitment ?? commitmentUsd
+
+    // drawnPct: use the latest effective commitment.
+    const drawnPct = snapshotCommitment.gt(0)
+      ? totalCalled.div(snapshotCommitment).mul(100).toDecimalPlaces(2)
+      : new Decimal(0)
+
+    // unfundedUsd = F from the last ledger row. The row's investmentCapacity already
+    // accounts for commitment history step-ups and the correct E = ΣB − ΣD formula.
+    const unfundedUsd = lastRow != null
+      ? lastRow.investmentCapacity
+      : commitmentUsd
+
     const snapshot: FundSnapshot = {
-      commitmentUsd,
+      commitmentUsd: snapshotCommitment,
       totalCalledUsd:     totalCalled,
       totalReceivedUsd:   totalReceived,
       drawnPct,
-      unfundedUsd:        commitmentUsd.minus(totalCalled),
+      unfundedUsd,
       investmentCapacity: lastRow?.investmentCapacity ?? commitmentUsd,
       netCashPosition:    lastRow?.netCashPosition    ?? new Decimal(0),
       dpi:                totalCalled.gt(0)
@@ -119,9 +175,33 @@ export class CalculationEngine {
     return { rows, snapshot }
   }
 
+  /**
+   * Annualised IRR (XIRR) from dated cash flows via bisection on NPV.
+   * Returns a fraction (0.18 = 18%) or null when it can't be solved (needs at
+   * least one inflow and one outflow with a sign change).
+   */
+  static xirr(flows: { date: Date; amount: number }[]): number | null {
+    const valid = flows.filter(x => x.amount !== 0 && !Number.isNaN(x.amount))
+    if (valid.length < 2) return null
+    if (!valid.some(x => x.amount < 0) || !valid.some(x => x.amount > 0)) return null
+    const t0 = Math.min(...valid.map(x => x.date.getTime()))
+    const yrs = (d: Date) => (d.getTime() - t0) / (365.25 * 24 * 3600 * 1000)
+    const npv = (r: number) => valid.reduce((s, x) => s + x.amount / Math.pow(1 + r, yrs(x.date)), 0)
+    let lo = -0.9999, hi = 100
+    let flo = npv(lo), fhi = npv(hi)
+    if (flo * fhi > 0) return null                  // no sign change in range
+    for (let i = 0; i < 256; i++) {
+      const mid = (lo + hi) / 2
+      const fm  = npv(mid)
+      if (Math.abs(fm) < 1e-7 || (hi - lo) < 1e-9) return mid
+      if (flo * fm < 0) { hi = mid; fhi = fm } else { lo = mid; flo = fm }
+    }
+    return (lo + hi) / 2
+  }
+
   /** Get current fund summary (used by list and dashboard endpoints). */
   static async fundSummary(fund: any): Promise<Record<string, unknown>> {
-    const [paidCalls, distributions] = await Promise.all([
+    const [paidCalls, distributions, navRec, commitmentHistory] = await Promise.all([
       prisma.capitalCall.findMany({
         where:   { fundId: fund.id, status: { in: ['approved', 'paid'] } },
         orderBy: { executionDate: 'asc' },
@@ -130,9 +210,23 @@ export class CalculationEngine {
         where:   { fundId: fund.id },
         orderBy: { distributionDate: 'asc' },
       }),
+      prisma.navRecord.findFirst({ where: { fundId: fund.id }, orderBy: { navDate: 'desc' } }),
+      prisma.fundCommitmentHistory.findMany({
+        where:   { fundId: fund.id },
+        orderBy: { effectiveDate: 'asc' },
+      }),
     ])
+    const navUsd  = navRec ? parseFloat(navRec.navUsd?.toString() ?? '0') : 0
+    const navDate = navRec ? new Date(navRec.navDate) : null
 
-    const commitment = new Decimal(fund.commitmentUsd.toString())
+    // For SDG fund (JPY only), use commitmentJpy; for others use commitmentUsd
+    const isSdg = fund.fundName && /sdg/i.test(fund.fundName)
+    const commitmentValue = isSdg && fund.commitmentJpy
+      ? String(fund.commitmentJpy)  // BigInt conversion
+      : fund.commitmentUsd.toString()
+    const commitment = new Decimal(commitmentValue)
+
+    const f = (d: Decimal) => parseFloat(d.toString())
 
     const txns: Transaction[] = [
       ...paidCalls.map((c: any) => ({
@@ -159,7 +253,6 @@ export class CalculationEngine {
     ]
 
     if (txns.length === 0) {
-      const c = parseFloat(commitment.toString())
       return {
         fund_id:            fund.id,
         fund_name:          fund.fundName,
@@ -168,20 +261,46 @@ export class CalculationEngine {
         strategy:           fund.strategy,
         vintage_year:       fund.vintageYear,
         currency:           fund.currency,
-        commitment_usd:     c,
+        commitment_usd:     isSdg ? null : 0,
+        commitment_jpy:     isSdg ? (fund.contractCommitmentJpy ? parseFloat(String(fund.contractCommitmentJpy)) : null) : null,
         total_called_usd:   0,
         total_received_usd: 0,
+        total_called_jpy:   0,
+        total_received_jpy: 0,
         drawn_pct:          0,
-        unfunded_usd:       c,
-        investment_capacity: c,
+        unfunded_usd:       0,
+        investment_capacity: 0,
         net_cash_position:  0,
+        nav_usd:            navUsd,
+        total_value_usd:    navUsd,
+        moic:               0,
+        irr:                null,
         is_active:          fund.isActive,
         dpi:                0,
+        tvpi:               0,
       }
     }
 
-    const { snapshot } = CalculationEngine.buildLedger(commitment, txns)
-    const f = (d: Decimal) => parseFloat(d.toString())
+    const commHistory = commitmentHistory.map((h: any) => ({
+      commitmentAmount: new Decimal(h.commitmentAmount.toString()),
+      effectiveDate: new Date(h.effectiveDate),
+    }))
+    const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new Decimal('150'), commHistory)
+    // JPY totals (sum of each row's B×fx / C×fx) for the dashboard's per-fund view.
+    const totalCalledJpy   = rows.reduce((s, r) => s.plus(r.capitalPaidJpy),     new Decimal(0))
+    const totalReceivedJpy = rows.reduce((s, r) => s.plus(r.capitalReceivedJpy), new Decimal(0))
+
+    const called       = f(snapshot.totalCalledUsd)
+    const received     = f(snapshot.totalReceivedUsd)
+    const totalValue   = received + navUsd                          // Distributions + NAV
+    const dpiRatio     = called > 0 ? received / called : 0
+    const moic         = called > 0 ? 1 + Math.round(dpiRatio * 10000) / 10000 : 0  // 1 + DPI
+    const tvpi         = called > 0 ? Math.round(totalValue / called * 10000) / 10000 : 0  // (Dist + NAV) / Called
+    // IRR from each row's net cash flow (G), plus the residual NAV as a terminal inflow.
+    const irrFlows = rows.map(r => ({ date: r.date, amount: f(r.cashFlow) }))
+    if (navUsd > 0 && navDate) irrFlows.push({ date: navDate, amount: navUsd })
+    const irrRaw = CalculationEngine.xirr(irrFlows)
+    const irr    = irrRaw != null ? Math.round(irrRaw * 1000) / 10 : null   // % to 1 dp
 
     return {
       fund_id:             fund.id,
@@ -191,13 +310,22 @@ export class CalculationEngine {
       strategy:            fund.strategy,
       vintage_year:        fund.vintageYear,
       currency:            fund.currency,
-      commitment_usd:      f(commitment),
-      total_called_usd:    f(snapshot.totalCalledUsd),
-      total_received_usd:  f(snapshot.totalReceivedUsd),
+      commitment_usd:          isSdg ? null : f(commitment),
+      commitment_jpy:          isSdg ? (fund.contractCommitmentJpy ? parseFloat(String(fund.contractCommitmentJpy)) : null) : null,
+      contract_commitment_usd: fund.contractCommitmentUsd ? f(new Decimal(fund.contractCommitmentUsd.toString())) : null,
+      total_called_usd:        called,
+      total_received_usd:  received,
+      total_called_jpy:    f(totalCalledJpy),
+      total_received_jpy:  f(totalReceivedJpy),
       drawn_pct:           f(snapshot.drawnPct),
       unfunded_usd:        f(snapshot.unfundedUsd),
       investment_capacity: f(snapshot.investmentCapacity),
       net_cash_position:   f(snapshot.netCashPosition),
+      nav_usd:             navUsd,
+      total_value_usd:     totalValue,
+      moic:                moic,
+      tvpi:                tvpi,
+      irr:                 irr,
       dpi:                 f(snapshot.dpi),
       is_active:           fund.isActive,
     }

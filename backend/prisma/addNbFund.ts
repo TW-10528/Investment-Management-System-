@@ -1,5 +1,5 @@
 /**
- * Idempotent add — NB Real Estate Secondary Opportunities Offshore Fund II LP.
+ * Idempotent add — Real Estate Secondary Opportunities Fund II.
  *
  * Adds the NB fund record so uploaded NB drawdown notices can auto-resolve
  * (fundParsers/fund-resolver.ts) WITHOUT wiping existing data like seed.ts does.
@@ -10,11 +10,11 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-const FUND_NAME = 'NB Real Estate Secondary Opportunities Offshore Fund II LP'
+const FUND_NAME = 'Real Estate Secondary Opportunities Fund II'
 
 async function main() {
   const existing = await prisma.fund.findFirst({
-    where: { fundName: { contains: 'NB Real Estate Secondary Opportunities', mode: 'insensitive' } },
+    where: { fundName: { contains: 'Real Estate Secondary Opportunities Fund II', mode: 'insensitive' } },
   })
 
   if (existing) {
@@ -25,7 +25,7 @@ async function main() {
   const fund = await prisma.fund.create({
     data: {
       fundName:      FUND_NAME,
-      manager:       'NB Alternatives Advisers LLC',
+      manager:       'Neuberger Berman',
       administrator: 'Neuberger Berman',
       strategy:      'Real Estate Secondaries',
       vintageYear:   2025,

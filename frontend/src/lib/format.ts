@@ -1,14 +1,34 @@
 /** Formatting helpers */
+import i18n from '../i18n';
+
+// Intl currency-style formatting resolves the currency symbol from locale data,
+// which on Japanese-locale browsers returns "ドル" for USD instead of "$".
+// We avoid that by hardcoding "$" / "¥" and using plain number formatting only.
+function wFmt(n: number, decimals = 0): string {
+  const abs = Math.abs(n);
+  const s   = abs.toFixed(decimals);
+  const [int, frac] = s.split('.');
+  const withCommas  = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return frac !== undefined ? `${withCommas}.${frac}` : withCommas;
+}
 
 export const fmt = {
-  usd: (v: number, compact = false) => {
-    if (compact && Math.abs(v) >= 1_000_000)
-      return `$${(v / 1_000_000).toFixed(1)}M`;
-    if (compact && Math.abs(v) >= 1_000)
-      return `$${(v / 1_000).toFixed(0)}K`;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency', currency: 'USD', maximumFractionDigits: 0,
-    }).format(v);
+  usd: (v: number, _compact = false) =>
+    `${v < 0 ? '-' : ''}$${wFmt(v, 2)}`,
+
+  /** Exact dollars, no cents — e.g. $1,234,567,890 */
+  usdFull: (v: number) =>
+    `${v < 0 ? '-' : ''}$${wFmt(v, 0)}`,
+
+  /** Abbreviated, professional — e.g. $1.23B, $45.6M, $980K */
+  usdAbbr: (v: number) => {
+    const sign = v < 0 ? '−' : '';
+    const a = Math.abs(v);
+    if (a >= 1e12) return `${sign}$${(a / 1e12).toFixed(2)}T`;
+    if (a >= 1e9)  return `${sign}$${(a / 1e9).toFixed(2)}B`;
+    if (a >= 1e6)  return `${sign}$${(a / 1e6).toFixed(2)}M`;
+    if (a >= 1e3)  return `${sign}$${(a / 1e3).toFixed(1)}K`;
+    return `${sign}$${a.toFixed(0)}`;
   },
 
   jpy: (v: number) =>
@@ -20,7 +40,16 @@ export const fmt = {
 
   date: (s?: string | null) => {
     if (!s) return '—';
-    return new Date(s).toLocaleDateString('en-US', {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '—';
+
+    if (i18n.language === 'ja') {
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      return `${year}年${month}月${day}日`;
+    }
+    return d.toLocaleDateString('en-US', {
       year: 'numeric', month: 'short', day: '2-digit',
     });
   },
@@ -29,6 +58,16 @@ export const fmt = {
     if (!s) return '—';
     const d = new Date(s);
     return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+  },
+
+  dateWithKanjiJp: (s?: string | null) => {
+    if (!s) return '—';
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '—';
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    return `${year}年${month}月${day}日`;
   },
 
   rate: (v?: number | null) => v != null ? v.toFixed(2) : '—',

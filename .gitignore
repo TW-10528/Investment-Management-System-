@@ -4,6 +4,43 @@ backend/*.pyc
 backend/.env
 frontend/node_modules/
 frontend/dist/
-*.envbackend/node_modules/
+*.env
+backend/node_modules/
+node_modules/
 backend/*.db
 backend/uploads/
+
+# Build outputs
+backend/dist/
+frontend/build/
+
+# Python environments & cache
+sglang-env/
+.venv/
+env/
+venv/
+__pycache__/
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
+# Dependency locks
+pnpm-lock.yaml
+yarn.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*

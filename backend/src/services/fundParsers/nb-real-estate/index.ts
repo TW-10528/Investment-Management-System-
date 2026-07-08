@@ -35,8 +35,9 @@ export function parseNbRealEstate(rawText: string, previousState: NbPreviousStat
   const unfundedUsd    = f.remaining_commitment ?? (commitmentUsd > 0 ? commitmentUsd - totalCalledUsd : 0) // F
   const callPct        = a.percent_of_capital_commitment_called ?? 0      // e.g. 5.00 → "5.00%"
 
-  const noticeDate = a.notice_date ?? new Date().toISOString().slice(0, 10)
-  const dueDate    = a.payment_date ?? noticeDate
+  // Use payment_date as primary date (when LP actually receives/pays), fall back to notice_date
+  const noticeDate = a.payment_date ?? a.notice_date ?? new Date().toISOString().slice(0, 10)
+  const dueDate    = a.payment_date ?? a.notice_date ?? noticeDate
 
   // ── Confidence scoring (mirrors the previous parser's heuristic) ──────────────
   let score = 0
@@ -52,7 +53,8 @@ export function parseNbRealEstate(rawText: string, previousState: NbPreviousStat
 
   return {
     fundKey:          'nb-real-estate',
-    fundName:         report.fund_name,
+    fundName:         'Real Estate Secondary Opportunities Fund II',
+    fundManager:      'Neuberger Berman',
     noticeType:       'capital_call',   // combined call + distribution ride on one row
     noticeDate,
     dueDate,
@@ -61,6 +63,9 @@ export function parseNbRealEstate(rawText: string, previousState: NbPreviousStat
     reinvestableUsd,                    // D
     managementFeeUsd: a.net_management_fee || 0,
     taxExpenseUsd:    a.tax_expense || 0,
+    returnOfCapitalUsd: f.return_of_capital ?? 0,
+    gainUsd:            f.gain ?? 0,
+    interestUsd:        f.interest ?? 0,
     commitmentUsd,
     totalCalledUsd,
     unfundedUsd,
@@ -69,6 +74,6 @@ export function parseNbRealEstate(rawText: string, previousState: NbPreviousStat
     investmentTargets: [],
     confidence,
     confidenceGrade,
-    nbReport:         report,
+    fundReport:       report,
   }
 }

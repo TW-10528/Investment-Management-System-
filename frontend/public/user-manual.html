@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Management System - User Manual</title>
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --border-color: #e0e0e0;
+            --accent: #2563eb;
+            --accent-light: #eff6ff;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", sans-serif;
+            --font-mono: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-primary: #0f172a;
+                --bg-secondary: #1e293b;
+                --text-primary: #f1f5f9;
+                --text-secondary: #cbd5e1;
+                --border-color: #334155;
+                --accent-light: #0c2340;
+            }
+        }
+
+        :root[data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --border-color: #e0e0e0;
+            --accent: #2563eb;
+            --accent-light: #eff6ff;
+        }
+
+        :root[data-theme="dark"] {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border-color: #334155;
+            --accent: #3b82f6;
+            --accent-light: #0c2340;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+        }
+
+        body {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 2rem 0;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 0 1.5rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .sidebar-header h1 {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .sidebar-header p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .sidebar-nav {
+            list-style: none;
+        }
+
+        .sidebar-nav li {
+            margin: 0;
+        }
+
+        .sidebar-nav a {
+            display: block;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.95rem;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .sidebar-nav a:hover {
+            color: var(--text-primary);
+            border-left-color: var(--accent);
+            background: var(--accent-light);
+        }
+
+        .sidebar-nav a.active {
+            color: var(--accent);
+            border-left-color: var(--accent);
+            background: var(--accent-light);
+            font-weight: 600;
+        }
+
+        /* Main Content */
+        .main {
+            padding: 3rem;
+            overflow-y: auto;
+            max-width: 900px;
+        }
+
+        .section {
+            margin-bottom: 4rem;
+            scroll-margin-top: 2rem;
+        }
+
+        .section-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            text-wrap: balance;
+        }
+
+        .section-subtitle {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-top: 2.5rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            text-wrap: balance;
+        }
+
+        .section-description {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            line-height: 1.7;
+            max-width: 65ch;
+        }
+
+        /* Step Lists */
+        .steps {
+            list-style: none;
+            margin: 1.5rem 0;
+        }
+
+        .steps li {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .step-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            background: var(--accent-light);
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+            padding-top: 0.25rem;
+        }
+
+        .step-content p {
+            margin: 0.5rem 0;
+            color: var(--text-primary);
+        }
+
+        .step-content strong {
+            color: var(--accent);
+        }
+
+        /* Cards and Callouts */
+        .callout {
+            border-left: 4px solid;
+            padding: 1.25rem;
+            margin: 1.5rem 0;
+            border-radius: 4px;
+            background: var(--bg-secondary);
+        }
+
+        .callout.tip {
+            border-left-color: var(--success);
+            background: rgba(16, 185, 129, 0.08);
+        }
+
+        .callout.warning {
+            border-left-color: var(--warning);
+            background: rgba(245, 158, 11, 0.08);
+        }
+
+        .callout.important {
+            border-left-color: var(--danger);
+            background: rgba(239, 68, 68, 0.08);
+        }
+
+        .callout-title {
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+
+        .callout p {
+            margin: 0.5rem 0;
+            font-size: 0.95rem;
+        }
+
+        /* Tables */
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        th {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 700;
+            border-bottom: 2px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Typography Helpers */
+        .small {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        code {
+            background: var(--bg-secondary);
+            padding: 0.25em 0.5em;
+            border-radius: 3px;
+            font-family: var(--font-mono);
+            font-size: 0.9em;
+        }
+
+        .highlight {
+            background: rgba(37, 99, 235, 0.15);
+            padding: 0.25em 0.4em;
+            border-radius: 3px;
+        }
+
+        /* Status Badges */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .badge.success {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+
+        .badge.warning {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: fixed;
+                left: -260px;
+                top: 0;
+                height: 100vh;
+                z-index: 100;
+                transition: left 0.3s;
+            }
+
+            .main {
+                padding: 2rem;
+            }
+
+            .section-title {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1>Manual</h1>
+            <p>Investment Management System</p>
+        </div>
+        <ul class="sidebar-nav">
+            <li><a href="#getting-started" class="active">Getting Started</a></li>
+            <li><a href="#dashboard">Dashboard Overview</a></li>
+            <li><a href="#managing-funds">Managing Funds</a></li>
+            <li><a href="#uploading-documents">Uploading Documents</a></li>
+            <li><a href="#understanding-reports">Understanding Reports</a></li>
+            <li><a href="#common-tasks">Common Tasks</a></li>
+            <li><a href="#troubleshooting">Troubleshooting</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Section: Getting Started -->
+        <section class="section" id="getting-started">
+            <h1 class="section-title">Getting Started</h1>
+            <p class="section-description">Welcome to the Investment Management System. This guide will help you navigate the system step by step, even if you've never used similar software before.</p>
+
+            <h2 class="section-subtitle">Logging In</h2>
+            <p class="section-description">To access the system, you'll need your login credentials (username and password).</p>
+
+            <ol class="steps">
+                <li>
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <p>Open the system in your web browser by entering the address provided to you</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <p>Enter your <strong>username</strong> (usually your email address)</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <p>Enter your <strong>password</strong></p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <p>Click the <strong>"Login"</strong> button</p>
+                    </div>
+                </li>
+            </ol>
+
+            <div class="callout tip">
+                <div class="callout-title">💡 Tip</div>
+                <p>If you forget your password, ask your administrator for help to reset it.</p>
+            </div>
+
+            <h2 class="section-subtitle">Understanding the Main Menu</h2>
+            <p class="section-description">Once logged in, you'll see the main navigation menu on the left side of the screen. Here's what each section does:</p>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Menu Item</th>
+                            <th>What It Does</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Dashboard</strong></td>
+                            <td>Shows an overview of all your funds and key information at a glance</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Funds</strong></td>
+                            <td>View and manage all investment funds in the system</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Reports</strong></td>
+                            <td>View documents and reports related to your funds</td>
+                        </tr>
+                        <tr>
+                            <td><strong>FX Rates</strong></td>
+                            <td>Check currency exchange rates for currency conversions</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Alerts & Notifications</strong></td>
+                            <td>View important messages and alerts about your funds</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Users</strong></td>
+                            <td>Manage team members and their access (admin only)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Settings</strong></td>
+                            <td>Adjust system preferences and your account settings</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section: Dashboard Overview -->
+        <section class="section" id="dashboard">
+            <h1 class="section-title">Dashboard Overview</h1>
+            <p class="section-description">The Dashboard is your starting point when you log in. It provides a quick summary of all your investment funds and important metrics.</p>
+
+            <h2 class="section-subtitle">What You'll See</h2>
+            <ol class="steps">
+                <li>
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <p><strong>Key Metrics at the Top</strong> — Shows total commitment, amount invested, and other important numbers</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <p><strong>List of All Funds</strong> — Each fund is shown with its key information (name, type, status)</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <p><strong>Recent Activity</strong> — Shows the latest documents uploaded or changes made</p>
+                    </div>
+                </li>
+            </ol>
+
+            <h2 class="section-subtitle">Fund Status Colors</h2>
+            <p class="section-description">Each fund shows a status that helps you quickly understand its condition:</p>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Status Color</th>
+                            <th>Meaning</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge success">Green</span></td>
+                            <td>Fund is active and working normally</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge warning">Yellow/Orange</span></td>
+                            <td>Fund needs your attention (missing documents, pending items)</td>
+                        </tr>
+                        <tr>
+                            <td>Gray</td>
+                            <td>Fund is inactive or archived</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section: Managing Funds -->
+        <section class="section" id="managing-funds">
+            <h1 class="section-title">Managing Funds</h1>
+            <p class="section-description">A "fund" is an investment vehicle. In this section, you'll learn how to view, create, and manage funds.</p>
+
+            <h2 class="section-subtitle">Viewing a Fund</h2>
+            <ol class="steps">
+                <li>
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <p>Click <strong>"Funds"</strong> in the left menu</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <p>You'll see a list of all funds. Click on any fund name to view its details</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <p>You'll now see the fund's detailed page with information like:</p>
+                        <ul style="margin-top: 0.5rem; margin-left: 1.5rem; color: var(--text-secondary);">
+                            <li>Total committed amount</li>
+                            <li>Amount paid in</li>
+                            <li>Remaining unfunded commitment</li>
+                            <li>All documents related to this fund</li>
+                        </ul>
+                    </div>
+                </li>
+            </ol>
+
+            <h2 class="section-subtitle">Understanding Fund Information</h2>
+            <p class="section-description">Each fund has several important pieces of information. Here's what they mean:</p>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Term</th>
+                            <th>What It Means</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Total Commitment</strong></td>
+                            <td>The total amount you promised to invest in this fund</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Paid In (E)</strong></td>
+                            <td>The amount of money you have actually paid to the fund so far</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Unfunded (F)</strong></td>
+                            <td>The amount still remaining that you might need to pay in the future</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Dry Power</strong></td>
+                            <td>Cash that's available in the fund to invest (not yet deployed)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>DPI</strong></td>
+                            <td>Distribution to Paid-In ratio — shows how much profit you've made</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="callout important">
+                <div class="callout-title">⚠️ Important</div>
+                <p>Always review your unfunded commitment — this is money you may be required to pay in the future.</p>
+            </div>
+        </section>
+
+        <!-- Section: Uploading Documents -->
+        <section class="section" id="uploading-documents">
+            <h1 class="section-title">Uploading Documents</h1>
+            <p class="section-description">Documents are how you provide important information to the system. This might include capital call notices, distribution statements, or other fund documents.</p>
+
+            <h2 class="section-subtitle">How to Upload a Document</h2>
+            <ol class="steps">
+                <li>
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <p>Navigate to the fund where you want to upload a document</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <p>Scroll down to the <strong>"Documents / Reports"</strong> section</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <p>Click the <strong>"Upload Document"</strong> button</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <p>Select the PDF file from your computer by clicking the upload area</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <p>The system will automatically read the document and extract key information</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <p>Review the extracted information and click <strong>"Save"</strong> to complete the upload</p>
+                    </div>
+                </li>
+            </ol>
+
+            <div class="callout tip">
+                <div class="callout-title">💡 Tip</div>
+                <p>The system can read both regular PDFs and scanned documents (images). Make sure your document is clear and readable for the best results.</p>
+            </div>
+
+            <h2 class="section-subtitle">Types of Documents</h2>
+            <p class="section-description">Documents are organized into different types based on what they contain:</p>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Document Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Capital Call</strong></td>
+                            <td>Request to pay additional money into the fund</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Distribution</strong></td>
+                            <td>Statement showing money you're receiving from the fund</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Capital & Distribution</strong></td>
+                            <td>Document that includes both capital call and distribution information</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Viewing Documents</strong></td>
+                            <td>Other informational documents (reports, statements, notices)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section: Understanding Reports -->
+        <section class="section" id="understanding-reports">
+            <h1 class="section-title">Understanding Reports</h1>
+            <p class="section-description">Reports show detailed information about your fund's performance and the documents you've uploaded.</p>
+
+            <h2 class="section-subtitle">Viewing Fund Reports</h2>
+            <ol class="steps">
+                <li>
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <p>Go to a specific fund by clicking <strong>"Funds"</strong> → select a fund name</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <p>Click on the <strong>"Documents / Reports"</strong> tab</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <p>You'll see two sections:</p>
+                        <ul style="margin-top: 0.5rem; margin-left: 1.5rem; color: var(--text-secondary);">
+                            <li><strong>Files</strong> — Transaction documents (Capital Calls, Distributions)</li>
+                            <li><strong>Viewing Documents</strong> — Other informational documents</li>
+                        </ul>
+                    </div>
+                </li>
+            </ol>
+
+            <h2 class="section-subtitle">Understanding Document Information</h2>
+            <p class="section-description">Each document shows the following information:</p>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Column</th>
+                            <th>What It Shows</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>File</strong></td>
+                            <td>The name of the document</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Type</strong></td>
+                            <td>What kind of document it is (Capital Call, Distribution, etc.)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Notice Date</strong></td>
+                            <td>When the document was issued</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Due Date</strong></td>
+                            <td>When action is required (if applicable)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Amount</strong></td>
+                            <td>The money involved (capital to pay or distribution to receive)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Confidence</strong></td>
+                            <td>How confident the system is in the extracted data</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="callout tip">
+                <div class="callout-title">💡 Tip</div>
+                <p>Click <strong>"View"</strong> next to any document to see the original PDF or get more details.</p>
+            </div>
+        </section>
+
+        <!-- Section: Common Tasks -->
+        <section class="section" id="common-tasks">
+            <h1 class="section-title">Common Tasks</h1>
+            <p class="section-description">Here are step-by-step guides for the most common things you'll do in the system.</p>
+
+            <h2 class="section-subtitle">Task: Upload a Capital Call Notice</h2>
+            <ol class="steps">
+                <li>
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <p>Click <strong>"Funds"</strong> in the left menu and select the fund</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <p>Scroll to <strong>"Documents / Reports"</strong> section</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <p>Click <strong>"Upload Document"</strong> button</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <p>Select your Capital Call PDF file</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <p>The system will automatically detect it's a Capital Call and extract the amount due</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <p>Review the information and click <strong>"Save"</strong></p>
+                    </div>
+                </li>
+            </ol>
+
+            <h2 class="section-subtitle">Task: Check How Much You Owe</h2>
+            <ol class="steps">
+                <li>
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <p>Click <strong>"Funds"</strong> and select your fund</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <p>Look at the top of the page where it says <strong>"Unfunded (F)"</strong></p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <p>This number is the amount you may still need to pay into the fund</p>
+                    </div>
+                </li>
+            </ol>
+
+            <h2 class="section-subtitle">Task: Find When a Document Was Issued</h2>
+            <ol class="steps">
+                <li>
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <p>Go to the fund and click <strong>"Documents / Reports"</strong></p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <p>Look in the <strong>"Notice Date"</strong> column to see when each document was issued</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <p>Documents are sorted with the oldest first</p>
+                    </div>
+                </li>
+            </ol>
+        </section>
+
+        <!-- Section: Troubleshooting -->
+        <section class="section" id="troubleshooting">
+            <h1 class="section-title">Troubleshooting</h1>
+            <p class="section-description">Having trouble? Here are solutions to common problems.</p>
+
+            <h2 class="section-subtitle">I Can't Log In</h2>
+            <div class="callout warning">
+                <p style="margin: 0;"><strong>Solution:</strong> Check that you're entering your username and password correctly. If you still can't log in, contact your administrator to reset your password.</p>
+            </div>
+
+            <h2 class="section-subtitle">My Document Didn't Upload Properly</h2>
+            <div class="callout warning">
+                <p style="margin: 0;"><strong>Check:</strong> Make sure your file is a PDF and is under 100 MB. Try uploading again. If the problem continues, the document might be corrupt — try scanning or exporting it again.</p>
+            </div>
+
+            <h2 class="section-subtitle">The System Extracted the Wrong Information</h2>
+            <div class="callout warning">
+                <p style="margin: 0;"><strong>Solution:</strong> The system sometimes makes mistakes, especially with scanned documents. You can manually correct the information by editing the document details after upload. Look for an <strong>"Edit"</strong> button next to the document.</p>
+            </div>
+
+            <h2 class="section-subtitle">I See a "Confidence: Low" Warning</h2>
+            <div class="callout tip">
+                <p style="margin: 0;"><strong>What it means:</strong> The system is less certain about the information it extracted. Review the details carefully and correct any errors if needed.</p>
+            </div>
+
+            <h2 class="section-subtitle">I Can't Find a Document</h2>
+            <div class="callout warning">
+                <p style="margin: 0;"><strong>Solution:</strong> Go to the fund, click <strong>"Documents / Reports"</strong>, and look in both the <strong>"Files"</strong> and <strong>"Viewing Documents"</strong> sections. Documents are sorted by date — the oldest appears first. Try scrolling down to find older documents.</p>
+            </div>
+
+            <h2 class="section-subtitle">Still Need Help?</h2>
+            <div class="callout tip">
+                <p style="margin: 0;">Contact your system administrator or support team. They can help with issues this manual doesn't cover.</p>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <div style="border-top: 1px solid var(--border-color); padding-top: 2rem; margin-top: 4rem; color: var(--text-secondary); font-size: 0.9rem;">
+            <p>Investment Management System User Manual</p>
+            <p>Version 1.0 | Last updated July 2026</p>
+        </div>
+    </main>
+</body>
+</html>

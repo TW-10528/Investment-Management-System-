@@ -50,7 +50,7 @@ router.get('/', async (c) => {
     include: { fund: { select: { fundName: true } } },
     orderBy: { dueDate: 'desc' },
   })
-  return c.json(calls.map(cc => callDict(cc, (cc as any).fund?.fundName)))
+  return c.json(calls.map((cc: any) => callDict(cc, (cc as any).fund?.fundName)))
 })
 
 // GET /:id

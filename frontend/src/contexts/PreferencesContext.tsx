@@ -3,13 +3,14 @@
  * Stores: theme, language, currency, compact numbers, date format.
  * All values persist in localStorage.
  */
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useEffect, useState, type ReactNode } from 'react';
 import i18n from '../i18n';
 
-export type Theme      = 'light' | 'dark';
-export type Currency   = 'USD' | 'JPY';
-export type DateFmt    = 'US' | 'ISO' | 'JP';
-export type LangCode   = 'en' | 'ja' | 'tl' | 'zh' | 'ko';
+export type Theme       = 'light';   // dark theme removed — app is light-only
+export type Currency    = 'USD' | 'JPY';
+export type DateFmt     = 'US' | 'ISO' | 'JP';
+export type LangCode    = 'en' | 'ja';
+export type LandingPage = 'dashboard' | 'funds';
 
 interface Prefs {
   theme:          Theme;
@@ -17,15 +18,21 @@ interface Prefs {
   currency:       Currency;
   compactNumbers: boolean;
   dateFormat:     DateFmt;
+  landingPage:    LandingPage;
+  showAnalysis:   boolean;
+  showCalculator: boolean;
 }
 
 interface PrefsCtx extends Prefs {
-  setTheme:          (t: Theme)      => void;
-  setLanguage:       (l: LangCode)   => void;
-  setCurrency:       (c: Currency)   => void;
-  setCompactNumbers: (v: boolean)    => void;
-  setDateFormat:     (f: DateFmt)    => void;
-  resetAll:          ()              => void;
+  setTheme:          (t: Theme)        => void;
+  setLanguage:       (l: LangCode)     => void;
+  setCurrency:       (c: Currency)     => void;
+  setCompactNumbers: (v: boolean)      => void;
+  setDateFormat:     (f: DateFmt)      => void;
+  setLandingPage:    (p: LandingPage)  => void;
+  setShowAnalysis:   (v: boolean)      => void;
+  setShowCalculator: (v: boolean)      => void;
+  resetAll:          ()                => void;
 }
 
 const DEFAULTS: Prefs = {
@@ -34,14 +41,29 @@ const DEFAULTS: Prefs = {
   currency:       'USD',
   compactNumbers: true,
   dateFormat:     'US',
+  landingPage:    'dashboard',
+  showAnalysis:   true,
+  showCalculator: true,
 };
+
+const VALID_LANGS: LangCode[] = ['en', 'ja'];
 
 function load(): Prefs {
   try {
     const raw = localStorage.getItem('ims_prefs');
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      console.log('🔧 [load] localStorage has language:', parsed.language);
+      // STRICT: Only accept saved language if it's valid. Never override with browser lang.
+      if (VALID_LANGS.includes(parsed.language)) {
+        console.log('✅ [load] using saved language:', parsed.language);
+        return { ...DEFAULTS, ...parsed, theme: 'light' };
+      }
+    }
   } catch { /* ignore */ }
-  return { ...DEFAULTS };
+  // No valid saved prefs → use default English (NOT browser detection)
+  console.log('❌ [load] no valid saved language, defaulting to en');
+  return { ...DEFAULTS, language: 'en' };
 }
 
 function save(p: Prefs) {
@@ -50,24 +72,28 @@ function save(p: Prefs) {
   localStorage.setItem('ims_language', p.language);
 }
 
-const Ctx = createContext<PrefsCtx>({} as PrefsCtx);
+export const PrefsCtx = createContext<PrefsCtx>({} as PrefsCtx);
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<Prefs>(load);
 
-  // Apply theme class to <html>
+  // Initialize theme
   useEffect(() => {
-    const html = document.documentElement;
-    if (prefs.theme === 'dark') {
-      html.classList.add('dark');
-    } else {
-      html.classList.remove('dark');
-    }
-  }, [prefs.theme]);
+    document.documentElement.classList.remove('dark');
+  }, []);
 
-  // Apply language to i18n
+  // Sync language to i18n whenever it changes (including mount)
   useEffect(() => {
-    i18n.changeLanguage(prefs.language);
+    const updateLanguage = async () => {
+      try {
+        console.log('🔄 [useEffect] prefs.language is:', prefs.language, '| i18n.language was:', i18n.language);
+        await i18n.changeLanguage(prefs.language);
+        console.log('✅ [useEffect] i18n.language is now:', i18n.language);
+      } catch (err) {
+        console.error('❌ [useEffect] Failed to change language:', err);
+      }
+    };
+    updateLanguage();
   }, [prefs.language]);
 
   function update(patch: Partial<Prefs>) {
@@ -79,18 +105,19 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <Ctx.Provider value={{
+    <PrefsCtx.Provider value={{
       ...prefs,
       setTheme:          t => update({ theme: t }),
       setLanguage:       l => update({ language: l }),
       setCurrency:       c => update({ currency: c }),
       setCompactNumbers: v => update({ compactNumbers: v }),
       setDateFormat:     f => update({ dateFormat: f }),
+      setLandingPage:    p => update({ landingPage: p }),
+      setShowAnalysis:   v => update({ showAnalysis: v }),
+      setShowCalculator: v => update({ showCalculator: v }),
       resetAll:          () => { save(DEFAULTS); setPrefs({ ...DEFAULTS }); },
     }}>
       {children}
-    </Ctx.Provider>
+    </PrefsCtx.Provider>
   );
 }
-
-export function usePreferences() { return useContext(Ctx); }

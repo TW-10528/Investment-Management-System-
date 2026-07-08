@@ -20,7 +20,7 @@ router.get('/dashboard', async (c) => {
     orderBy: { sortOrder: 'asc' },
   })
 
-  const items = await Promise.all(rules.map(async (rule) => {
+  const items = await Promise.all(rules.map(async (rule: any) => {
     const result = await prisma.calculationResult.findFirst({
       where:   { ruleId: rule.id, error: null },
       orderBy: { createdAt: 'desc' },
@@ -57,7 +57,7 @@ router.get('/results/:noticeId', async (c) => {
     include: { rule: true },
     orderBy: { rule: { sortOrder: 'asc' } },
   })
-  return c.json(results.map(r => ({
+  return c.json(results.map((r: any) => ({
     id:          r.id,
     ruleId:      r.ruleId,
     noticeId:    r.noticeId,
@@ -96,7 +96,7 @@ router.post('/run/:noticeId', async (c) => {
 
   return c.json({
     message: `Ran ${results.length} rule(s) against notice ${notice.id}.`,
-    results: results.map(r => ({
+    results: results.map((r: any) => ({
       ruleName:   r.rule.name,
       formula:    r.rule.formula,
       outputText: r.outputText,
@@ -111,7 +111,7 @@ router.get('/', async (c) => {
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   })
 
-  const enriched = await Promise.all(rules.map(async (rule) => {
+  const enriched = await Promise.all(rules.map(async (rule: any) => {
     const latest = await prisma.calculationResult.findFirst({
       where:   { ruleId: rule.id, error: null },
       orderBy: { createdAt: 'desc' },
@@ -246,7 +246,7 @@ router.get('/extractors', async (c) => {
   const rows = await prisma.attributeExtractor.findMany({
     orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
   })
-  return c.json(rows.map(r => ({
+  return c.json(rows.map((r: any) => ({
     id:             r.id,
     attributeName:  r.attributeName,
     label:          r.label,
@@ -340,48 +340,6 @@ router.post('/extractors/test', async (c) => {
 
   const value = extractByKeyword(text, keywords, extractionType ?? 'usd')
   return c.json({ value: value ?? null, found: value !== undefined })
-})
-
-// ── Siguler Guff preset ───────────────────────────────────────────────────────
-
-const SIGULER_GUFF_EXTRACTORS = [
-  { attributeName: 'sgTotalCall', label: 'Total Capital Call Amount (SG)', keywords: ['capital call equal to', 'Capital Call equal to', 'Capital Call is equal to'], extractionType: 'usd' },
-  { attributeName: 'sgLpShare',   label: 'LP Share of Capital Call (SG)',  keywords: ['Your share of this capital call is', 'your share of this capital call is'], extractionType: 'usd' },
-  { attributeName: 'sgDueDate',   label: 'Capital Call Due Date (SG)',      keywords: ['due no later than', 'Due No Later Than', 'payable no later than'], extractionType: 'date' },
-  { attributeName: 'sgFundedPct', label: 'Funded % After This Call (SG)',   keywords: ['After this call, you will have funded', 'After this call you will have funded', 'you will have funded'], extractionType: 'pct' },
-]
-
-const SIGULER_GUFF_RULES = [
-  { name: 'SG — LP Share (JPY)',              description: 'Siguler Guff: LP share of capital call converted to JPY',          formula: 'sgLpShare * fxRate',              explanation: 'Converts the LP-specific share of the Siguler Guff capital call from USD to JPY at the notice FX rate. Formula: LP Share (USD) × FX Rate (USD/JPY).',                                                                           outputUnit: 'JPY', applicableTypes: ['capital_call'], displayOnDashboard: true,  sortOrder: 10 },
-  { name: 'SG — Total Call (JPY)',             description: 'Siguler Guff: total fund capital call in JPY',                     formula: 'sgTotalCall * fxRate',            explanation: 'Converts the total Siguler Guff capital call amount from USD to JPY. Formula: Total Call (USD) × FX Rate.',                                                                                                              outputUnit: 'JPY', applicableTypes: ['capital_call'], displayOnDashboard: false, sortOrder: 11 },
-  { name: 'SG — Commitment Utilization %',     description: 'Siguler Guff: % of commitment funded after this call',            formula: 'sgFundedPct',                     explanation: 'The cumulative funded percentage of the LP commitment after this capital call, as stated in the notice.',                                                                                                                outputUnit: '%',   applicableTypes: ['capital_call'], displayOnDashboard: true,  sortOrder: 12 },
-  { name: 'SG — Unfunded Commitment (USD)',    description: 'Siguler Guff: remaining unfunded commitment',                      formula: 'commitmentUsd - totalCalledUsd',  explanation: 'Remaining unfunded LP commitment: Total Commitment minus total capital called to date. From commitment summary section of notice.',                                                                                       outputUnit: 'USD', applicableTypes: ['capital_call'], displayOnDashboard: true,  sortOrder: 13 },
-  { name: 'SG — Net Cash Flow (JPY)',          description: 'Siguler Guff: net capital call minus any distribution offset, in JPY', formula: 'netCallUsd * fxRate',         explanation: 'Net capital call (gross call minus any deemed distribution or reinvestable offset) converted to JPY. Matches Excel column G × FX rate.',                                                                                  outputUnit: 'JPY', applicableTypes: ['capital_call'], displayOnDashboard: true,  sortOrder: 14 },
-  { name: 'SG — Management Fee (JPY)',         description: 'Siguler Guff: management fee component in JPY',                   formula: 'managementFeeUsd * fxRate',       explanation: 'Management fee portion of the capital call converted to JPY at the notice FX rate.',                                                                                                                                    outputUnit: 'JPY', applicableTypes: ['capital_call'], displayOnDashboard: false, sortOrder: 15 },
-]
-
-router.post('/presets/siguler-guff', async (c) => {
-  const user = c.get('user')
-  if (!canEdit(user.role)) return c.json({ detail: 'Edit access required.' }, 403)
-
-  const created = { extractors: [] as string[], rules: [] as string[] }
-  const skipped = { extractors: [] as string[], rules: [] as string[] }
-
-  for (const ext of SIGULER_GUFF_EXTRACTORS) {
-    const existing = await prisma.attributeExtractor.findFirst({ where: { attributeName: ext.attributeName } })
-    if (existing) { skipped.extractors.push(ext.attributeName); continue }
-    await prisma.attributeExtractor.create({ data: { ...ext, isActive: true, createdBy: user.email } })
-    created.extractors.push(ext.attributeName)
-  }
-
-  for (const rule of SIGULER_GUFF_RULES) {
-    const existing = await prisma.calculationRule.findFirst({ where: { name: rule.name } })
-    if (existing) { skipped.rules.push(rule.name); continue }
-    await prisma.calculationRule.create({ data: { ...rule, isActive: true, createdBy: user.email } })
-    created.rules.push(rule.name)
-  }
-
-  return c.json({ message: 'Siguler Guff preset applied.', created, skipped })
 })
 
 export default router

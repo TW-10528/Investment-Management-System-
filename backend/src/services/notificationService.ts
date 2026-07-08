@@ -20,7 +20,7 @@ export async function createNotification(input: CreateNotificationInput) {
       title:     input.title,
       message:   input.message,
       link:      input.link    ?? null,
-      metadata:  (input.metadata ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+      metadata:  (input.metadata ?? null) as any,
     },
   })
 }
@@ -32,7 +32,7 @@ export async function notifyAllAdmins(input: Omit<CreateNotificationInput, 'user
     select: { id: true, email: true },
   })
   await Promise.all(
-    admins.map(a =>
+    admins.map((a: any) =>
       createNotification({ ...input, userId: a.id, userEmail: a.email })
     )
   )

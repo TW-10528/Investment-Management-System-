@@ -13,12 +13,22 @@ export interface FundSummary {
   vintage_year?: number;
   currency?: string;
   commitment_usd: number;
+  contract_commitment_usd?: number | null;
+  commitment_jpy?: number | null;
+  contract_commitment_jpy?: number | null;
   total_called_usd: number;
+  total_called_jpy?: number;
   drawn_pct: number;
   unfunded_usd: number;
   investment_capacity: number;
   net_cash_position: number;
   total_received_usd: number;
+  total_received_jpy?: number;
+  nav_usd?: number;
+  total_value_usd?: number;
+  moic?: number;
+  tvpi?: number;
+  irr?: number | null;
   dpi: number;
   is_active?: boolean;
 }
@@ -58,9 +68,13 @@ export interface LedgerRow {
   net_cash_position: number;   // H
   capital_paid_jpy: number;
   capital_received_jpy: number;
+  return_of_capital?: number;
+  gain?: number;
+  interest?: number;
   call_id?: string;
   dist_id?: string;
   wire_reference?: string;
+  notes?: string;
 }
 
 export interface LedgerSnapshot {
@@ -123,7 +137,10 @@ export interface DashboardData {
   // Performance multiples
   dpi: number;
   tvpi: number;
+  moic?: number;
+  irr?: number | null;
   total_nav_usd: number;
+  total_value_usd?: number;
   pending_calls_count: number;
   overdue_calls_count: number;
   overdue_calls: { id: string; due_date: string; net_call_usd: number }[];
