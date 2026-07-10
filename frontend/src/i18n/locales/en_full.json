@@ -1,0 +1,1388 @@
+{
+  "path": "nav.navigation",
+  "value": "Navigation"
+}
+{
+  "path": "nav.dashboard",
+  "value": "Dashboard"
+}
+{
+  "path": "nav.funds",
+  "value": "Funds"
+}
+{
+  "path": "nav.notices",
+  "value": "Notices"
+}
+{
+  "path": "nav.capitalCalls",
+  "value": "Capital Calls"
+}
+{
+  "path": "nav.distributions",
+  "value": "Distributions"
+}
+{
+  "path": "nav.fxRates",
+  "value": "FX Rates"
+}
+{
+  "path": "nav.investments",
+  "value": "Investments"
+}
+{
+  "path": "nav.calculator",
+  "value": "Calculators"
+}
+{
+  "path": "nav.rulesEngine",
+  "value": "Rules Engine"
+}
+{
+  "path": "nav.users",
+  "value": "Users"
+}
+{
+  "path": "nav.signOut",
+  "value": "Sign out"
+}
+{
+  "path": "nav.viewOnly",
+  "value": "View only"
+}
+{
+  "path": "calculator.title",
+  "value": "Advanced Financial Calculators"
+}
+{
+  "path": "calculator.subtitle",
+  "value": "IRR · DPI/TVPI · Live FX Converter · Net Call · Fee & Carry modelling"
+}
+{
+  "path": "calculator.irrTab",
+  "value": "IRR / NPV"
+}
+{
+  "path": "calculator.fxTab",
+  "value": "FX Converter"
+}
+{
+  "path": "calculator.multiplesTab",
+  "value": "DPI / TVPI"
+}
+{
+  "path": "calculator.netCallTab",
+  "value": "Net Call"
+}
+{
+  "path": "calculator.feeTab",
+  "value": "Fee & Carry"
+}
+{
+  "path": "calculator.availableAll",
+  "value": "Available to all users"
+}
+{
+  "path": "dashboard.title",
+  "value": "Portfolio Dashboard"
+}
+{
+  "path": "dashboard.subtitle",
+  "value": "Investment Overview"
+}
+{
+  "path": "dashboard.asOf",
+  "value": "As of"
+}
+{
+  "path": "dashboard.activeFunds",
+  "value": "Active Funds"
+}
+{
+  "path": "dashboard.totalCommitment",
+  "value": "Total Commitment"
+}
+{
+  "path": "dashboard.paidIn",
+  "value": "Paid-in"
+}
+{
+  "path": "dashboard.dryPowder",
+  "value": "Dry Powder"
+}
+{
+  "path": "dashboard.totalDistributed",
+  "value": "Total Distributed"
+}
+{
+  "path": "dashboard.netCashPosition",
+  "value": "Net Cash Position"
+}
+{
+  "path": "dashboard.netOutflow",
+  "value": "Net outflow"
+}
+{
+  "path": "dashboard.netInflow",
+  "value": "Net inflow"
+}
+{
+  "path": "dashboard.drawn",
+  "value": "drawn"
+}
+{
+  "path": "dashboard.ofCommitment",
+  "value": "of commitment"
+}
+{
+  "path": "dashboard.commitmentUtilisation",
+  "value": "Commitment Utilisation — Paid-in vs Dry Powder"
+}
+{
+  "path": "dashboard.strategyAllocation",
+  "value": "Strategy Allocation"
+}
+{
+  "path": "dashboard.distributionBreakdown",
+  "value": "Distribution Breakdown"
+}
+{
+  "path": "dashboard.returnOfPrincipal",
+  "value": "Return of Principal"
+}
+{
+  "path": "dashboard.profitIncome",
+  "value": "Profit / Income"
+}
+{
+  "path": "dashboard.totalDistributions",
+  "value": "Total Distributions"
+}
+{
+  "path": "dashboard.ofTotal",
+  "value": "of total"
+}
+{
+  "path": "dashboard.fundNAV",
+  "value": "Fund NAV"
+}
+{
+  "path": "dashboard.noNavData",
+  "value": "No NAV data yet — upload a financial statement PDF"
+}
+{
+  "path": "dashboard.recentInvestments",
+  "value": "Recent Investments"
+}
+{
+  "path": "dashboard.noInvestments",
+  "value": "No investment data yet — approve a Capital Call notice to populate"
+}
+{
+  "path": "dashboard.fundPortfolio",
+  "value": "Fund Portfolio"
+}
+{
+  "path": "dashboard.strategy",
+  "value": "Strategy"
+}
+{
+  "path": "dashboard.commitment",
+  "value": "Commitment"
+}
+{
+  "path": "dashboard.capacity",
+  "value": "Inv. Capacity"
+}
+{
+  "path": "dashboard.dpi",
+  "value": "DPI"
+}
+{
+  "path": "dashboard.tvpi",
+  "value": "TVPI"
+}
+{
+  "path": "dashboard.totalNav",
+  "value": "Total NAV"
+}
+{
+  "path": "dashboard.performanceMultiples",
+  "value": "Performance Multiples"
+}
+{
+  "path": "dashboard.portfolioHealth",
+  "value": "Portfolio Health"
+}
+{
+  "path": "dashboard.deploymentByFund",
+  "value": "Deployment by Fund"
+}
+{
+  "path": "dashboard.overdueCalls",
+  "value": "Overdue Capital Call"
+}
+{
+  "path": "dashboard.overdueCallsPlural",
+  "value": "Overdue Capital Calls"
+}
+{
+  "path": "dashboard.refreshLiveRate",
+  "value": "Refresh Live Rate"
+}
+{
+  "path": "dashboard.pendingCalls",
+  "value": "Pending Calls"
+}
+{
+  "path": "dashboard.overdue",
+  "value": "Overdue"
+}
+{
+  "path": "dashboard.usdJpy",
+  "value": "USD / JPY Rate"
+}
+{
+  "path": "dashboard.liveRate",
+  "value": "Live market rate"
+}
+{
+  "path": "dashboard.stored",
+  "value": "Stored"
+}
+{
+  "path": "dashboard.noStrategyData",
+  "value": "No strategy data"
+}
+{
+  "path": "dashboard.underManagement",
+  "value": "under management"
+}
+{
+  "path": "dashboard.portfolioTotal",
+  "value": "Portfolio Total"
+}
+{
+  "path": "dashboard.available",
+  "value": "available"
+}
+{
+  "path": "dashboard.grossCommitment",
+  "value": "gross LP commitment"
+}
+{
+  "path": "notices.title",
+  "value": "Notice Processing"
+}
+{
+  "path": "notices.subtitle",
+  "value": "Upload GP notices — data is auto-extracted and awaits admin approval"
+}
+{
+  "path": "notices.pending",
+  "value": "pending"
+}
+{
+  "path": "notices.uploadPDF",
+  "value": "Upload PDF"
+}
+{
+  "path": "notices.all",
+  "value": "All"
+}
+{
+  "path": "notices.approved",
+  "value": "Approved"
+}
+{
+  "path": "notices.rejected",
+  "value": "Rejected"
+}
+{
+  "path": "notices.uploadFirst",
+  "value": "Upload your first notice"
+}
+{
+  "path": "notices.uploadSubtitle",
+  "value": "Upload a Capital Call, Distribution, or Financial Statement PDF. The system will automatically extract key data for admin review."
+}
+{
+  "path": "notices.capitalCalls",
+  "value": "Capital Calls → CF records"
+}
+{
+  "path": "notices.distributions",
+  "value": "Distributions → CF records"
+}
+{
+  "path": "notices.financials",
+  "value": "Financials → NAV records"
+}
+{
+  "path": "notices.file",
+  "value": "File"
+}
+{
+  "path": "notices.type",
+  "value": "Type"
+}
+{
+  "path": "notices.fund",
+  "value": "Fund"
+}
+{
+  "path": "notices.status",
+  "value": "Status"
+}
+{
+  "path": "notices.confidence",
+  "value": "Confidence"
+}
+{
+  "path": "notices.uploaded",
+  "value": "Uploaded"
+}
+{
+  "path": "notices.review",
+  "value": "Review →"
+}
+{
+  "path": "notices.view",
+  "value": "View →"
+}
+{
+  "path": "notices.uploadTitle",
+  "value": "Upload Notice PDF"
+}
+{
+  "path": "notices.selectPDF",
+  "value": "Click to select a PDF notice"
+}
+{
+  "path": "notices.maxSize",
+  "value": "Max 20 MB"
+}
+{
+  "path": "notices.noticeType",
+  "value": "Notice Type"
+}
+{
+  "path": "notices.capitalCallNotice",
+  "value": "Capital Call Notice"
+}
+{
+  "path": "notices.distributionNotice",
+  "value": "Distribution Notice"
+}
+{
+  "path": "notices.financialStatement",
+  "value": "Financial Statement"
+}
+{
+  "path": "notices.assignFund",
+  "value": "Assign to Fund"
+}
+{
+  "path": "notices.fundOptional",
+  "value": "(can be assigned during approval)"
+}
+{
+  "path": "notices.cancel",
+  "value": "Cancel"
+}
+{
+  "path": "notices.uploadAndParse",
+  "value": "Upload & Parse"
+}
+{
+  "path": "notices.uploading",
+  "value": "Uploading…"
+}
+{
+  "path": "notices.extractedData",
+  "value": "Extracted Data"
+}
+{
+  "path": "notices.investmentTargets",
+  "value": "Investment Targets Detected"
+}
+{
+  "path": "notices.distributionBreakdown",
+  "value": "Distribution Breakdown"
+}
+{
+  "path": "notices.assignFundRequired",
+  "value": "Assign to Fund"
+}
+{
+  "path": "notices.adminNotes",
+  "value": "Admin Notes"
+}
+{
+  "path": "notices.adminNotesPlaceholder",
+  "value": "Optional notes…"
+}
+{
+  "path": "notices.reject",
+  "value": "Reject"
+}
+{
+  "path": "notices.approve",
+  "value": "Approve & Create Records"
+}
+{
+  "path": "notices.selectFundFirst",
+  "value": "Please select a fund before approving."
+}
+{
+  "path": "notices.approved_msg",
+  "value": "Notice approved — CF records created!"
+}
+{
+  "path": "notices.rejected_msg",
+  "value": "Notice rejected."
+}
+{
+  "path": "notices.keywords",
+  "value": "Keywords Extracted"
+}
+{
+  "path": "notices.sector",
+  "value": "Sector"
+}
+{
+  "path": "notices.geography",
+  "value": "Geography"
+}
+{
+  "path": "notices.dealType",
+  "value": "Deal Type"
+}
+{
+  "path": "investments.title",
+  "value": "Investment Destinations"
+}
+{
+  "path": "investments.subtitle",
+  "value": "All investment targets extracted from Capital Call notices"
+}
+{
+  "path": "investments.search",
+  "value": "Search by project, company, or fund…"
+}
+{
+  "path": "investments.allFunds",
+  "value": "All Funds"
+}
+{
+  "path": "investments.allSectors",
+  "value": "All Sectors"
+}
+{
+  "path": "investments.allGeographies",
+  "value": "All Geographies"
+}
+{
+  "path": "investments.noData",
+  "value": "No investment targets found"
+}
+{
+  "path": "investments.noDataSub",
+  "value": "Approve a Capital Call notice to see investment destinations"
+}
+{
+  "path": "investments.project",
+  "value": "Project / Company"
+}
+{
+  "path": "investments.fund",
+  "value": "Fund"
+}
+{
+  "path": "investments.amount",
+  "value": "Amount (USD)"
+}
+{
+  "path": "investments.date",
+  "value": "Date"
+}
+{
+  "path": "investments.sector",
+  "value": "Sector"
+}
+{
+  "path": "investments.geography",
+  "value": "Geography"
+}
+{
+  "path": "investments.type",
+  "value": "Type"
+}
+{
+  "path": "investments.code",
+  "value": "Code"
+}
+{
+  "path": "investments.totalInvested",
+  "value": "Total Invested"
+}
+{
+  "path": "investments.targets",
+  "value": "Targets"
+}
+{
+  "path": "auth.login",
+  "value": "Sign In"
+}
+{
+  "path": "auth.email",
+  "value": "Email address"
+}
+{
+  "path": "auth.password",
+  "value": "Password"
+}
+{
+  "path": "auth.signIn",
+  "value": "Sign In"
+}
+{
+  "path": "auth.signingIn",
+  "value": "Signing in…"
+}
+{
+  "path": "auth.noAccount",
+  "value": "Don't have an account?"
+}
+{
+  "path": "auth.signUp",
+  "value": "Sign up"
+}
+{
+  "path": "auth.forgotPassword",
+  "value": "Forgot password?"
+}
+{
+  "path": "auth.register",
+  "value": "Create Account"
+}
+{
+  "path": "auth.fullName",
+  "value": "Full name"
+}
+{
+  "path": "auth.createAccount",
+  "value": "Create Account"
+}
+{
+  "path": "auth.registering",
+  "value": "Registering…"
+}
+{
+  "path": "auth.alreadyAccount",
+  "value": "Already have an account?"
+}
+{
+  "path": "auth.pendingApproval",
+  "value": "Account pending administrator approval"
+}
+{
+  "path": "auth.pendingSubtitle",
+  "value": "You'll receive access once an admin approves your account."
+}
+{
+  "path": "common.loading",
+  "value": "Loading…"
+}
+{
+  "path": "common.save",
+  "value": "Save"
+}
+{
+  "path": "common.cancel",
+  "value": "Cancel"
+}
+{
+  "path": "common.delete",
+  "value": "Delete"
+}
+{
+  "path": "common.edit",
+  "value": "Edit"
+}
+{
+  "path": "common.close",
+  "value": "Close"
+}
+{
+  "path": "common.confirm",
+  "value": "Confirm"
+}
+{
+  "path": "common.search",
+  "value": "Search"
+}
+{
+  "path": "common.filter",
+  "value": "Filter"
+}
+{
+  "path": "common.noData",
+  "value": "No data"
+}
+{
+  "path": "common.viewAll",
+  "value": "View all →"
+}
+{
+  "path": "common.actions",
+  "value": "Actions"
+}
+{
+  "path": "common.date",
+  "value": "Date"
+}
+{
+  "path": "common.amount",
+  "value": "Amount"
+}
+{
+  "path": "common.notes",
+  "value": "Notes"
+}
+{
+  "path": "common.status",
+  "value": "Status"
+}
+{
+  "path": "common.fund",
+  "value": "Fund"
+}
+{
+  "path": "common.yes",
+  "value": "Yes"
+}
+{
+  "path": "common.no",
+  "value": "No"
+}
+{
+  "path": "common.error",
+  "value": "An error occurred"
+}
+{
+  "path": "common.success",
+  "value": "Success"
+}
+{
+  "path": "common.refresh",
+  "value": "Refresh"
+}
+{
+  "path": "settings.title",
+  "value": "Settings & Preferences"
+}
+{
+  "path": "settings.theme",
+  "value": "Theme"
+}
+{
+  "path": "settings.light",
+  "value": "Light"
+}
+{
+  "path": "settings.dark",
+  "value": "Dark"
+}
+{
+  "path": "settings.language",
+  "value": "Language"
+}
+{
+  "path": "settings.currency",
+  "value": "Default Currency"
+}
+{
+  "path": "settings.usd",
+  "value": "USD (Dollar)"
+}
+{
+  "path": "settings.jpy",
+  "value": "JPY (Yen)"
+}
+{
+  "path": "settings.compactNumbers",
+  "value": "Compact number format"
+}
+{
+  "path": "settings.compactOn",
+  "value": "On (e.g. $1.2M)"
+}
+{
+  "path": "settings.compactOff",
+  "value": "Off (e.g. $1,200,000)"
+}
+{
+  "path": "settings.dateFormat",
+  "value": "Date format"
+}
+{
+  "path": "settings.dateFormatUS",
+  "value": "MM/DD/YYYY"
+}
+{
+  "path": "settings.dateFormatISO",
+  "value": "YYYY-MM-DD"
+}
+{
+  "path": "settings.dateFormatJP",
+  "value": "YYYY年M月D日"
+}
+{
+  "path": "settings.saved",
+  "value": "Preferences saved!"
+}
+{
+  "path": "settings.reset",
+  "value": "Reset to defaults"
+}
+{
+  "path": "users.title",
+  "value": "User Management"
+}
+{
+  "path": "users.pending",
+  "value": "Pending Approval"
+}
+{
+  "path": "users.active",
+  "value": "Active"
+}
+{
+  "path": "users.inactive",
+  "value": "Inactive"
+}
+{
+  "path": "users.approve",
+  "value": "Approve"
+}
+{
+  "path": "users.reject",
+  "value": "Reject"
+}
+{
+  "path": "users.deactivate",
+  "value": "Deactivate"
+}
+{
+  "path": "users.createUser",
+  "value": "Create User"
+}
+{
+  "path": "users.role",
+  "value": "Role"
+}
+{
+  "path": "users.name",
+  "value": "Name"
+}
+{
+  "path": "users.email",
+  "value": "Email"
+}
+{
+  "path": "users.joined",
+  "value": "Joined"
+}
+{
+  "path": "users.lastLogin",
+  "value": "Last Login"
+}
+{
+  "path": "users.awaitingApproval",
+  "value": "users awaiting approval"
+}
+{
+  "path": "users.reviewNow",
+  "value": "Review now →"
+}
+{
+  "path": "users.addNewUser",
+  "value": "+ Add New User"
+}
+{
+  "path": "users.addUser",
+  "value": "+ Add User"
+}
+{
+  "path": "users.activeStatus",
+  "value": "Active"
+}
+{
+  "path": "users.inactiveStatus",
+  "value": "Inactive"
+}
+{
+  "path": "users.reactivate",
+  "value": "↺ Reactivate"
+}
+{
+  "path": "users.you",
+  "value": "You"
+}
+{
+  "path": "users.newRegistration",
+  "value": "New Registration"
+}
+{
+  "path": "users.approveAs",
+  "value": "Approve as:"
+}
+{
+  "path": "users.accessOverview",
+  "value": "Access Level Overview"
+}
+{
+  "path": "users.pendingWord",
+  "value": "pending"
+}
+{
+  "path": "users.loadingUsers",
+  "value": "Loading users…"
+}
+{
+  "path": "users.deactivateAction",
+  "value": "⊘ Deactivate"
+}
+{
+  "path": "funds.title",
+  "value": "Fund Management"
+}
+{
+  "path": "funds.addFund",
+  "value": "Add Fund"
+}
+{
+  "path": "funds.editFund",
+  "value": "Edit Fund"
+}
+{
+  "path": "funds.newFund",
+  "value": "Add New Fund"
+}
+{
+  "path": "funds.search",
+  "value": "Search funds…"
+}
+{
+  "path": "funds.noFunds",
+  "value": "No funds found"
+}
+{
+  "path": "funds.noFundsSub",
+  "value": "Try a different search or add your first fund"
+}
+{
+  "path": "funds.fundName",
+  "value": "Fund Name *"
+}
+{
+  "path": "funds.fundNameJp",
+  "value": "Fund Name (Japanese)"
+}
+{
+  "path": "funds.manager",
+  "value": "Manager"
+}
+{
+  "path": "funds.strategy",
+  "value": "Strategy *"
+}
+{
+  "path": "funds.vintageYear",
+  "value": "Vintage Year"
+}
+{
+  "path": "funds.currency",
+  "value": "Currency"
+}
+{
+  "path": "funds.commitment",
+  "value": "Commitment (USD)"
+}
+{
+  "path": "funds.entryFx",
+  "value": "Entry FX Rate (USD/JPY)"
+}
+{
+  "path": "funds.mgmtFee",
+  "value": "Management Fee %"
+}
+{
+  "path": "funds.carry",
+  "value": "Carry %"
+}
+{
+  "path": "funds.hurdle",
+  "value": "Hurdle Rate %"
+}
+{
+  "path": "funds.notes",
+  "value": "Notes"
+}
+{
+  "path": "funds.viewLedger",
+  "value": "View Ledger"
+}
+{
+  "path": "funds.edit",
+  "value": "Edit"
+}
+{
+  "path": "funds.deactivate",
+  "value": "Deactivate"
+}
+{
+  "path": "funds.totalCalled",
+  "value": "Total Called"
+}
+{
+  "path": "funds.invCapacity",
+  "value": "Inv. Capacity"
+}
+{
+  "path": "funds.drawn",
+  "value": "Drawn"
+}
+{
+  "path": "funds.saving",
+  "value": "Saving…"
+}
+{
+  "path": "funds.created",
+  "value": "Fund created"
+}
+{
+  "path": "funds.updated",
+  "value": "Fund updated"
+}
+{
+  "path": "funds.deactivated",
+  "value": "Fund deactivated"
+}
+{
+  "path": "funds.deactivateConfirm",
+  "value": "Deactivate \"{{name}}\"? This will hide it from the active list."
+}
+{
+  "path": "funds.createFund",
+  "value": "Create Fund"
+}
+{
+  "path": "funds.updateFund",
+  "value": "Update Fund"
+}
+{
+  "path": "funds.viewOnly",
+  "value": "View only — contact Finance or Admin to make changes"
+}
+{
+  "path": "funds.backToAll",
+  "value": "← All funds"
+}
+{
+  "path": "funds.selectToView",
+  "value": "select a fund to view its details"
+}
+{
+  "path": "funds.hideInactive",
+  "value": "Hide inactive"
+}
+{
+  "path": "funds.showInactive",
+  "value": "Show inactive ({{count}})"
+}
+{
+  "path": "funds.noFundsCreate",
+  "value": "Click \"+ Add Fund\" to create your first fund."
+}
+{
+  "path": "funds.viewOnlyMode",
+  "value": "You are in view-only mode. Log in as Admin or Finance Manager to edit."
+}
+{
+  "path": "fundUpload.title",
+  "value": "Upload a fund document"
+}
+{
+  "path": "fundUpload.subtitle",
+  "value": "Pick the fund, drop its capital-call / distribution PDF, and it's parsed and filed under that fund automatically."
+}
+{
+  "path": "fundUpload.docTypeLabel",
+  "value": "1 · Document type"
+}
+{
+  "path": "fundUpload.whichFund",
+  "value": "2 · Which fund?"
+}
+{
+  "path": "fundUpload.dropPdf",
+  "value": "Drop a PDF here or click to browse"
+}
+{
+  "path": "fundUpload.processing",
+  "value": "Processing…"
+}
+{
+  "path": "fundUpload.upload",
+  "value": "Upload"
+}
+{
+  "path": "fundUpload.capitalAndDist",
+  "value": "Capital & Distribution"
+}
+{
+  "path": "capitalCalls.title",
+  "value": "Capital Calls"
+}
+{
+  "path": "capitalCalls.shown",
+  "value": "shown"
+}
+{
+  "path": "capitalCalls.gross",
+  "value": "Gross Amount"
+}
+{
+  "path": "capitalCalls.netUsd",
+  "value": "Net Amount (USD)"
+}
+{
+  "path": "capitalCalls.netJpy",
+  "value": "Net Amount (JPY)"
+}
+{
+  "path": "capitalCalls.noticeDate",
+  "value": "Notice Date"
+}
+{
+  "path": "capitalCalls.dueDate",
+  "value": "Due Date"
+}
+{
+  "path": "capitalCalls.paidDate",
+  "value": "Paid Date"
+}
+{
+  "path": "capitalCalls.grossUsd",
+  "value": "Gross (USD)"
+}
+{
+  "path": "capitalCalls.netUsdCol",
+  "value": "Net (USD)"
+}
+{
+  "path": "capitalCalls.netJpyCol",
+  "value": "Net (JPY)"
+}
+{
+  "path": "capitalCalls.fx",
+  "value": "FX"
+}
+{
+  "path": "capitalCalls.approve",
+  "value": "Approve"
+}
+{
+  "path": "capitalCalls.markPaid",
+  "value": "Mark Paid"
+}
+{
+  "path": "capitalCalls.noCalls",
+  "value": "No capital calls found for"
+}
+{
+  "path": "capitalCalls.viewOnly",
+  "value": "View only — contact Finance or Admin to approve or mark as paid"
+}
+{
+  "path": "capitalCalls.newCall",
+  "value": "New Capital Call"
+}
+{
+  "path": "capitalCalls.createDesc",
+  "value": "Create a new capital call record"
+}
+{
+  "path": "capitalCalls.selectFund",
+  "value": "Select fund…"
+}
+{
+  "path": "capitalCalls.grossCallAmt",
+  "value": "Gross Call Amount (USD)"
+}
+{
+  "path": "capitalCalls.callPctLabel",
+  "value": "Or: Call % of Commitment"
+}
+{
+  "path": "capitalCalls.autoFills",
+  "value": "Auto-fills gross amount"
+}
+{
+  "path": "capitalCalls.distOffset",
+  "value": "Distribution Offset (USD)"
+}
+{
+  "path": "capitalCalls.reinvestableAmt",
+  "value": "Reinvestable Amount (USD)"
+}
+{
+  "path": "capitalCalls.reducesNet",
+  "value": "Reduces net call"
+}
+{
+  "path": "capitalCalls.addsBack",
+  "value": "Adds back to net"
+}
+{
+  "path": "capitalCalls.usdJpyRate",
+  "value": "USD / JPY Rate"
+}
+{
+  "path": "capitalCalls.initialStatus",
+  "value": "Initial Status"
+}
+{
+  "path": "capitalCalls.pendingNew",
+  "value": "Pending (new entry)"
+}
+{
+  "path": "capitalCalls.paidHistorical",
+  "value": "Paid (historical entry)"
+}
+{
+  "path": "capitalCalls.calcNetCall",
+  "value": "Calculated Net Call"
+}
+{
+  "path": "capitalCalls.allAmountsUsd",
+  "value": "All amounts in USD unless stated"
+}
+{
+  "path": "capitalCalls.creating",
+  "value": "Creating…"
+}
+{
+  "path": "capitalCalls.createCall",
+  "value": "Create Capital Call"
+}
+{
+  "path": "capitalCalls.newButton",
+  "value": "+ New Capital Call"
+}
+{
+  "path": "capitalCalls.createFirst",
+  "value": "+ Create First Capital Call"
+}
+{
+  "path": "capitalCalls.statusAll",
+  "value": "All"
+}
+{
+  "path": "capitalCalls.statusPending",
+  "value": "Pending"
+}
+{
+  "path": "capitalCalls.statusApproved",
+  "value": "Approved"
+}
+{
+  "path": "capitalCalls.statusPaid",
+  "value": "Paid"
+}
+{
+  "path": "capitalCalls.statusCancelled",
+  "value": "Cancelled"
+}
+{
+  "path": "distributions.title",
+  "value": "Distributions"
+}
+{
+  "path": "distributions.subtitle",
+  "value": "Capital returns and income from portfolio funds"
+}
+{
+  "path": "distributions.totalUsd",
+  "value": "Total Received (USD)"
+}
+{
+  "path": "distributions.totalJpy",
+  "value": "Total Received (JPY)"
+}
+{
+  "path": "distributions.reinvestable",
+  "value": "Reinvestable"
+}
+{
+  "path": "distributions.recallable",
+  "value": "Outstanding Recallable"
+}
+{
+  "path": "distributions.type",
+  "value": "Type"
+}
+{
+  "path": "distributions.amountUsd",
+  "value": "Amount (USD)"
+}
+{
+  "path": "distributions.amountJpy",
+  "value": "Amount (JPY)"
+}
+{
+  "path": "distributions.fxRate",
+  "value": "FX Rate"
+}
+{
+  "path": "distributions.recallableCol",
+  "value": "Recallable"
+}
+{
+  "path": "distributions.recallExpiry",
+  "value": "Recall Expiry"
+}
+{
+  "path": "distributions.recalled",
+  "value": "Recalled"
+}
+{
+  "path": "distributions.noData",
+  "value": "No distributions found"
+}
+{
+  "path": "distributions.deleteConfirm",
+  "value": "Delete this distribution? This cannot be undone."
+}
+{
+  "path": "distributions.viewOnly",
+  "value": "View only — contact Finance or Admin to manage distributions"
+}
+{
+  "path": "fxRates.title",
+  "value": "FX Rates"
+}
+{
+  "path": "fxRates.subtitle",
+  "value": "USD / JPY — MUFG TTM historical rates"
+}
+{
+  "path": "fxRates.refreshLive",
+  "value": "Refresh Live"
+}
+{
+  "path": "fxRates.addRate",
+  "value": "+ Add Rate"
+}
+{
+  "path": "fxRates.liveMarket",
+  "value": "Live Market Rate (frankfurter.app)"
+}
+{
+  "path": "fxRates.addMufg",
+  "value": "Add MUFG TTM Rate"
+}
+{
+  "path": "fxRates.rateHistory",
+  "value": "Rate History (90 days)"
+}
+{
+  "path": "fxRates.entries",
+  "value": "entries"
+}
+{
+  "path": "fxRates.livePairs",
+  "value": "Live Multi-Currency Rates"
+}
+{
+  "path": "fxRates.historicalLookup",
+  "value": "Historical Rate Lookup"
+}
+{
+  "path": "fxRates.historicalSub",
+  "value": "Look up the MUFG TTM rate recorded for any date"
+}
+{
+  "path": "fxRates.lookupFetch",
+  "value": "Fetch Rate"
+}
+{
+  "path": "fxRates.lookupFetching",
+  "value": "Fetching…"
+}
+{
+  "path": "fxRates.lookupNearestDay",
+  "value": "Nearest trading day"
+}
+{
+  "path": "fxRates.lookupNoRate",
+  "value": "No MUFG TTM rate has been entered for this date — use + Add Rate to record it"
+}
+{
+  "path": "fxRates.noHistory",
+  "value": "No rate history found"
+}
+{
+  "path": "fxRates.saveRate",
+  "value": "Save Rate"
+}
+{
+  "path": "fxRates.saving",
+  "value": "Saving…"
+}
+{
+  "path": "fxRates.saved",
+  "value": "Rate saved"
+}
+{
+  "path": "fxRates.dateLabel",
+  "value": "Date"
+}
+{
+  "path": "fxRates.rateLabel",
+  "value": "USD/JPY Rate"
+}
+{
+  "path": "fxRates.equalsLabel",
+  "value": "1 USD ="
+}
+{
+  "path": "fxRates.sourceLabel",
+  "value": "Source"
+}
+{
+  "path": "fxRates.viewOnly",
+  "value": "View only — contact Admin to add FX rates"
+}
+{
+  "path": "fxRates.murcWarningTitle",
+  "value": "Today's MUFG TTM rate is not yet available"
+}
+{
+  "path": "fxRates.murcWarningBody",
+  "value": "MURC publishes the official rate daily after 11:00 AM JST. Showing most recent saved rate"
+}
+{
+  "path": "fxRates.fetchToday",
+  "value": "Fetch Today"
+}
+{
+  "path": "fxRates.latestRate",
+  "value": "Latest saved rate"
+}
+{
+  "path": "fxRates.autoLoaded",
+  "value": "Auto-loaded from DB"
+}

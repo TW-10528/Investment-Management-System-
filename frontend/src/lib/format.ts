@@ -1,0 +1,98 @@
+/** Formatting helpers */
+import i18n from '../i18n';
+
+// Intl currency-style formatting resolves the currency symbol from locale data,
+// which on Japanese-locale browsers returns "ドル" for USD instead of "$".
+// We avoid that by hardcoding "$" / "¥" and using plain number formatting only.
+function wFmt(n: number, decimals = 0): string {
+  const abs = Math.abs(n);
+  const s   = abs.toFixed(decimals);
+  const [int, frac] = s.split('.');
+  const withCommas  = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return frac !== undefined ? `${withCommas}.${frac}` : withCommas;
+}
+
+export const fmt = {
+  usd: (v: number, _compact = false) =>
+    `${v < 0 ? '-' : ''}$${wFmt(v, 2)}`,
+
+  /** Exact dollars, no cents — e.g. $1,234,567,890 */
+  usdFull: (v: number) =>
+    `${v < 0 ? '-' : ''}$${wFmt(v, 0)}`,
+
+  /** Abbreviated, professional — e.g. $1.23B, $45.6M, $980K */
+  usdAbbr: (v: number) => {
+    const sign = v < 0 ? '−' : '';
+    const a = Math.abs(v);
+    if (a >= 1e12) return `${sign}$${(a / 1e12).toFixed(2)}T`;
+    if (a >= 1e9)  return `${sign}$${(a / 1e9).toFixed(2)}B`;
+    if (a >= 1e6)  return `${sign}$${(a / 1e6).toFixed(2)}M`;
+    if (a >= 1e3)  return `${sign}$${(a / 1e3).toFixed(1)}K`;
+    return `${sign}$${a.toFixed(0)}`;
+  },
+
+  jpy: (v: number) =>
+    `¥${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(v)}`,
+
+  pct: (v: number, decimals = 1) => `${v.toFixed(decimals)}%`,
+
+  num: (v: number) => new Intl.NumberFormat('en-US').format(v),
+
+  date: (s?: string | null) => {
+    if (!s) return '—';
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '—';
+
+    if (i18n.language === 'ja') {
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      return `${year}年${month}月${day}日`;
+    }
+    return d.toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: '2-digit',
+    });
+  },
+
+  dateJp: (s?: string | null) => {
+    if (!s) return '—';
+    const d = new Date(s);
+    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+  },
+
+  dateWithKanjiJp: (s?: string | null) => {
+    if (!s) return '—';
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '—';
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    return `${year}年${month}月${day}日`;
+  },
+
+  rate: (v?: number | null) => v != null ? v.toFixed(2) : '—',
+};
+
+export const strategyColor: Record<string, string> = {
+  Secondaries:    '#6366f1',
+  Buyout:         '#0ea5e9',
+  'Real Estate':  '#f59e0b',
+  'Hedge Fund':   '#8b5cf6',
+  'Private Credit':'#10b981',
+  Infrastructure: '#f97316',
+  Growth:         '#ec4899',
+  Venture:        '#14b8a6',
+  Other:          '#6b7280',
+};
+
+export const strategyBg: Record<string, string> = {
+  Secondaries:    'bg-indigo-100 text-indigo-800',
+  Buyout:         'bg-sky-100 text-sky-800',
+  'Real Estate':  'bg-amber-100 text-amber-800',
+  'Hedge Fund':   'bg-purple-100 text-purple-800',
+  'Private Credit':'bg-emerald-100 text-emerald-800',
+  Infrastructure: 'bg-orange-100 text-orange-800',
+  Growth:         'bg-pink-100 text-pink-800',
+  Venture:        'bg-teal-100 text-teal-800',
+  Other:          'bg-gray-100 text-gray-700',
+};

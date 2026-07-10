@@ -1,0 +1,16 @@
+[
+  "auth",
+  "calculator",
+  "capitalCalls",
+  "common",
+  "dashboard",
+  "distributions",
+  "fundUpload",
+  "funds",
+  "fxRates",
+  "investments",
+  "nav",
+  "notices",
+  "settings",
+  "users"
+]

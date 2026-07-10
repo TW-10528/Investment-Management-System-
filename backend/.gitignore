@@ -1,0 +1,5 @@
+
+# PaddleOCR sidecar venv (~900MB) + downloaded model weights — recreate with:
+#   python3 -m venv paddle-venv && paddle-venv/bin/pip install paddlepaddle paddleocr
+# Models auto-download to ~/.paddlex/official_models/ on first OCR call.
+paddle-venv/

@@ -1,0 +1,549 @@
+// Thirdwave IMS — Prisma Schema
+// Aviary pattern: Hono + TypeScript + Prisma + PostgreSQL
+// Mirrors the original SQLAlchemy models exactly
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  user
+  board_member
+  finance_staff
+  finance_manager
+  admin
+}
+
+enum UserStatus {
+  pending
+  active
+  inactive
+}
+
+enum CallStatus {
+  pending
+  approved
+  paid
+  cancelled
+}
+
+// ── Models ────────────────────────────────────────────────────────────────────
+
+model User {
+  id             String     @id @default(uuid())
+  email          String     @unique
+  fullName       String?    @map("full_name")
+  fullNameJp     String?    @map("full_name_jp")
+  hashedPassword String     @map("hashed_password")
+  role           UserRole   @default(user)
+  status         UserStatus @default(pending)
+  isActive       Boolean    @default(true) @map("is_active")
+  lastLogin      DateTime?  @map("last_login")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Fund {
+  id                    String    @id @default(uuid())
+  fundName              String    @map("fund_name")
+  fundNameJp            String?   @map("fund_name_jp")
+  manager               String?
+  administrator         String?
+  strategy              String?
+  vintageYear           Int?      @map("vintage_year")
+  currency              String    @default("USD")
+  commitmentUsd          Decimal   @default(0) @db.Decimal(20, 6) @map("commitment_usd")
+  contractCommitmentUsd  Decimal?  @db.Decimal(20, 6) @map("contract_commitment_usd")
+  commitmentJpy          BigInt?   @map("commitment_jpy")
+  contractCommitmentJpy  BigInt?   @map("contract_commitment_jpy")
+  entryFxRate            Decimal?  @db.Decimal(12, 6) @map("entry_fx_rate")
+  contractDate          DateTime? @map("contract_date") @db.Date
+  investmentPeriodStart DateTime? @map("investment_period_start") @db.Date
+  investmentPeriodEnd   DateTime? @map("investment_period_end") @db.Date
+  fundTermYears         Int?      @map("fund_term_years")
+  managementFeePct      Decimal?  @default(0) @db.Decimal(8, 4) @map("management_fee_pct")
+  carryPct              Decimal?  @default(0) @db.Decimal(8, 4) @map("carry_pct")
+  hurdleRatePct         Decimal?  @default(0) @db.Decimal(8, 4) @map("hurdle_rate_pct")
+  wireBank              String?   @map("wire_bank")
+  wireAccountName       String?   @map("wire_account_name")
+  wireAccountNumber     String?   @map("wire_account_number")
+  wireAba               String?   @map("wire_aba")
+  wireSwift             String?   @map("wire_swift")
+  wireReference         String?   @map("wire_reference")
+  notes                 String?
+  aiExtractionTemplate  Json?     @map("ai_extraction_template")
+  isActive              Boolean   @default(true) @map("is_active")
+
+  // ISOLATED FIELDS FOR NEW FUND FAMILY ONBOARDING (DO NOT MODIFY EXISTING 8 FUNDS)
+  fundFamilyId          String?   @map("fund_family_id")   // NULL for existing 8 funds
+  familySequence        Int?      @map("family_sequence")   // XI=11, XII=12, etc. (for new funds only)
+  isNewFund             Boolean   @default(false) @map("is_new_fund")  // TRUE only for newly added funds
+
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  capitalCalls      CapitalCall[]
+  distributions     Distribution[]
+  navRecords        NavRecord[]
+  investmentTargets InvestmentTarget[]
+  notices           Notice[]
+  fundReports       FundReport[]
+  sigfSnapshot      SigfSnapshot?
+  commitments       Commitment[]
+  commitmentHistory FundCommitmentHistory[]
+  fundFamily        FundFamily?  @relation(fields: [fundFamilyId], references: [id])
+
+  @@map("funds")
+}
+
+// NEW: FundFamily model (isolated for new fund onboarding)
+// Existing 8 funds do NOT belong to any family (fundFamilyId = NULL)
+model FundFamily {
+  id          String   @id @default(uuid())
+  familyName  String   @unique @map("family_name")  // e.g., "Dover Street"
+  familyCode  String?  @map("family_code")          // e.g., "DOVER"
+  strategy    String?                               // inherited from first fund in family
+  manager     String?                               // inherited from first fund in family
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  funds       Fund[]
+
+  @@map("fund_families")
+}
+
+// A commitment is an optional sub-grouping INSIDE a fund. Some funds (e.g. the
+// Japanese SDG fund) make several separate commitments over time, each with its
+// own commitment amount and its own independent stream of capital calls /
+// distributions. Capital calls and distributions may belong to a commitment;
+// when commitmentId is null they roll up at the fund level (default for the
+// existing single-commitment funds).
+model Commitment {
+  id             String    @id @default(uuid())
+  fundId         String    @map("fund_id")
+  name           String
+  commitmentUsd  Decimal   @default(0) @db.Decimal(20, 6) @map("commitment_usd") // JPY held here for SDG
+  commitmentDate DateTime? @map("commitment_date") @db.Date
+  currency       String    @default("JPY")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  fund          Fund           @relation(fields: [fundId], references: [id])
+  capitalCalls  CapitalCall[]
+  distributions Distribution[]
+
+  @@map("commitments")
+}
+
+model CapitalCall {
+  id                  String     @id @default(uuid())
+  fundId              String     @map("fund_id")
+  noticeDate          DateTime   @map("notice_date") @db.Date
+  dueDate             DateTime   @map("due_date") @db.Date
+  executionDate       DateTime?  @map("execution_date") @db.Date
+  callNumber          Int?       @map("call_number")
+  callPct             Decimal?   @default(0) @db.Decimal(8, 6) @map("call_pct")
+  grossCallUsd        Decimal    @default(0) @db.Decimal(20, 6) @map("gross_call_usd")
+  distributionUsd     Decimal    @default(0) @db.Decimal(20, 6) @map("distribution_usd")
+  reinvestableUsd     Decimal    @default(0) @db.Decimal(20, 6) @map("reinvestable_usd")
+  netCallUsd          Decimal    @default(0) @db.Decimal(20, 6) @map("net_call_usd")
+  fxRate              Decimal?   @db.Decimal(12, 6) @map("fx_rate")
+  netCallJpy          Decimal    @default(0) @db.Decimal(20, 2) @map("net_call_jpy")
+  investmentAmountUsd Decimal?   @default(0) @db.Decimal(20, 6) @map("investment_amount_usd")
+  managementFeeUsd    Decimal?   @default(0) @db.Decimal(20, 6) @map("management_fee_usd")
+  expenseUsd          Decimal?   @default(0) @db.Decimal(20, 6) @map("expense_usd")
+  // Finance-detail columns surfaced in the ledger.
+  returnOfCapitalUsd  Decimal?   @default(0) @db.Decimal(20, 6) @map("return_of_capital_usd")
+  gainUsd             Decimal?   @default(0) @db.Decimal(20, 6) @map("gain_usd")
+  interestUsd         Decimal?   @default(0) @db.Decimal(20, 6) @map("interest_usd")
+  // Manual cash-flow override (col G). When set, the ledger uses this instead of -B + C.
+  // Used for funds whose cash flow is entered by hand until automated extraction exists.
+  manualCashFlowUsd   Decimal?   @db.Decimal(20, 6) @map("manual_cash_flow_usd")
+  // SDG: remaining unfunded after this call (本出資後の出資未履行金額).
+  // When set, overrides the generic F = prev_F - B + D formula for this row.
+  unfundedAfterCallUsd Decimal?  @db.Decimal(20, 2) @map("unfunded_after_call_usd")
+  status              CallStatus @default(pending)
+  wireReference       String?    @map("wire_reference")
+  wireFeeJpy          Decimal?   @default(0) @db.Decimal(12, 2) @map("wire_fee_jpy")
+  isRecallable        Boolean    @default(false) @map("is_recallable")
+  notes               String?
+  approvedBy          String?    @map("approved_by")
+  approvedAt          DateTime?  @map("approved_at")
+  paidAt              DateTime?  @map("paid_at")
+  sourcePdfId         String?    @map("source_pdf_id")  // FK to FundReport
+  commitmentId        String?    @map("commitment_id")  // optional sub-grouping
+  createdAt           DateTime   @default(now()) @map("created_at")
+
+  fund       Fund        @relation(fields: [fundId], references: [id])
+  commitment Commitment? @relation(fields: [commitmentId], references: [id])
+
+  @@map("capital_calls")
+}
+
+model Distribution {
+  id               String    @id @default(uuid())
+  fundId           String    @map("fund_id")
+  distributionDate DateTime  @map("distribution_date") @db.Date
+  distType         String    @map("dist_type")
+  amountUsd        Decimal   @default(0) @db.Decimal(20, 6) @map("amount_usd")
+  amountJpy        Decimal   @default(0) @db.Decimal(20, 2) @map("amount_jpy")
+  fxRate           Decimal?  @db.Decimal(12, 6) @map("fx_rate")
+  reinvestableUsd  Decimal   @default(0) @db.Decimal(20, 6) @map("reinvestable_usd")
+  // Finance-detail columns surfaced in the ledger.
+  returnOfCapitalUsd Decimal? @default(0) @db.Decimal(20, 6) @map("return_of_capital_usd")
+  gainUsd            Decimal? @default(0) @db.Decimal(20, 6) @map("gain_usd")
+  interestUsd        Decimal? @default(0) @db.Decimal(20, 6) @map("interest_usd")
+  isRecallable     Boolean   @default(false) @map("is_recallable")
+  recallExpiry     DateTime? @map("recall_expiry") @db.Date
+  isRecalled       Boolean   @default(false) @map("is_recalled")
+  commitmentId     String?   @map("commitment_id")  // optional sub-grouping
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  fund       Fund        @relation(fields: [fundId], references: [id])
+  commitment Commitment? @relation(fields: [commitmentId], references: [id])
+
+  @@map("distributions")
+}
+
+model FxRate {
+  id       String   @id @default(uuid())
+  rateDate DateTime @map("rate_date") @db.Date
+  usdJpy   Decimal  @db.Decimal(12, 6) @map("usd_jpy")
+  source   String   @default("manual")
+
+  @@map("fx_rates")
+}
+
+model NavRecord {
+  id             String   @id @default(uuid())
+  fundId         String   @map("fund_id")
+  navDate        DateTime @map("nav_date") @db.Date
+  navUsd         Decimal? @db.Decimal(20, 6) @map("nav_usd")
+  period         String?
+  sourceNoticeId String?  @map("source_notice_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  fund Fund @relation(fields: [fundId], references: [id])
+
+  @@map("nav_records")
+}
+
+model InvestmentTarget {
+  id             String    @id @default(uuid())
+  fundId         String    @map("fund_id")
+  projectName    String?   @map("project_name")
+  actualName     String?   @map("actual_name")
+  investmentDate DateTime? @map("investment_date") @db.Date
+  amountUsd      Decimal?  @db.Decimal(20, 6) @map("amount_usd")
+  investmentType String?   @map("investment_type")
+  sector         String?
+  geography      String?
+  dealType       String?   @map("deal_type")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  fund Fund @relation(fields: [fundId], references: [id])
+
+  @@map("investment_targets")
+}
+
+model Notice {
+  id           String    @id @default(uuid())
+  filename     String
+  originalName String?   @map("original_name")
+  fileHash     String?   @map("file_hash")
+  noticeType   String    @map("notice_type")
+  status       String    @default("pending")
+  fundId       String?   @map("fund_id")
+  commitmentId String?   @map("commitment_id")   // optional sub-grouping (per-commitment chaining)
+  extractedData Json?    @map("extracted_data")
+  confidence   Float?
+  adminNotes   String?   @map("admin_notes")
+  uploadedBy   String?   @map("uploaded_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  approvedAt   DateTime? @map("approved_at")
+
+  fund Fund? @relation(fields: [fundId], references: [id])
+
+  @@map("notices")
+}
+
+// ── FundReport — one record per parsed PDF ────────────────────────────────────
+// Stores the raw extracted fields from sigulerGuffParser + source file reference.
+// Each capital call created from a PDF gets a sourcePdfId pointing here.
+model FundReport {
+  id            String   @id @default(uuid())
+  fundId        String   @map("fund_id")
+  filename      String                          // original filename
+  filePath      String   @map("file_path")      // relative path under uploads/
+  reportType    String   @default("capital_call") @map("report_type")
+  noticeDate    DateTime @map("notice_date") @db.Date
+  dueDate       DateTime @map("due_date")       @db.Date
+  batchId       String?  @map("batch_id")
+  isInitialCall Boolean  @default(false) @map("is_initial_call")
+  // Extracted values (keyword-anchored by sigulerGuffParser.ts)
+  callPct       Decimal  @default(0) @db.Decimal(8, 6) @map("call_pct")
+  netCallUsd    Decimal  @default(0) @db.Decimal(20, 6) @map("net_call_usd")
+  cumulativePct Decimal  @default(0) @db.Decimal(8, 6) @map("cumulative_pct")
+  commitmentUsd Decimal  @default(0) @db.Decimal(20, 6) @map("commitment_usd")
+  // Full raw extraction as JSON (all parser fields for audit/reference)
+  extractedData Json?    @map("extracted_data")
+  // Link to the capital call created from this PDF (nullable — set after call is created)
+  capitalCallId String?  @unique @map("capital_call_id")
+  processedBy   String?  @map("processed_by")
+  processedAt   DateTime @default(now()) @map("processed_at")
+
+  fund Fund @relation(fields: [fundId], references: [id])
+
+  @@map("fund_reports")
+}
+
+// ── SigfSnapshot — latest sigf.ts computed columns per fund ──────────────────
+// Recalculated every time a new PDF is uploaded for the fund.
+// Dashboard reads from here (DB) instead of re-parsing PDFs at request time.
+model SigfSnapshot {
+  id                 String   @id @default(uuid())
+  fundId             String   @unique @map("fund_id")   // one snapshot per fund
+  fundCode           String   @map("fund_code")         // e.g. 'SIGF'
+  pdfCount           Int      @map("pdf_count")
+  commitmentUsd      Decimal  @default(0) @db.Decimal(20, 6) @map("commitment_usd")
+  // sigf.ts column totals (final row values)
+  cumulativeDrawn    Decimal  @default(0) @db.Decimal(20, 6) @map("cumulative_drawn")    // E
+  investmentCapacity Decimal  @default(0) @db.Decimal(20, 6) @map("investment_capacity") // F
+  netCashFlow        Decimal  @default(0) @db.Decimal(20, 6) @map("net_cash_flow")       // G
+  nonRecallableDist  Decimal  @default(0) @db.Decimal(20, 6) @map("non_recallable_dist") // L
+  distributionsTotal Decimal  @default(0) @db.Decimal(20, 6) @map("distributions_total")
+  dpi                Decimal  @default(0) @db.Decimal(12, 6)
+  // Per-call rows as JSON array [{call_number, due_date, paid, cumulative_drawn, ...}]
+  callRows           Json     @map("call_rows")
+  computedAt         DateTime @default(now()) @map("computed_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  fund Fund @relation(fields: [fundId], references: [id])
+
+  @@map("sigf_snapshots")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  tableName String   @map("table_name")
+  recordId  String?  @map("record_id")
+  userEmail String?  @map("user_email")
+  userId    String?  @map("user_id")
+  oldValues Json?    @map("old_values")
+  newValues Json?    @map("new_values")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
+model OtpToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("otp_tokens")
+}
+
+model CalculationRule {
+  id                 String   @id @default(uuid())
+  name               String
+  description        String?
+  formula            String
+  explanation        String?
+  outputUnit         String?  @map("output_unit")
+  applicableTypes    String[] @default([]) @map("applicable_types")
+  displayOnDashboard Boolean  @default(true) @map("display_on_dashboard")
+  isActive           Boolean  @default(true) @map("is_active")
+  sortOrder          Int      @default(0) @map("sort_order")
+  createdBy          String?  @map("created_by")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  results CalculationResult[]
+
+  @@map("calculation_rules")
+}
+
+model AttributeExtractor {
+  id             String   @id @default(uuid())
+  attributeName  String   @map("attribute_name")   // variable name used in formulas
+  label          String                             // human-readable label
+  keywords       String[] @default([])              // PDF keyword anchors to search for
+  extractionType String   @default("usd") @map("extraction_type") // usd | pct | number | date | text
+  isActive       Boolean  @default(true) @map("is_active")
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("attribute_extractors")
+}
+
+model CalculationResult {
+  id          String   @id @default(uuid())
+  ruleId      String   @map("rule_id")
+  noticeId    String   @map("notice_id")
+  fundId      String?  @map("fund_id")
+  inputValues Json?    @map("input_values")
+  outputValue Decimal? @db.Decimal(30, 6) @map("output_value")
+  outputText  String?  @map("output_text")
+  error       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  rule CalculationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@map("calculation_results")
+}
+
+// Commitment history for funds whose LP commitment grows over time (e.g. SDG).
+// Each row records a NEW total commitment amount effective from a given date.
+// The calculation engine looks up the row with effectiveDate ≤ transactionDate to
+// determine what commitment was in force on the day of each capital call.
+// Old rows are NEVER deleted — they protect the historical F calculations.
+model FundCommitmentHistory {
+  id               String   @id @default(uuid())
+  fundId           String   @map("fund_id")
+  commitmentAmount Decimal  @db.Decimal(20, 2) @map("commitment_amount")
+  effectiveDate    DateTime @map("effective_date") @db.Date
+  notes            String?
+
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  fund Fund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  @@index([fundId, effectiveDate])
+  @@map("fund_commitment_history")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  userEmail String?  @map("user_email")
+  type      String   // 'user_registered' | 'user_approved' | 'user_rejected' | 'notice_uploaded' | 'notice_approved' | 'notice_rejected' | 'capital_call_due' | 'general'
+  title     String
+  message   String
+  link      String?  // frontend route to navigate to
+  isRead    Boolean  @default(false) @map("is_read")
+  metadata  Json?    // extra data
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
+// ── Fund Onboarding: AI-driven fund discovery & template creation ────────────
+
+model FundTemplate {
+  id              String    @id @default(uuid())
+  templateName    String    // Display name: "Goldman Sachs Vintage XXII"
+  fundKey         String    @unique // Machine key: "goldman-sachs-vintage-22"
+  manager         String?
+  fundNameJp      String?   @map("fund_name_jp")
+  strategy        String?
+  extractionSchema Json    // { B_label: string, C_label: string, D_label: string, ... }
+
+  sampleCount     Int       @default(1) @map("sample_count")
+  lastUpdated     DateTime  @updatedAt @map("last_updated")
+  confidence      Float     @default(0.75) // 0-1 confidence score
+
+  pdfLabels       PdfLabel[]
+
+  createdBy       String?   @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@map("fund_templates")
+}
+
+model PdfLabel {
+  id              String    @id @default(uuid())
+  templateId      String    @map("template_id")
+  template        FundTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  fileName        String    @map("file_name")
+  fileHash        String    // SHA256 of PDF content
+
+  // Extracted values on this specific PDF
+  values          Json      // { B: 1000000, C: 500000, D: 250000, ... }
+  extractionDate  DateTime  @map("extraction_date")
+  extractedBy     String?   @map("extracted_by")
+
+  pdfStoragePath  String?   @map("pdf_storage_path")
+  validationLog   Json?     @map("validation_log")
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([templateId])
+  @@index([fileHash])
+  @@map("pdf_labels")
+}
+
+model OnboardingSession {
+  id              String    @id @default(uuid())
+
+  fileName        String    @map("file_name")
+  fileHash        String    @unique @map("file_hash")
+
+  currentStep     Int       @default(1) @map("current_step")
+
+  fundKey         String?   @map("fund_key")
+  fundDisplayName String?   @map("fund_display_name")
+  reportType      String?   @map("report_type")
+  aiConfidence    Float?    @map("ai_confidence")
+
+  extractedValues Json?     @map("extracted_values")
+  userEditedValues Json?    @map("user_edited_values")
+
+  calculatedValues Json?    @map("calculated_values")
+
+  validationResults Json?   @map("validation_results")
+
+  templateId      String?   @map("template_id")
+  isNewTemplate   Boolean   @default(false) @map("is_new_template")
+
+  status          String    @default("in_progress")
+  errorMessage    String?   @map("error_message")
+
+  userId          String?   @map("user_id")
+  userEmail       String?   @map("user_email")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([fileHash])
+  @@index([userEmail])
+  @@index([status])
+  @@map("onboarding_sessions")
+}
+
+model CorrectionFeedback {
+  id              String    @id @default(uuid())
+  sessionId       String    @map("session_id")
+
+  correctedFields String[]  @map("corrected_fields")
+  originalValues  Json      @map("original_values")
+  correctedValues Json      @map("corrected_values")
+
+  feedback        String?
+
+  accepted        Boolean   @default(false)
+  aiAnalysis      Json?     @map("ai_analysis")
+
+  createdBy       String?   @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@map("correction_feedback")
+}
