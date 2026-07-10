@@ -1920,8 +1920,8 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
                   const lastUpdated = list.length > 0 ? new Date(Math.max(...list.map(r => new Date(r.created_at || 0).getTime()))).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No updates';
 
                   return (
-                    <button key={f.fund_id} onClick={() => setOpenFundId(f.fund_id)}
-                      className="theme-card border theme-border rounded-lg p-4 text-left transition-shadow hover:shadow-md">
+                    <div key={f.fund_id} onClick={() => setOpenFundId(f.fund_id)}
+                      className="theme-card border theme-border rounded-lg p-4 text-left transition-shadow hover:shadow-md cursor-pointer">
                       {/* Header with icon, name, and menu */}
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-start gap-2 min-w-0 flex-1">
@@ -1992,7 +1992,7 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
                       >
                         View Ledger →
                       </button>
-                    </button>
+                    </div>
                   );
                 })}
               </div>

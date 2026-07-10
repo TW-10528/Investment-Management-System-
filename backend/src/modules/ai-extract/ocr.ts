@@ -36,7 +36,7 @@ export async function extractPdfText(buffer: Buffer): Promise<{ text: string; us
     const isLikelySdg = buffer.toString('latin1', 0, 2000).includes('SDG')
     console.log(`[extractPdfText] Document appears to be ${isLikelySdg ? 'SDG' : 'non-SDG'}`)
 
-    const viewportScale = isLikelySdg ? 0.5 : 1.0
+    const viewportScale = isLikelySdg ? 2.0 : 1.0
     const headPages = isLikelySdg ? 1 : 2
     const tailPages = isLikelySdg ? 0 : 1
 
@@ -61,7 +61,7 @@ export async function extractPdfText(buffer: Buffer): Promise<{ text: string; us
 
     try {
       const isLikelySdg = buffer.toString('latin1', 0, 2000).includes('SDG')
-      const viewportScale = isLikelySdg ? 0.5 : 1.0
+      const viewportScale = isLikelySdg ? 2.0 : 1.0
 
       console.log(`[extractPdfText] Starting OCR (fallback) with scale=${viewportScale}`)
       const ocrStartTime = Date.now()

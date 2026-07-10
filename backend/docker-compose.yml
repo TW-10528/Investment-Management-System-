@@ -1,33 +1,64 @@
-version: '3.9'
-
+version: "3.9"
+ 
 services:
-  postgres:
+
+  db:
+
     image: postgres:16-alpine
-    container_name: ims_postgres
+
+    container_name: ims_db_leena
+
     restart: unless-stopped
+
     environment:
+
       POSTGRES_USER: ims_user
+
       POSTGRES_PASSWORD: ims_password
-      POSTGRES_DB: ims_db
+
+      POSTGRES_DB: ims_db_leena
+
     ports:
-      - '5432:5432'
+
+      - "6002:5432"
+
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+
+      - ims_pgdata_leena:/var/lib/postgresql/data
+
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ims_user -d ims_db']
+
+      test: ["CMD-SHELL", "pg_isready -U ims_user -d ims_db_leena"]
+
       interval: 10s
+
       timeout: 5s
+
       retries: 5
-
+ 
   redis:
-    image: redis:7-alpine
-    container_name: ims_redis
-    restart: unless-stopped
-    ports:
-      - '6379:6379'
-    volumes:
-      - redis_data:/data
 
+    image: redis:7-alpine
+
+    container_name: ims_redis_leena
+
+    restart: unless-stopped
+
+    ports:
+
+      - "6381:6379"
+
+    volumes:
+
+      - redis_data_leena:/data
+ 
 volumes:
-  postgres_data:
-  redis_data:
+
+  ims_pgdata_leena:
+
+    name: ims_pgdata_leena
+ 
+  redis_data_leena:
+
+    name: redis_data_leena
+ 

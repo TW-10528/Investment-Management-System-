@@ -110,7 +110,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "5176:80"
+      - "5178:80"
     networks:
       - ims-network
     environment:

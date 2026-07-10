@@ -7,6 +7,7 @@
  */
 
 import 'dotenv/config'
+console.log("DATABASE_URL =", process.env.DATABASE_URL);
 import './lib/httpProxy'   // side-effect: route outbound fetch via corporate proxy (must be first)
 import { serve } from '@hono/node-server'
 import { createApp } from './app'
