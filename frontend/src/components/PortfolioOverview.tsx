@@ -8,7 +8,7 @@
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bar, ComposedChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { Bar, BarChart, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { dashboardAPI, fundPdfAPI, fundsAPI, fxRatesAPI } from '../services/api';
 import type { DashboardData, FundSummary, LedgerRow } from '../types/index';
 import { usePreferences } from '../contexts/usePreferences';
@@ -431,18 +431,16 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                 <p className="text-sm font-bold mb-1" style={{ color: '#1e40af' }}>{t('manageFunds.commitmentContributionDistribution')}</p>
                 <div style={{ width: '100%', height: 350 }}>
                   <ResponsiveContainer>
-                    <ComposedChart data={barDataUsd} margin={{ top: 40, right: 8, bottom: 60, left: 4 }}>
+                    <BarChart data={barDataUsd} margin={{ top: 40, right: 8, bottom: 60, left: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-card-border)" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} interval={0} angle={-20} textAnchor="end" height={80} />
-                      <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.usdAbbr(v)} width={56} />
-                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={40} />
-                      <Tooltip formatter={(v: any) => typeof v === 'number' && v > 100 ? fmt.usdFull(Number(v)) : `${Number(v).toFixed(1)}%`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                      <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.usdAbbr(v)} width={56} />
+                      <Tooltip formatter={(v: any) => fmt.usdFull(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <Bar yAxisId="left" dataKey="Commitment" fill="#1e40af" radius={[3,3,0,0]} label={{ dataKey: 'Commitment', formatter: (v: any) => fmt.usdAbbr(v ?? 0), position: 'top', fontSize: 9, fill: '#1e40af' }} />
-                      <Bar yAxisId="left" dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} label={{ dataKey: 'Contribution', formatter: (v: any) => fmt.usdAbbr(v ?? 0), position: 'top', fontSize: 9, fill: '#1e40af' }} />
-                      <Bar yAxisId="left" dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} label={{ dataKey: 'Distribution', formatter: (v: any) => fmt.usdAbbr(v ?? 0), position: 'top', fontSize: 9, fill: '#1e40af' }} />
-                      <Line yAxisId="right" type="monotone" dataKey="utilizationPct" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} name="Commitment Utilization %" />
-                    </ComposedChart>
+                      <Bar dataKey="Commitment" fill="#2a78d6" radius={[3,3,0,0]} label={{ dataKey: 'Commitment', formatter: (v: any) => fmt.usdAbbr(v ?? 0), position: 'top', fontSize: 9, fill: '#2a78d6' }} />
+                      <Bar dataKey="Contribution" fill="#008300" radius={[3,3,0,0]} label={{ dataKey: 'Contribution', formatter: (v: any) => fmt.usdAbbr(v ?? 0), position: 'top', fontSize: 9, fill: '#008300' }} />
+                      <Bar dataKey="Distribution" fill="#eda100" radius={[3,3,0,0]} label={{ dataKey: 'Distribution', formatter: (v: any) => fmt.usdAbbr(v ?? 0), position: 'top', fontSize: 9, fill: '#eda100' }} />
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
@@ -515,18 +513,16 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                   <p className="text-sm font-bold theme-text mb-1">{t('manageFunds.sdgFundActivityJpy')}</p>
                   <div style={{ width: '100%', height: 350 }}>
                     <ResponsiveContainer>
-                      <ComposedChart data={barDataJpy} margin={{ top: 40, right: 8, bottom: 60, left: 4 }}>
+                      <BarChart data={barDataJpy} margin={{ top: 40, right: 8, bottom: 60, left: 4 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-card-border)" vertical={false} />
                         <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} interval={0} angle={-20} textAnchor="end" height={80} />
-                        <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.jpy(v)} width={80} />
-                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={40} />
-                        <Tooltip formatter={(v: any) => typeof v === 'number' && v > 100 ? fmt.jpy(Number(v)) : `${Number(v).toFixed(1)}%`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                        <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.jpy(v)} width={80} />
+                        <Tooltip formatter={(v: any) => fmt.jpy(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Bar yAxisId="left" dataKey="Commitment" fill="#1e40af" radius={[3,3,0,0]} label={{ dataKey: 'Commitment', formatter: (v: any) => fmt.jpy(v ?? 0), position: 'top', fontSize: 10, fill: '#1e40af' }} />
-                        <Bar yAxisId="left" dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} label={{ dataKey: 'Contribution', formatter: (v: any) => fmt.jpy(v ?? 0), position: 'top', fontSize: 10, fill: '#1e40af' }} />
-                        <Bar yAxisId="left" dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} label={{ dataKey: 'Distribution', formatter: (v: any) => fmt.jpy(v ?? 0), position: 'top', fontSize: 10, fill: '#1e40af' }} />
-                        <Line yAxisId="right" type="monotone" dataKey="utilizationPct" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} name="Interest Rate %" />
-                      </ComposedChart>
+                        <Bar dataKey="Commitment" fill="#2a78d6" radius={[3,3,0,0]} label={{ dataKey: 'Commitment', formatter: (v: any) => fmt.jpy(v ?? 0), position: 'top', fontSize: 10, fill: '#2a78d6' }} />
+                        <Bar dataKey="Contribution" fill="#008300" radius={[3,3,0,0]} label={{ dataKey: 'Contribution', formatter: (v: any) => fmt.jpy(v ?? 0), position: 'top', fontSize: 10, fill: '#008300' }} />
+                        <Bar dataKey="Distribution" fill="#eda100" radius={[3,3,0,0]} label={{ dataKey: 'Distribution', formatter: (v: any) => fmt.jpy(v ?? 0), position: 'top', fontSize: 10, fill: '#eda100' }} />
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>

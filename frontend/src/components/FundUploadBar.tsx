@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import api, { fundReportsAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import ExtractedDataReviewForm from './ExtractedDataReviewForm';
+import NewFundCalculationForm from './NewFundCalculationForm';
 import { fundNamesMatchExact, isNewFundVariant } from '../utils/fundNameParser';
 
 function DuplicateModal({ fileName, uploadedAt, onClose }: { fileName: string; uploadedAt: string; onClose: () => void }) {
@@ -180,6 +181,11 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   // Unknown fund creation states
   const [showCreateFundForm, setShowCreateFundForm] = useState(false)
   const [creatingFund, setCreatingFund] = useState(false)
+  const [showNewFundCalcForm, setShowNewFundCalcForm] = useState(false)
+  const [newFundData, setNewFundData] = useState<{ id: string; name: string; noticeDate?: string } | null>(null)
+  const [savingNewFund, setSavingNewFund] = useState(false)
+  const [createNewFromManual, setCreateNewFromManual] = useState(false)
+  const [manualFundName, setManualFundName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Load custom document types from localStorage on mount
@@ -219,7 +225,13 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
         m = matchFund(d.classification?.fund_key, d.classification?.fund_display_name, funds)
       }
       setMatched(m || null)
-      if (m) setOverrideFund(m.fund_id)
+      if (m) {
+        setOverrideFund(m.fund_id)
+        // Warn if this is a fund variant (has Roman numerals) to prevent series confusion
+        if (d.classification?.fund_display_name && /[IVX]+(-[A-Z])?(\s|LP|$)/i.test(d.classification?.fund_display_name)) {
+          toast(`⚠️ Detected: ${d.classification?.fund_display_name} — Please verify this is the correct series before uploading.`, { duration: 6000 })
+        }
+      }
     } catch (err: any) {
       // Check if the error is from cancellation
       if (err.name === 'AbortError' || err.code === 'ECONNABORTED') {
@@ -244,7 +256,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
   // Handle creating a new fund from extracted data
   async function handleCreateFund(
     fundData: any,
-    documentData: any,
+    _documentData: any,
     _correctedFields: string[]
   ) {
     if (!file || !detection) return
@@ -283,52 +295,92 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
 
       const newFundResult = await response.json()
       const newFundId = newFundResult.data.id
+      const noticeDate = detection.extraction?.transaction_date || new Date().toISOString().split('T')[0]
 
       toast.success(`New fund "${fundName}" created!`)
 
-      // Now upload the document to the new fund
-      const docType = REPORT_TYPE_MAP[documentData.documentType] ?? 'capital_call'
-      const displayType = documentData.documentType
-
-      setUploading(true)
-      try {
-        const form = new FormData()
-        form.append('file', file)
-        if (detection.extraction) {
-          const minimal = {
-            B_capital_contribution: detection.extraction.B_capital_contribution,
-            C_distribution_received: detection.extraction.C_distribution_received,
-            D_reinvestable: detection.extraction.D_reinvestable,
-            transaction_date: detection.extraction.transaction_date,
-            currency: detection.extraction.currency,
-          }
-          form.append('extraction_data', JSON.stringify(minimal))
-        }
-        await fundReportsAPI.upload(newFundId, form, docType)
-
-        toast.success(`Document uploaded to "${fundName}".`)
-
-        setDone({
-          fundId: newFundId,
-          docType,
-          displayType,
-          fundName,
-        })
-
-        setShowCreateFundForm(false)
-        setFile(null)
-        setDetection(null)
-        setMatched(null)
-
-        // Refresh funds list (parent will handle this)
-        onUploaded(newFundId, docType)
-      } finally {
-        setUploading(false)
-      }
+      // Show calculation form for new fund entry values
+      setNewFundData({ id: newFundId, name: fundName, noticeDate })
+      setShowNewFundCalcForm(true)
+      setShowCreateFundForm(false)
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || err.message || 'Fund creation or upload failed')
     } finally {
       setCreatingFund(false)
+    }
+  }
+
+  // Handle saving new fund calculation form
+  async function handleSaveNewFundCalculation(
+    values: any,
+    _ledger: any
+  ) {
+    if (!file || !newFundData || !detection) return
+
+    setSavingNewFund(true)
+    try {
+      const docType = REPORT_TYPE_MAP[detection.classification?.report_type] ?? 'capital_call'
+      const displayType = detection.classification?.report_type || 'CAPITAL_CALL'
+
+      // Upload document with the calculated values
+      const form = new FormData()
+      form.append('file', file)
+
+      // Pass extracted data with the input values
+      const extractedData = {
+        B_capital_contribution: parseFloat(values.capital_distribution) || 0,
+        C_distribution_received: parseFloat(values.distribution_received) || 0,
+        D_reinvestable: parseFloat(values.reinvestable) || 0,
+        total_commitment_amount: parseFloat(values.commitment_usd) || 0,
+        transaction_date: values.transaction_date,
+        interest: 0,
+        gain: 0,
+      }
+      form.append('extraction_data', JSON.stringify(extractedData))
+
+      await fundReportsAPI.upload(newFundData.id, form, docType)
+
+      // Update fund commitment if provided
+      const commitmentAmount = parseFloat(values.commitment_usd) || 0
+      if (commitmentAmount > 0) {
+        try {
+          await fetch(`/api/v1/funds/${newFundData.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            },
+            body: JSON.stringify({
+              commitment_usd: commitmentAmount,
+            }),
+          })
+        } catch (err) {
+          console.error('Failed to update fund commitment:', err)
+          // Don't fail the whole operation if commitment update fails
+        }
+      }
+
+      toast.success(`Document uploaded to "${newFundData.name}" and ledger created.`)
+
+      setDone({
+        fundId: newFundData.id,
+        docType,
+        displayType,
+        fundName: newFundData.name,
+      })
+
+      setShowNewFundCalcForm(false)
+      setFile(null)
+      setDetection(null)
+      setMatched(null)
+      setNewFundData(null)
+
+      // Refresh funds list (parent will handle this)
+      onUploaded(newFundData.id, docType)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || err.message || 'Failed to save new fund entry')
+    } finally {
+      setSavingNewFund(false)
     }
   }
 
@@ -356,6 +408,57 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
       }
     } finally {
       setUploading(false)
+    }
+  }
+
+  // Handle creating new fund from manual fallback
+  async function handleCreateNewFromManual() {
+    if (!manualFundName.trim()) return
+
+    setCreatingFund(true)
+    try {
+      const fundName = manualFundName.trim()
+      let familyName = fundName
+      const romanMatch = fundName.match(/^(.+)\s+X{1,3}(IX|IV|V?I{0,3})$/i)
+      const numberMatch = fundName.match(/^(.+)\s+(\d+)$/i)
+      if (romanMatch) {
+        familyName = romanMatch[1].trim()
+      } else if (numberMatch) {
+        familyName = numberMatch[1].trim()
+      }
+
+      const response = await fetch('/api/v1/fund-families/add-fund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fundName,
+          familyName,
+          manager: '',
+          strategy: '',
+          currency: 'USD',
+          commitmentUsd: 0,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create fund')
+      }
+
+      const newFundResult = await response.json()
+      const newFundId = newFundResult.data.id
+
+      toast.success(`New fund "${fundName}" created!`)
+
+      // Show calculation form for new fund entry
+      setNewFundData({ id: newFundId, name: fundName })
+      setShowNewFundCalcForm(true)
+      setDetectFailed(false)
+      setCreateNewFromManual(false)
+      setManualFundName('')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || err.message || 'Fund creation failed')
+    } finally {
+      setCreatingFund(false)
     }
   }
 
@@ -446,6 +549,7 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
     setEditingDocType(false); setSelectedDocType('')
     setShowAddDocType(false); setNewDocTypeName('')
     setShowCreateFundForm(false); setCreatingFund(false)
+    setCreateNewFromManual(false); setManualFundName('')
   }
 
   function uploadNext() {
@@ -616,35 +720,49 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
         )}
 
         {/* ── AI failed — manual save fallback ── */}
-        {detectFailed && file && !detection && !detecting && !uploading && (
+        {detectFailed && file && !detection && !detecting && !uploading && !createNewFromManual && (
           <div className="rounded-xl border border-amber-200 overflow-hidden" style={{ background: 'rgba(251,191,36,0.04)' }}>
             <div className="px-5 py-3 border-b border-amber-200" style={{ background: 'rgba(251,191,36,0.08)' }}>
               <p className="text-sm font-bold text-amber-800">AI could not read this document</p>
-              <p className="text-xs text-amber-700 mt-0.5">The scanned PDF took too long to process. Select a fund and document type to save it manually.</p>
+              <p className="text-xs text-amber-700 mt-0.5">The scanned PDF took too long to process. Choose an option below:</p>
             </div>
-            <div className="px-5 py-4 space-y-3">
+            <div className="px-5 py-4 space-y-4">
               <p className="text-xs theme-text-muted font-medium truncate">{file.name}</p>
-              <select
-                value={manualFundId}
-                onChange={e => setManualFundId(e.target.value)}
-                className="theme-input rounded-lg px-3 py-2 text-sm w-full border theme-border"
-              >
-                <option value="">— select fund —</option>
-                {funds.map(f => (
-                  <option key={f.fund_id} value={f.fund_id}>{f.fund_name}</option>
-                ))}
-              </select>
-              <select
-                value={manualDocType}
-                onChange={e => setManualDocType(e.target.value)}
-                className="theme-input rounded-lg px-3 py-2 text-sm w-full border theme-border"
-              >
-                {Object.entries(DOC_TYPE_LABELS)
-                  .filter(([k]) => k !== 'UNKNOWN')
-                  .map(([k, v]) => (
-                    <option key={k} value={k}>{v.label}</option>
+
+              {/* Existing fund option */}
+              <div className="border-l-4 border-blue-400 pl-4 py-2">
+                <p className="text-xs font-semibold theme-text mb-2">Save to Existing Fund</p>
+                <select
+                  value={manualFundId}
+                  onChange={e => setManualFundId(e.target.value)}
+                  className="theme-input rounded-lg px-3 py-2 text-sm w-full border theme-border mb-2"
+                >
+                  <option value="">— select fund —</option>
+                  {funds.map(f => (
+                    <option key={f.fund_id} value={f.fund_id}>{f.fund_name}</option>
                   ))}
-              </select>
+                </select>
+                <select
+                  value={manualDocType}
+                  onChange={e => setManualDocType(e.target.value)}
+                  className="theme-input rounded-lg px-3 py-2 text-sm w-full border theme-border"
+                >
+                  {Object.entries(DOC_TYPE_LABELS)
+                    .filter(([k]) => k !== 'UNKNOWN')
+                    .map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                </select>
+              </div>
+
+              {/* New fund option */}
+              <button
+                onClick={() => setCreateNewFromManual(true)}
+                className="w-full px-4 py-3 rounded-lg border-2 border-emerald-300 hover:bg-emerald-50/50 transition-colors text-left"
+              >
+                <p className="text-xs font-semibold text-emerald-700">+ Create New Fund</p>
+                <p className="text-xs text-emerald-600 mt-1">Enter fund name and manually set values</p>
+              </button>
             </div>
             <div className="px-5 py-4 border-t border-amber-200 flex items-center justify-between gap-4"
                  style={{ background: 'rgba(251,191,36,0.04)' }}>
@@ -659,6 +777,50 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                 {uploading
                   ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-1.5" />Saving…</>
                   : 'Save for Viewing'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Create new fund from manual fallback ── */}
+        {detectFailed && file && !detection && !detecting && !uploading && createNewFromManual && (
+          <div className="rounded-xl border border-emerald-200 overflow-hidden" style={{ background: 'rgba(16,185,129,0.04)' }}>
+            <div className="px-5 py-3 border-b border-emerald-200" style={{ background: 'rgba(16,185,129,0.08)' }}>
+              <p className="text-sm font-bold text-emerald-800">Create New Fund</p>
+              <p className="text-xs text-emerald-700 mt-0.5">Enter the fund name, then set transaction values.</p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-xs theme-text-muted font-medium truncate">{file.name}</p>
+              <div>
+                <label className="text-xs font-semibold theme-text-muted uppercase mb-1 block">Fund Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Everstone Capital Partners Fund IV LP"
+                  value={manualFundName}
+                  onChange={e => setManualFundName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg theme-bg theme-border border text-sm theme-text"
+                />
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-emerald-200 flex items-center justify-between gap-4"
+                 style={{ background: 'rgba(16,185,129,0.04)' }}>
+              <button
+                onClick={() => {
+                  setCreateNewFromManual(false)
+                  setManualFundName('')
+                }}
+                className="text-sm theme-text-muted hover:theme-text transition-colors"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleCreateNewFromManual}
+                disabled={creatingFund || !manualFundName.trim()}
+                className="px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-emerald-600 hover:bg-emerald-700"
+              >
+                {creatingFund
+                  ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-1.5" />Creating…</>
+                  : 'Create Fund'}
               </button>
             </div>
           </div>
@@ -975,6 +1137,23 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
             onCancel={() => setShowCreateFundForm(false)}
             onSave={handleCreateFund}
             isLoading={creatingFund}
+          />
+        )}
+
+        {/* ── New Fund Calculation Form ── */}
+        {showNewFundCalcForm && newFundData && (
+          <NewFundCalculationForm
+            fundId={newFundData.id}
+            fundName={newFundData.name}
+            noticeDate={newFundData.noticeDate}
+            onCancel={() => {
+              setShowNewFundCalcForm(false)
+              setNewFundData(null)
+              setFile(null)
+              setDetection(null)
+            }}
+            onSave={handleSaveNewFundCalculation}
+            isLoading={savingNewFund}
           />
         )}
       </div>

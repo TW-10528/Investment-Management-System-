@@ -243,6 +243,46 @@ export default function Layout() {
 
         {/* Bottom controls */}
         <div style={{ borderTop: '1px solid var(--color-card-border)' }} className="px-3 py-3 space-y-2">
+          {/* Language Toggle */}
+          <div className="relative">
+            <button
+              onClick={() => setShowLangMenu(p => !p)}
+              title="Change language"
+              className="w-full flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 hover:scale-105"
+              style={{
+                background: 'var(--color-card)',
+                border: '1px solid var(--color-card-border)',
+                color: '#1e40af',
+              }}
+            >
+              <span className="text-base leading-none">{currentLang?.flag}</span>
+              <span className="uppercase leading-none">{prefs.language}</span>
+            </button>
+            {showLangMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowLangMenu(false)} />
+                <div className="absolute bottom-full left-0 mb-2 rounded-xl shadow-2xl overflow-hidden z-50 w-full animate-fade-in"
+                     style={{ background: 'var(--color-card)', border: '1px solid var(--color-card-border)' }}>
+                  {LANGUAGES.map(lang => (
+                    <button
+                      key={lang.code}
+                      onClick={() => { prefs.setLanguage(lang.code); setShowLangMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left"
+                      style={prefs.language === lang.code
+                        ? { background: 'rgba(30,64,175,0.12)', color: '#1e40af', fontWeight: '600' }
+                        : { color: '#475569' }}
+                      onMouseEnter={e => { if (prefs.language !== lang.code) (e.currentTarget as HTMLElement).style.background = 'var(--color-row-hover)'; }}
+                      onMouseLeave={e => { if (prefs.language !== lang.code) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                    >
+                      <span className="text-base">{lang.flag}</span>
+                      <span>{lang.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
           {/* User card */}
           <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl" style={{
             background: 'var(--color-row-hover)',
@@ -280,50 +320,6 @@ export default function Layout() {
 
       {/* ── Main content ──────────────────────────────────────────────────────── */}
       <main className="flex-1 flex flex-col overflow-hidden transition-colors relative" style={{ background: 'var(--color-bg)' }}>
-        {/* Floating Controls - Top Right (Language only) */}
-        <div className="fixed top-4 right-4 lg:top-6 lg:right-6 z-30 flex flex-col-reverse gap-3 items-end">
-          {/* Language Toggle */}
-          <div className="relative">
-            <button
-              onClick={() => setShowLangMenu(p => !p)}
-              title="Change language"
-              className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 hover:scale-105 min-w-max"
-              style={{
-                background: 'var(--color-card)',
-                border: '1px solid var(--color-card-border)',
-                boxShadow: 'var(--shadow-card)',
-                color: '#1e40af',
-              }}
-            >
-              <span className="text-base leading-none">{currentLang?.flag}</span>
-              <span className="uppercase leading-none">{prefs.language}</span>
-            </button>
-            {showLangMenu && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowLangMenu(false)} />
-                <div className="absolute top-full right-0 mt-2 rounded-xl shadow-2xl overflow-hidden z-50 min-w-[160px] animate-fade-in"
-                     style={{ background: 'var(--color-card)', border: '1px solid var(--color-card-border)' }}>
-                  {LANGUAGES.map(lang => (
-                    <button
-                      key={lang.code}
-                      onClick={() => { prefs.setLanguage(lang.code); setShowLangMenu(false); }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left"
-                      style={prefs.language === lang.code
-                        ? { background: 'rgba(30,64,175,0.12)', color: '#1e40af', fontWeight: '600' }
-                        : { color: '#475569' }}
-                      onMouseEnter={e => { if (prefs.language !== lang.code) (e.currentTarget as HTMLElement).style.background = 'var(--color-row-hover)'; }}
-                      onMouseLeave={e => { if (prefs.language !== lang.code) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                    >
-                      <span className="text-base">{lang.flag}</span>
-                      <span>{lang.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
         {/* Page Content - Scrollable Area */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <SidebarContext.Provider value={{ sidebarOpen, setSidebarOpen }}>
