@@ -583,17 +583,39 @@ router.post('/upload', async (c) => {
   // On subsequent uploads the value is already set and identical, so the update
   // is effectively a no-op (guard: |new - current| ≤ 1 → skip to avoid noise).
   //
+  // For distributions of these funds, if commitment isn't extracted from the
+  // distribution document itself, fetch it from the first subscription/transaction
+  // report for the fund.
+  //
   // SDG and Siguler Guff are excluded: their commitment is entered manually in
   // fund settings — not extracted from any document.
   const FUNDS_WITH_COMMITMENT_IN_REPORT = [
     'nb-real-estate', 'hamilton-lane', 'hamilton-strategic', 'dover-street', 'capula-grv', 'goldman-sachs', 'siguler-guff',
   ]
-  if (FUNDS_WITH_COMMITMENT_IN_REPORT.includes(parsed.fundKey) && (parsed.commitmentUsd ?? 0) > 0) {
+
+  let commitmentUsdToUpdate = parsed.commitmentUsd ?? 0
+
+  // If no commitment found in this document but fund has previous reports,
+  // fetch commitment from the first subscription/transaction report
+  if (commitmentUsdToUpdate === 0 && FUNDS_WITH_COMMITMENT_IN_REPORT.includes(parsed.fundKey)) {
+    const firstNotice = await prisma.notice.findFirst({
+      where: { fundId: resolvedFund.id },
+      orderBy: { createdAt: 'asc' },
+    })
+    if (firstNotice) {
+      const firstData = (firstNotice.extractedData as any) ?? {}
+      if (firstData.commitmentUsd && firstData.commitmentUsd > 0) {
+        commitmentUsdToUpdate = firstData.commitmentUsd
+      }
+    }
+  }
+
+  if (FUNDS_WITH_COMMITMENT_IN_REPORT.includes(parsed.fundKey) && commitmentUsdToUpdate > 0) {
     const currentCommitment = parseFloat(resolvedFund.commitmentUsd.toString())
-    if (Math.abs(parsed.commitmentUsd - currentCommitment) > 1) {
+    if (Math.abs(commitmentUsdToUpdate - currentCommitment) > 1) {
       await prisma.fund.update({
         where: { id: resolvedFund.id },
-        data:  { commitmentUsd: new Decimal(parsed.commitmentUsd) },
+        data:  { commitmentUsd: new Decimal(commitmentUsdToUpdate) },
       })
     }
   }
@@ -1048,6 +1070,73 @@ router.delete('/:id', async (c) => {
   await prisma.notice.delete({ where: { id: notice.id } })
 
   return c.json({ message: 'Report deleted — ledger and dashboard updated.', fund_id: notice.fundId })
+})
+
+// ── POST /calculate-new-fund-ledger — Calculate ledger preview for NEW FUND with custom values ──
+// Used when adding a new fund with manual input fields (capital distribution, gain, interest, commitment)
+// Returns calculated ledger rows without saving to database
+router.post('/calculate-new-fund-ledger', async (c) => {
+  try {
+    const body = await c.req.json() as any
+    const {
+      commitment_usd = 0,
+      transaction_date,
+      capital_distribution = 0,    // B: capital paid in
+      distribution_received = 0,    // C: distribution/gains received
+      reinvestable = 0,             // D: reinvestable amount
+      gain = 0,
+      interest = 0,
+      fx_rate = 150,
+    } = body
+
+    const commitment = new Decimal(String(commitment_usd || 0))
+    const f = (v: Decimal) => parseFloat(v.toString())
+
+    // Create a single transaction from the input values
+    const txn = {
+      date: transaction_date ? new Date(transaction_date) : new Date(),
+      txType: 'capital_call' as const,
+      description: 'New Fund Initial Entry',
+      fxRate: new Decimal(String(fx_rate)),
+      capitalPaidIn: new Decimal(String(capital_distribution || 0)),
+      capitalReceived: new Decimal(String(distribution_received || 0)),
+      reinvestable: new Decimal(String(reinvestable || 0)),
+    }
+
+    const result = CalculationEngine.buildLedger(commitment, [txn], new Decimal(String(fx_rate)))
+
+    const snapshot = result.snapshot
+    const rows = result.rows.map((r: any, i: number) => ({
+      row: i + 1,
+      date: r.date.toISOString().slice(0, 10),
+      type: r.txType,
+      description: r.description,
+      capital_paid_in: f(r.capitalPaidIn),
+      capital_received: f(r.capitalReceived),
+      reinvestable: f(r.reinvestable),
+      cumulative_called: f(r.cumulativeCalled),
+      investment_capacity: f(r.investmentCapacity),
+      cash_flow: f(r.cashFlow),
+      net_cash_position: f(r.netCashPosition),
+    }))
+
+    return c.json({
+      snapshot: {
+        commitment_usd: f(snapshot.commitmentUsd),
+        total_called_usd: f(snapshot.totalCalledUsd),
+        total_received_usd: f(snapshot.totalReceivedUsd),
+        drawn_pct: f(snapshot.drawnPct),
+        unfunded_usd: f(snapshot.unfundedUsd),
+        investment_capacity: f(snapshot.investmentCapacity),
+        net_cash_position: f(snapshot.netCashPosition),
+        dpi: f(snapshot.dpi),
+      },
+      rows,
+    })
+  } catch (err: any) {
+    console.error('[fund-reports/calculate-new-fund-ledger] error:', err)
+    return c.json({ detail: err.message ?? 'Calculation failed' }, 400)
+  }
 })
 
 // ── GET /:id/ledger — full ledger for the fund linked to this notice ───────────

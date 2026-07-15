@@ -327,6 +327,22 @@ DOCUMENT TEXT:
 {{DOCUMENT_TEXT}}
 """`,
 
+  EVERSTONE: `You are extracting from an Everstone Capital Partners Fund notice.
+⚠️ CRITICAL: This fund has multiple series (IV, VII-B, etc.). Extract the EXACT series from the document.
+
+- Extract capital contribution or distribution fields:
+  B = capital contribution amount if present, else 0
+  C = distribution amount if present, else 0
+  D = 0
+- return_of_capital = null, gain = null, interest = null
+  (Everstone reports do not provide this breakdown)
+${COMMON_SCHEMA}
+
+DOCUMENT TEXT:
+"""
+{{DOCUMENT_TEXT}}
+"""`,
+
   UNKNOWN: `TASK: This is a fund report from a fund NOT yet in the system. Analyze it and
 propose a field-mapping template so it can be onboarded.
 

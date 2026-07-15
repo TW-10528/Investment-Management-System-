@@ -13,6 +13,7 @@ import { parseNbRealEstate } from '../../services/fundParsers/nb-real-estate/ind
 import { parseHamiltonLane } from '../../services/fundParsers/hamilton-lane/index'
 import { parseHamiltonStrategic } from '../../services/fundParsers/hamilton-strategic/index'
 import { parseDoverStreet } from '../../services/fundParsers/dover-street/index'
+import { parseCapulaGrv } from '../../services/fundParsers/capula-grv/index'
 
 const router = new Hono<HonoEnv>()
 
@@ -191,9 +192,9 @@ router.post('/test', async (c) => {
     }
 
     // ── Rich Extraction (override AI for known fund types) ─────────────────
-    // For funds with dedicated parsers (NB Real Estate, Hamilton, Dover, SDG), use the
+    // For funds with dedicated parsers (NB Real Estate, Hamilton, Dover, Capula, SDG), use the
     // rich extractor instead of AI to get more accurate values for the preview
-    const RICH_FUNDS = ['NB_REAL_ESTATE', 'HAMILTON_SEC', 'HAMILTON_STRAT', 'DOVER', 'SDG']
+    const RICH_FUNDS = ['NB_REAL_ESTATE', 'HAMILTON_SEC', 'HAMILTON_STRAT', 'DOVER', 'CAPULA', 'SDG']
     if (RICH_FUNDS.includes(fund_key) && pdfText) {
       try {
         let richNotice = null
@@ -201,6 +202,7 @@ router.post('/test', async (c) => {
         else if (fund_key === 'HAMILTON_SEC') richNotice = parseHamiltonLane(pdfText)
         else if (fund_key === 'HAMILTON_STRAT') richNotice = parseHamiltonStrategic(pdfText)
         else if (fund_key === 'DOVER') richNotice = parseDoverStreet(pdfText, null, '')
+        else if (fund_key === 'CAPULA') richNotice = parseCapulaGrv(pdfText)
         else if (fund_key === 'SDG') richNotice = extractSdgNotice(pdfText, file.name)
 
         // Override AI extraction with rich extraction values
