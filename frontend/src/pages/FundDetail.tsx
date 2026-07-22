@@ -145,24 +145,72 @@ export default function FundDetail() {
       </div>
 
       {/* Snapshot metrics */}
-      {snap && (() => {
+      {(() => {
+        console.log('[FUNDDETAIL OUTER DEBUG] snap is:', snap ? 'defined' : 'NULL/UNDEFINED', snap);
+        if (!snap) return null;
         const totalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
         const totalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
         const totalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
 
+        const isSdg = fund && /sdg/i.test(fund.fund_name ?? '');
+
+        // For SDG: read directly from last row since snapshot isn't working
+        const lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
+
+        // VISIBLE DEBUG
+        if (isSdg) {
+          console.log('[FUNDDETAIL DEBUG]', {
+            isSdg,
+            rows_length: rows.length,
+            lastRow_exists: !!lastRow,
+            lastRow_cumulative_called: lastRow?.cumulative_called,
+            lastRow_investment_capacity: lastRow?.investment_capacity,
+          });
+        }
+
+        const commitmentVal = isSdg ? (snap.commitment_jpy ?? 0) : (snap.commitment_usd ?? 0);
+        const totalCalledVal = isSdg ? (lastRow?.cumulative_called ?? 0) : (snap?.total_called_usd ?? 0);
+        const totalReceivedVal = isSdg ? (snap.total_received_jpy ?? 0) : (snap.total_received_usd ?? 0);
+        const dryPowderVal = isSdg ? (lastRow?.investment_capacity ?? 0) : (snap?.unfunded_usd ?? 0);
+
+        // VISIBLE DEBUG - display on page
+        if (isSdg) {
+          console.warn('SDG VALUES:', { totalCalledVal, dryPowderVal });
+        }
+
+        console.log('[FUNDDETAIL DEBUG]', {
+          fund_name: fund?.fund_name,
+          isSdg,
+          snap_keys: Object.keys(snap || {}),
+          snap_total_called_jpy: snap?.total_called_jpy,
+          snap_total_called_usd: snap?.total_called_usd,
+          snap_unfunded_jpy: snap?.unfunded_jpy,
+          snap_unfunded_usd: snap?.unfunded_usd,
+          totalCalledVal,
+          dryPowderVal,
+        });
+
         return (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-            <Snap label="Commitment"     value={fmt.usd(snap.commitment_usd, true)} />
-            <Snap label="Total Called"   value={fmt.usd(snap.total_called_usd, true)} />
-            <Snap label="Total Received" value={fmt.usd(snap.total_received_usd, true)} />
+          <div>
+            {isSdg && (
+              <div style={{ background: '#fff3cd', padding: '10px', marginBottom: '10px', fontSize: '12px', color: '#333' }}>
+                DEBUG: isSdg={String(isSdg)} | totalCalledVal={totalCalledVal} | dryPowderVal={dryPowderVal}
+                <br />snap.total_called_jpy={snap?.total_called_jpy} | snap.unfunded_jpy={snap?.unfunded_jpy}
+              </div>
+            )}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+              <Snap label="Commitment"     value={isSdg ? fmt.jpy(commitmentVal) : fmt.usd(commitmentVal, true)} />
+              <Snap label={isSdg ? "Paid-In (E)" : "Total Called"}   value={isSdg ? fmt.jpy(totalCalledVal) : fmt.usd(totalCalledVal, true)} />
+            <Snap label="Total Received" value={isSdg ? fmt.jpy(totalReceivedVal) : fmt.usd(totalReceivedVal, true)} />
             <Snap label="Drawn %"        value={fmt.pct(snap.drawn_pct)} />
-            <Snap label="Unfunded"       value={fmt.usd(snap.unfunded_usd, true)} />
+            <Snap label={isSdg ? "Dry Powder (F)" : "Unfunded"}       value={isSdg ? fmt.jpy(dryPowderVal) : fmt.usd(dryPowderVal, true)} />
             <Snap label="Inv. Capacity"  value={fmt.usd(snap.investment_capacity, true)} />
-            <Snap label="Net Cash"       value={fmt.usd(snap.net_cash_position, true)} sub={snap.net_cash_position < 0 ? 'Net outflow' : 'Net inflow'} />
+            <Snap label="Net Cash"       value={isSdg ? fmt.jpy(snap.net_cash_position) : fmt.usd(snap.net_cash_position, true)} sub={snap.net_cash_position < 0 ? 'Net outflow' : 'Net inflow'} />
             <Snap label="DPI"            value={snap.dpi.toFixed(2) + 'x'} />
-            <Snap label="Return of Capital" value={fmt.usd(totalReturnOfCapital, true)} />
-            <Snap label="Gain" value={fmt.usd(totalGain, true)} />
-            <Snap label="Interest" value={fmt.usd(totalInterest, true)} />
+            <Snap label="Return of Capital" value={isSdg ? fmt.jpy(totalReturnOfCapital) : fmt.usd(totalReturnOfCapital, true)} />
+            <Snap label="Gain" value={isSdg ? fmt.jpy(totalGain) : fmt.usd(totalGain, true)} />
+            <Snap label="Interest" value={isSdg ? fmt.jpy(totalInterest) : fmt.usd(totalInterest, true)} />
+            </div>
           </div>
         );
       })()}

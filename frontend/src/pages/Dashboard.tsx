@@ -342,11 +342,11 @@ export default function Dashboard() {
         if (!sdgFund) return null;
 
         const sdgCommit = sdgFund.contract_commitment_jpy ?? sdgFund.commitment_jpy ?? 0;
-        const sdgDist = sdgFund.total_received_usd ?? 0;
+        const sdgValue = sdgFund.total_value_usd ?? ((sdgFund.total_received_jpy ?? sdgFund.total_received_usd ?? 0) + (sdgFund.nav_usd ?? 0));
 
         const cards = [
           { emoji: '📋', label: 'Commitment', value: fmt.jpy(sdgCommit), currency: 'JPY' },
-          { emoji: '📈', label: 'Distribution', value: latestSaved ? fmt.jpy(sdgDist * latestSaved) : fmt.jpy(sdgDist), currency: 'JPY' },
+          { emoji: '📈', label: 'Distribution', value: fmt.jpy(sdgValue), currency: 'JPY' },
         ];
 
         if (totals.sdgInterest !== 0) {
@@ -392,7 +392,7 @@ export default function Dashboard() {
           const regularDist = regularFunds.reduce((sum, f) => sum + (f.total_received_usd ?? 0), 0);
           const regularNav = regularFunds.reduce((sum, f) => sum + (f.nav_usd ?? 0), 0);
           const regularCommit = regularFunds.reduce((sum, f) => sum + (f.commitment_usd ?? 0), 0);
-          const regularValue = regularFunds.reduce((sum, f) => sum + (f.total_value_usd ?? (f.total_received_usd + (f.nav_usd ?? 0))), 0);
+          const regularValue = regularFunds.reduce((sum, f) => sum + (f.total_value_usd ?? ((f.total_received_usd ?? 0) + (f.nav_usd ?? 0))), 0);
           const dpi = regularCalled > 0 ? regularDist / regularCalled : 0;
           const tvpi = regularCalled > 0 ? regularValue / regularCalled : 0;
           const moic = 1 + dpi;
@@ -402,7 +402,7 @@ export default function Dashboard() {
           const sdgDist = sdgFund ? (sdgFund.total_received_usd ?? 0) : 0;
           const sdgNav = sdgFund ? (sdgFund.nav_usd ?? 0) : 0;
           const sdgCommit = sdgFund ? (sdgFund.contract_commitment_jpy ?? sdgFund.commitment_usd ?? 0) : 0;
-          const sdgValue = sdgFund ? (sdgFund.total_value_usd ?? (sdgFund.total_received_usd + (sdgFund.nav_usd ?? 0))) : 0;
+          const sdgValue = sdgFund ? (sdgFund.total_value_usd ?? ((sdgFund.total_received_usd ?? 0) + (sdgFund.nav_usd ?? 0))) : 0;
           const sdgDpi = sdgCalled > 0 ? sdgDist / sdgCalled : 0;
           const sdgTvpi = sdgCalled > 0 ? sdgValue / sdgCalled : 0;
           const sdgMoic = sdgDpi * sdgTvpi;
@@ -464,7 +464,7 @@ export default function Dashboard() {
                 {/* 7 Funds rows (USD) */}
                 {activeFunds.map(f => {
                   const navUsd   = f.nav_usd ?? 0;
-                  const valueUsd = f.total_value_usd ?? (f.total_received_usd + navUsd);
+                  const valueUsd = f.total_value_usd ?? ((f.total_received_usd ?? 0) + navUsd);
                   const fundNameKey = getFundNameTranslationKey(f.fund_name);
                   const isSdg = /sdg/i.test(f.fund_name ?? '');
 
@@ -478,9 +478,9 @@ export default function Dashboard() {
                         </Link>
                       </td>
                       <td className="px-3 py-2.5 text-sm theme-text">{f.manager || '—'}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums theme-text text-sm font-semibold">{fmt.usdFull(f.contract_commitment_usd ?? f.commitment_usd)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-sm" style={{ color: C.indigo }}>{fmt.usdFull(f.total_called_usd)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-sm" style={{ color: C.indigo }}>{fmt.usdFull(f.total_received_usd)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums theme-text text-sm font-semibold">{fmt.usdFull(f.contract_commitment_usd ?? f.commitment_usd ?? 0)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-sm" style={{ color: C.indigo }}>{fmt.usdFull(f.total_called_usd ?? 0)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-sm" style={{ color: C.indigo }}>{fmt.usdFull(f.total_received_usd ?? 0)}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-sm font-semibold" style={{ color: C.violet }}>{fmt.usdFull(navUsd)}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums font-bold text-base theme-text">{fmt.usdFull(valueUsd)}</td>
                     </tr>
@@ -493,7 +493,7 @@ export default function Dashboard() {
 
                   const fundNameKey = getFundNameTranslationKey(sdgFund.fund_name);
                   const navUsd = sdgFund.nav_usd ?? 0;
-                  const valueUsd = sdgFund.total_value_usd ?? (sdgFund.total_received_usd + navUsd);
+                  const valueUsd = sdgFund.total_value_usd ?? ((sdgFund.total_received_jpy ?? sdgFund.total_received_usd ?? 0) + navUsd);
 
                   return (
                     <tr key={sdgFund.fund_id} className="theme-row-hover transition-colors" style={{ borderTop: '2px solid rgba(99,102,241,0.2)' }}>
@@ -502,10 +502,10 @@ export default function Dashboard() {
                       </td>
                       <td className="px-3 py-2.5 text-sm theme-text">{sdgFund.manager || '—'}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums theme-text text-sm font-semibold">{fmt.jpy(sdgFund.contract_commitment_jpy ?? sdgFund.commitment_jpy ?? 0)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-sm" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgFund.total_called_usd * latestSaved) : '—'}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-sm" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgFund.total_received_usd * latestSaved) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-sm" style={{ color: C.indigo }}>{fmt.jpy(sdgFund.total_called_jpy ?? (latestSaved ? (sdgFund.total_called_usd ?? 0) * latestSaved : 0))}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-sm" style={{ color: C.indigo }}>{fmt.jpy(sdgFund.total_received_jpy ?? (latestSaved ? (sdgFund.total_received_usd ?? 0) * latestSaved : 0))}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-sm font-semibold" style={{ color: C.violet }}>{latestSaved ? fmt.jpy(navUsd * latestSaved) : '—'}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-base" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(valueUsd * latestSaved) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-bold text-base" style={{ color: C.indigo }}>{fmt.jpy(valueUsd)}</td>
                     </tr>
                   );
                 })()}
@@ -518,7 +518,7 @@ export default function Dashboard() {
                   const regCalled = regularFunds.reduce((sum, f) => sum + (f.total_called_usd ?? 0), 0);
                   const regDist = regularFunds.reduce((sum, f) => sum + (f.total_received_usd ?? 0), 0);
                   const regNav = regularFunds.reduce((sum, f) => sum + (f.nav_usd ?? 0), 0);
-                  const regValue = regularFunds.reduce((sum, f) => sum + (f.total_value_usd ?? (f.total_received_usd + (f.nav_usd ?? 0))), 0);
+                  const regValue = regularFunds.reduce((sum, f) => sum + (f.total_value_usd ?? ((f.total_received_usd ?? 0) + (f.nav_usd ?? 0))), 0);
 
                   return (
                     <tr>
@@ -538,17 +538,17 @@ export default function Dashboard() {
                   if (!sdgFund) return null;
 
                   const navUsd = sdgFund.nav_usd ?? 0;
-                  const valueUsd = sdgFund.total_value_usd ?? (sdgFund.total_received_usd + navUsd);
+                  const valueUsd = sdgFund.total_value_usd ?? ((sdgFund.total_received_jpy ?? sdgFund.total_received_usd ?? 0) + navUsd);
 
                   return (
                     <tr>
                       <td className="px-4 py-2.5 text-xs font-bold theme-text-muted uppercase">{t('manageFunds.yenTotal')}</td>
                       <td className="px-3 py-2.5"></td>
                       <td className="px-3 py-2.5 text-right text-sm font-bold theme-text">{fmt.jpy(sdgFund.contract_commitment_jpy ?? sdgFund.commitment_jpy ?? 0)}</td>
-                      <td className="px-3 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgFund.total_called_usd * latestSaved) : '—'}</td>
-                      <td className="px-3 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{latestSaved ? fmt.jpy(sdgFund.total_received_usd * latestSaved) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{fmt.jpy(sdgFund.total_called_jpy ?? (latestSaved ? (sdgFund.total_called_usd ?? 0) * latestSaved : 0))}</td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold" style={{ color: C.indigo }}>{fmt.jpy(sdgFund.total_received_jpy ?? (latestSaved ? (sdgFund.total_received_usd ?? 0) * latestSaved : 0))}</td>
                       <td className="px-3 py-2.5 text-right text-sm font-bold" style={{ color: C.violet }}>{latestSaved ? fmt.jpy(navUsd * latestSaved) : '—'}</td>
-                      <td className="px-3 py-2.5 text-right text-base font-bold theme-text">{latestSaved ? fmt.jpy(valueUsd * latestSaved) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right text-base font-bold theme-text">{fmt.jpy(valueUsd)}</td>
                     </tr>
                   );
                 })()}

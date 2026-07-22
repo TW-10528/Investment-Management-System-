@@ -100,23 +100,23 @@ export default function Layout() {
           background: 'linear-gradient(135deg, rgba(30,64,175,0.08) 0%, rgba(15,118,110,0.04) 100%)',
           borderBottom: '1px solid var(--color-card-border)',
         }}>
-          <div className="flex flex-col gap-2">
-            <div className="w-full h-14 flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 186" className="w-full h-full object-contain" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Thirdwave Group logo">
-                <path fill="#2735b3" d="M84 106 104 78h43L127 124z"/>
-                <path fill="#2735b3" d="M131 124 163 66h49L178 116z"/>
-                <path fill="#2735b3" d="M185 122 218 66 273 30 230 136z"/>
-                <text x="286" y="95" fill="currentColor" fontFamily="Arial Black, Arial, Helvetica, sans-serif" fontSize="52" fontWeight="900" letterSpacing="0.8">
-                  THIRDWAVE
-                </text>
-                <text x="286" y="138" fill="currentColor" fontFamily="Arial Black, Arial, Helvetica, sans-serif" fontSize="52" fontWeight="900" letterSpacing="0.8">
-                  GROUP
-                </text>
+          <div className="flex items-start gap-2.5">
+            {/* Logo */}
+            <div className="w-14 h-14 flex-shrink-0 pt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="35 5 110 130" className="w-full h-full object-contain" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Thirdwave Group logo">
+                <path fill="#2735b3" d="M42 53 52 39h21.5L63.5 62z"/>
+                <path fill="#2735b3" d="M65.5 62 81.5 33h24.5L90 58z"/>
+                <path fill="#2735b3" d="M92.5 61 109 33 136.5 15 115 68z"/>
               </svg>
             </div>
-            <div className="px-1">
-              <p className="text-xs font-semibold theme-text-muted leading-tight">
-                {i18n.language === 'ja' ? '土地管理システム' : 'Investment Management System'}
+
+            {/* Text */}
+            <div className="flex-1 min-w-0 pt-0.5">
+              <p className="text-base font-bold theme-text leading-none">
+                {i18n.language === 'ja' ? 'サードウェーブ' : 'Thirdwave'}
+              </p>
+              <p className="text-xs font-medium theme-text-muted leading-tight mt-0.5">
+                {i18n.language === 'ja' ? '投資管理システム' : 'Investment Management'}
               </p>
             </div>
           </div>

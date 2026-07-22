@@ -55,13 +55,57 @@ router.get('/:id', async (c) => {
 
 // GET /:id/ledger
 router.get('/:id/ledger', async (c) => {
+  console.log('[LEDGER ENDPOINT] Called for fund ID:', c.req.param('id'))
   const fund = await prisma.fund.findUnique({ where: { id: c.req.param('id') } })
   if (!fund) return c.json({ detail: 'Fund not found' }, 404)
+  console.log('[LEDGER ENDPOINT] Fund name:', fund.fundName, '| isSdg:', /sdg/i.test(fund.fundName))
 
-  const [paidCalls, distributions] = await Promise.all([
-    prisma.capitalCall.findMany({ where: { fundId: fund.id, status: { in: ['approved', 'paid'] } }, orderBy: { executionDate: 'asc' } }),
-    prisma.distribution.findMany({ where: { fundId: fund.id }, orderBy: { distributionDate: 'asc' } }),
+  const [fundLevelCalls, fundLevelDists, commitments] = await Promise.all([
+    prisma.capitalCall.findMany({ where: { fundId: fund.id, commitmentId: null, status: { in: ['approved', 'paid'] } }, orderBy: { executionDate: 'asc' } }),
+    prisma.distribution.findMany({ where: { fundId: fund.id, commitmentId: null }, orderBy: { distributionDate: 'asc' } }),
+    prisma.commitment.findMany({ where: { fundId: fund.id } }),
   ])
+
+  // Get commitment-level capital calls and distributions
+  const commitmentCalls = commitments.length > 0
+    ? (await Promise.all(
+        commitments.map(c =>
+          prisma.capitalCall.findMany({
+            where: { commitmentId: c.id, status: { in: ['approved', 'paid'] } },
+            orderBy: { executionDate: 'asc' },
+          })
+        )
+      )).flat()
+    : []
+
+  const commitmentDists = commitments.length > 0
+    ? (await Promise.all(
+        commitments.map(c =>
+          prisma.distribution.findMany({
+            where: { commitmentId: c.id },
+            orderBy: { distributionDate: 'asc' },
+          })
+        )
+      )).flat()
+    : []
+
+  // Combine fund-level and commitment-level data
+  const paidCalls = [...fundLevelCalls, ...commitmentCalls]
+  const distributions = [...fundLevelDists, ...commitmentDists]
+
+  // Check if SDG fund early (for logging)
+  const isSdg = fund.fundName && /sdg/i.test(fund.fundName)
+
+  // DEBUG: Log what was fetched
+  if (isSdg) {
+    console.log(`[LEDGER DEBUG] Fund: ${fund.fundName}`)
+    console.log(`  - fundLevelCalls: ${fundLevelCalls.length}`)
+    console.log(`  - commitmentCalls: ${commitmentCalls.length}`)
+    console.log(`  - fundLevelDists: ${fundLevelDists.length}`)
+    console.log(`  - commitmentDists: ${commitmentDists.length}`)
+    console.log(`  - Total paidCalls: ${paidCalls.length}`)
+    console.log(`  - Total distributions: ${distributions.length}`)
+  }
 
   // Fetch commitment history for funds that use it (e.g. SDG).
   const histRecords = await prisma.fundCommitmentHistory.findMany({
@@ -75,17 +119,18 @@ router.get('/:id/ledger', async (c) => {
   // Use the current commitment from the fund record. The CalculationEngine will
   // apply commitment history to adjust F (investment capacity) at specific dates.
   // For SDG fund (JPY-only), use commitmentJpy. For USD funds, use commitmentUsd.
-  const isSdg = fund.fundName && /sdg/i.test(fund.fundName)
   const commitment = isSdg && fund.commitmentJpy
     ? new Decimal(fund.commitmentJpy.toString())
     : new Decimal(fund.commitmentUsd.toString())
 
+  // For SDG fund, the _Usd fields actually contain YEN values, not USD
+  // Use FX rate of 1 (no conversion) for SDG
   const txns = [
     ...paidCalls.map((cc: any) => ({
       date:            cc.executionDate ?? cc.dueDate,
       txType:          'capital_call' as const,
       description:     `Capital Call #${cc.callNumber}`,
-      fxRate:          cc.fxRate ? new Decimal(cc.fxRate.toString()) : null,
+      fxRate:          isSdg ? new Decimal('1') : (cc.fxRate ? new Decimal(cc.fxRate.toString()) : null),
       capitalPaidIn:   new Decimal(cc.grossCallUsd.toString()),
       capitalReceived: new Decimal(cc.distributionUsd.toString()),
       reinvestable:    new Decimal(cc.reinvestableUsd.toString()),
@@ -102,7 +147,7 @@ router.get('/:id/ledger', async (c) => {
       date:            d.distributionDate,
       txType:          'distribution' as const,
       description:     d.distType,
-      fxRate:          d.fxRate ? new Decimal(d.fxRate.toString()) : null,
+      fxRate:          isSdg ? new Decimal('1') : (d.fxRate ? new Decimal(d.fxRate.toString()) : null),
       capitalPaidIn:   new Decimal(0),
       capitalReceived: new Decimal(d.amountUsd.toString()),
       reinvestable:    new Decimal(d.reinvestableUsd.toString()),
@@ -121,17 +166,69 @@ router.get('/:id/ledger', async (c) => {
   const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new Decimal('150'), commitmentHistory)
   const f = (d: Decimal) => parseFloat(d.toString())
 
+  // DEBUG: Log buildLedger results
+  if (isSdg) {
+    console.log(`[BUILDLEDGER RESULT] SDG Fund: ${fund.fundName}`)
+    console.log(`  - Rows returned: ${rows.length}`)
+    if (rows.length > 0) {
+      const lastRowDebug = rows[rows.length - 1]
+      console.log(`  - Last row cumulativeCalled: ${lastRowDebug.cumulativeCalled.toString()}`)
+      console.log(`  - Last row description: ${lastRowDebug.description}`)
+    }
+  }
+
+  // For SDG fund, return JPY totals to match dashboard
+  // Use last row's cumulative called value (E) - already calculated correctly by buildLedger
+  const lastRow = rows.length > 0 ? rows[rows.length - 1] : null
+  const totalCalledJpy   = lastRow ? lastRow.cumulativeCalled : new Decimal(0)
+  const totalReceivedJpy = rows.reduce((s, r) => s.plus(r.capitalReceivedJpy), new Decimal(0))
+
+  // DEBUG: Log final snapshot values
+  if (isSdg) {
+    console.log(`[SNAPSHOT CALCULATION] SDG Fund: ${fund.fundName}`)
+    console.log(`  - totalCalledJpy (Decimal): ${totalCalledJpy.toString()}`)
+    console.log(`  - totalCalledJpy (float): ${f(totalCalledJpy)}`)
+    console.log(`  - totalReceivedJpy (float): ${f(totalReceivedJpy)}`)
+  }
+
+  // Build the snapshot object for response
+  const snapshotResponse = isSdg ? {
+    commitment_jpy:      f(commitment),
+    total_called_jpy:    f(totalCalledJpy),
+    total_received_jpy:  f(totalReceivedJpy),
+    drawn_pct:           f(snapshot.drawnPct),
+    unfunded_jpy:        f(commitment.minus(totalCalledJpy)),
+    investment_capacity: f(snapshot.investmentCapacity),
+    net_cash_position:   f(snapshot.netCashPosition),
+    dpi:                 f(snapshot.dpi),
+  } : {
+    commitment_usd:      f(snapshot.commitmentUsd),
+    total_called_usd:    f(snapshot.totalCalledUsd),
+    total_received_usd:  f(snapshot.totalReceivedUsd),
+    drawn_pct:           f(snapshot.drawnPct),
+    unfunded_usd:        f(snapshot.unfundedUsd),
+    investment_capacity: f(snapshot.investmentCapacity),
+    net_cash_position:   f(snapshot.netCashPosition),
+    dpi:                 f(snapshot.dpi),
+  };
+
+  // DEBUG: Log actual response
+  if (isSdg) {
+    console.log(`[SNAPSHOT RESPONSE] Actual response being sent:`)
+    console.log(JSON.stringify(snapshotResponse, null, 2))
+  }
+
   return c.json({
     fund_id:    fund.id,
     fund_name:  fund.fundName,
-    commitment: f(commitment),
+    commitment: isSdg ? f(commitment) : null,
     rows: rows.map((r) => ({
       date:                r.date.toISOString().slice(0, 10),
       tx_type:             r.txType,
       description:         r.description,
       fx_rate:             r.fxRate ? f(r.fxRate) : null,
-      capital_paid_in:     f(r.capitalPaidIn),
-      capital_received:    f(r.capitalReceived),
+      capital_paid_in:     isSdg ? f(r.capitalPaidJpy) : f(r.capitalPaidIn),
+      capital_received:    isSdg ? f(r.capitalReceivedJpy) : f(r.capitalReceived),
       reinvestable:        f(r.reinvestable),
       cumulative_called:   f(r.cumulativeCalled),
       investment_capacity: f(r.investmentCapacity),
@@ -147,17 +244,16 @@ router.get('/:id/ledger', async (c) => {
       wire_reference:      r.wireReference,
       notes:               r.notes ?? null,
     })),
-    snapshot: {
-      commitment_usd:      f(snapshot.commitmentUsd),
-      total_called_usd:    f(snapshot.totalCalledUsd),
-      total_received_usd:  f(snapshot.totalReceivedUsd),
-      drawn_pct:           f(snapshot.drawnPct),
-      unfunded_usd:        f(snapshot.unfundedUsd),
-      investment_capacity: f(snapshot.investmentCapacity),
-      net_cash_position:   f(snapshot.netCashPosition),
-      dpi:                 f(snapshot.dpi),
-    },
-  })
+    snapshot: snapshotResponse,
+  });
+
+  // DEBUG: Always log the response
+  console.log('[LEDGER BUILD RESULT]', {
+    isSdg,
+    rows_count: rows.length,
+    lastRow_cumulative_called: rows.length > 0 ? f(rows[rows.length - 1].cumulativeCalled) : null,
+    lastRow_investment_capacity: rows.length > 0 ? f(rows[rows.length - 1].investmentCapacity) : null,
+  });
 })
 
 // ── Commitments (optional per-fund sub-grouping; used by the SDG fund) ─────────

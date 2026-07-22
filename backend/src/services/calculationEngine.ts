@@ -201,13 +201,13 @@ export class CalculationEngine {
 
   /** Get current fund summary (used by list and dashboard endpoints). */
   static async fundSummary(fund: any): Promise<Record<string, unknown>> {
-    const [paidCalls, distributions, navRec, commitmentHistory] = await Promise.all([
+    const [fundLevelCalls, fundLevelDists, navRec, commitmentHistory, commitments] = await Promise.all([
       prisma.capitalCall.findMany({
-        where:   { fundId: fund.id, status: { in: ['approved', 'paid'] } },
+        where:   { fundId: fund.id, commitmentId: null, status: { in: ['approved', 'paid'] } },
         orderBy: { executionDate: 'asc' },
       }),
       prisma.distribution.findMany({
-        where:   { fundId: fund.id },
+        where:   { fundId: fund.id, commitmentId: null },
         orderBy: { distributionDate: 'asc' },
       }),
       prisma.navRecord.findFirst({ where: { fundId: fund.id }, orderBy: { navDate: 'desc' } }),
@@ -215,7 +215,37 @@ export class CalculationEngine {
         where:   { fundId: fund.id },
         orderBy: { effectiveDate: 'asc' },
       }),
+      prisma.commitment.findMany({
+        where: { fundId: fund.id },
+      }),
     ])
+
+    // Get commitment-level capital calls and distributions
+    const commitmentCalls = commitments.length > 0
+      ? (await Promise.all(
+          commitments.map(c =>
+            prisma.capitalCall.findMany({
+              where: { commitmentId: c.id, status: { in: ['approved', 'paid'] } },
+              orderBy: { executionDate: 'asc' },
+            })
+          )
+        )).flat()
+      : []
+
+    const commitmentDists = commitments.length > 0
+      ? (await Promise.all(
+          commitments.map(c =>
+            prisma.distribution.findMany({
+              where: { commitmentId: c.id },
+              orderBy: { distributionDate: 'asc' },
+            })
+          )
+        )).flat()
+      : []
+
+    // Combine fund-level and commitment-level data
+    const paidCalls = [...fundLevelCalls, ...commitmentCalls]
+    const distributions = [...fundLevelDists, ...commitmentDists]
     const navUsd  = navRec ? parseFloat(navRec.navUsd?.toString() ?? '0') : 0
     const navDate = navRec ? new Date(navRec.navDate) : null
 
@@ -228,12 +258,14 @@ export class CalculationEngine {
 
     const f = (d: Decimal) => parseFloat(d.toString())
 
+    // For SDG fund, the _Usd fields actually contain YEN values, not USD
+    // Use FX rate of 1 (no conversion) for SDG
     const txns: Transaction[] = [
       ...paidCalls.map((c: any) => ({
         date:            c.executionDate ?? c.dueDate,
         txType:          'capital_call' as const,
         description:     `Capital Call #${c.callNumber}`,
-        fxRate:          c.fxRate ? new Decimal(c.fxRate.toString()) : null,
+        fxRate:          isSdg ? new Decimal('1') : (c.fxRate ? new Decimal(c.fxRate.toString()) : null),
         capitalPaidIn:   new Decimal(c.grossCallUsd.toString()),
         capitalReceived: new Decimal(c.distributionUsd.toString()),
         reinvestable:    new Decimal(c.reinvestableUsd.toString()),
@@ -244,7 +276,7 @@ export class CalculationEngine {
         date:            d.distributionDate,
         txType:          'distribution' as const,
         description:     d.distType,
-        fxRate:          d.fxRate ? new Decimal(d.fxRate.toString()) : null,
+        fxRate:          isSdg ? new Decimal('1') : (d.fxRate ? new Decimal(d.fxRate.toString()) : null),
         capitalPaidIn:   new Decimal(0),
         capitalReceived: new Decimal(d.amountUsd.toString()),
         reinvestable:    new Decimal(d.reinvestableUsd.toString()),
@@ -286,13 +318,16 @@ export class CalculationEngine {
       effectiveDate: new Date(h.effectiveDate),
     }))
     const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new Decimal('150'), commHistory)
-    // JPY totals (sum of each row's B×fx / C×fx) for the dashboard's per-fund view.
-    const totalCalledJpy   = rows.reduce((s, r) => s.plus(r.capitalPaidJpy),     new Decimal(0))
+
+    // JPY totals for SDG fund's per-fund view
+    const lastRow = rows.length > 0 ? rows[rows.length - 1] : null
+    const totalCalledJpy   = isSdg && lastRow ? lastRow.cumulativeCalled : rows.reduce((s, r) => s.plus(r.capitalPaidJpy), new Decimal(0))
     const totalReceivedJpy = rows.reduce((s, r) => s.plus(r.capitalReceivedJpy), new Decimal(0))
 
     const called       = f(snapshot.totalCalledUsd)
     const received     = f(snapshot.totalReceivedUsd)
     const totalValue   = received + navUsd                          // Distributions + NAV
+    const totalValueJpy = f(totalReceivedJpy) + navUsd              // Distributions (JPY) + NAV
     const dpiRatio     = called > 0 ? received / called : 0
     const moic         = called > 0 ? 1 + Math.round(dpiRatio * 10000) / 10000 : 0  // 1 + DPI
     const tvpi         = called > 0 ? Math.round(totalValue / called * 10000) / 10000 : 0  // (Dist + NAV) / Called
@@ -302,7 +337,7 @@ export class CalculationEngine {
     const irrRaw = CalculationEngine.xirr(irrFlows)
     const irr    = irrRaw != null ? Math.round(irrRaw * 1000) / 10 : null   // % to 1 dp
 
-    return {
+    return isSdg ? {
       fund_id:             fund.id,
       fund_name:           fund.fundName,
       fund_name_jp:        fund.fundNameJp,
@@ -310,13 +345,39 @@ export class CalculationEngine {
       strategy:            fund.strategy,
       vintage_year:        fund.vintageYear,
       currency:            fund.currency,
-      commitment_usd:          isSdg ? null : f(commitment),
-      commitment_jpy:          isSdg ? (fund.contractCommitmentJpy ? parseFloat(String(fund.contractCommitmentJpy)) : null) : null,
-      contract_commitment_usd: fund.contractCommitmentUsd ? f(new Decimal(fund.contractCommitmentUsd.toString())) : null,
-      total_called_usd:        called,
-      total_received_usd:  received,
+      commitment_usd:      null,
+      commitment_jpy:      fund.contractCommitmentJpy ? parseFloat(String(fund.contractCommitmentJpy)) : null,
+      contract_commitment_usd: null,
+      total_called_usd:    null,
+      total_received_usd:  null,
       total_called_jpy:    f(totalCalledJpy),
       total_received_jpy:  f(totalReceivedJpy),
+      drawn_pct:           f(snapshot.drawnPct),
+      unfunded_usd:        null,
+      investment_capacity: f(snapshot.investmentCapacity),
+      net_cash_position:   f(snapshot.netCashPosition),
+      nav_usd:             navUsd,
+      total_value_usd:     totalValueJpy,
+      moic:                moic,
+      tvpi:                tvpi,
+      irr:                 irr,
+      dpi:                 f(snapshot.dpi),
+      is_active:           fund.isActive,
+    } : {
+      fund_id:             fund.id,
+      fund_name:           fund.fundName,
+      fund_name_jp:        fund.fundNameJp,
+      manager:             fund.manager,
+      strategy:            fund.strategy,
+      vintage_year:        fund.vintageYear,
+      currency:            fund.currency,
+      commitment_usd:      f(commitment),
+      commitment_jpy:      null,
+      contract_commitment_usd: fund.contractCommitmentUsd ? f(new Decimal(fund.contractCommitmentUsd.toString())) : null,
+      total_called_usd:    called,
+      total_received_usd:  received,
+      total_called_jpy:    null,
+      total_received_jpy:  null,
       drawn_pct:           f(snapshot.drawnPct),
       unfunded_usd:        f(snapshot.unfundedUsd),
       investment_capacity: f(snapshot.investmentCapacity),

@@ -335,7 +335,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                 if (!sdgFund) return null;
 
                 const sdgCommit = (sdgFund as any).contract_commitment_jpy ?? (sdgFund as any).commitment_jpy ?? 0;
-                const sdgDist = (sdgFund.total_called_usd ?? 0) * rate;
+                const sdgDist = (sdgFund as any).total_called_jpy ?? ((sdgFund.total_called_usd ?? 0) * rate);
                 const sdgInterest = totals.sdgInterest;
 
                 const tileData = [
@@ -375,10 +375,10 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
           Commitment:   f.commitment_usd,
           Contribution: f.total_called_usd,
           Distribution: f.total_received_usd,
-          utilizationPct: f.commitment_usd > 0 ? ((f.total_called_usd ?? 0) / f.commitment_usd) * 100 : 0,
+          utilizationPct: (f.commitment_usd ?? 0) > 0 ? ((f.total_called_usd ?? 0) / (f.commitment_usd ?? 1)) * 100 : 0,
         }));
         const pieDataUsd = regularFunds
-          .map(f => ({ name: f.fund_name, value: f.total_value_usd ?? (f.total_received_usd + (f.nav_usd ?? 0)) }))
+          .map(f => ({ name: f.fund_name, value: f.total_value_usd ?? ((f.total_received_usd ?? 0) + (f.nav_usd ?? 0)) }))
           .filter(d => d.value > 0);
 
         // SDG Fund data (JPY)
@@ -394,7 +394,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
         }] : [];
         const pieDataJpy = sdgFund ? [{
           name: sdgFund.fund_name,
-          value: ((sdgFund.total_value_usd ?? (sdgFund.total_received_usd + (sdgFund.nav_usd ?? 0))) * rate)
+          value: ((sdgFund.total_value_usd ?? ((sdgFund.total_received_usd ?? 0) + (sdgFund.nav_usd ?? 0))) * rate)
         }] : [];
 
         return (
@@ -411,13 +411,11 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-card-border)" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} interval={0} angle={-20} textAnchor="end" height={80} />
                       <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.usdAbbr(v)} width={56} />
-                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} width={40} />
                       <Tooltip formatter={(v: any) => typeof v === 'number' && v > 100 ? fmt.usdFull(Number(v)) : `${Number(v).toFixed(1)}%`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       <Bar yAxisId="left" dataKey="Commitment" fill="#1e40af" radius={[3,3,0,0]} label={{ dataKey: 'Commitment', formatter: (v: any) => fmt.usdAbbr(v ?? 0), position: 'top', fontSize: 9, fill: '#1e40af' }} />
                       <Bar yAxisId="left" dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} label={{ dataKey: 'Contribution', formatter: (v: any) => fmt.usdAbbr(v ?? 0), position: 'top', fontSize: 9, fill: '#1e40af' }} />
                       <Bar yAxisId="left" dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} label={{ dataKey: 'Distribution', formatter: (v: any) => fmt.usdAbbr(v ?? 0), position: 'top', fontSize: 9, fill: '#1e40af' }} />
-                      <Line yAxisId="right" type="monotone" dataKey="utilizationPct" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} name="Commitment Utilization %" />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -657,8 +655,8 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                     </td>
                     <td className="px-4 py-3 text-sm theme-text">{sdgFund.manager || '—'}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{yen((sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0))}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{yen(jpy(sdgFund.total_called_usd))}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{yen(jpy(sdgFund.total_received_usd))}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{yen(sdgFund.total_called_jpy ?? jpy(sdgFund.total_called_usd ?? 0))}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold" style={{ color: C.indigo }}>{yen(sdgFund.total_received_jpy ?? jpy(sdgFund.total_received_usd ?? 0))}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums" style={{ color: C.violet }}>{yen(jpy(navUsd))}</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums theme-text">{(sdgFund.moic ?? sdgFund.tvpi ?? 0).toFixed(2)}×</td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums font-semibold"

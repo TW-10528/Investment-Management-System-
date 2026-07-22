@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { capitalCallsAPI, fundsAPI, fxRatesAPI } from '../services/api';
+import { capitalCallsAPI, fundsAPI, fxRatesAPI } from '../services/api'; 
 import type { CapitalCall, FundSummary } from '../types/index';
 import { fmt } from '../lib/format';
 import toast from 'react-hot-toast';
@@ -48,8 +48,8 @@ function CreateCallModal({
   useEffect(() => {
     const pct  = parseFloat(form.call_pct);
     const fund = funds.find(f => f.fund_id === form.fund_id);
-    if (pct > 0 && fund && fund.commitment_usd > 0) {
-      setForm(f => ({ ...f, gross_call_usd: String((fund.commitment_usd * pct / 100).toFixed(0)) }));
+    if (pct > 0 && fund && (fund.commitment_usd ?? 0) > 0) {
+      setForm(f => ({ ...f, gross_call_usd: String(((fund.commitment_usd ?? 0) * pct / 100).toFixed(0)) }));
     }
   }, [form.call_pct, form.fund_id, funds]);
 
@@ -131,8 +131,8 @@ function CreateCallModal({
             </select>
             {selectedFund && (
               <p className="text-xs theme-text-muted mt-1">
-                Commitment: {fmt.usd(selectedFund.commitment_usd)} ·
-                Unfunded: {fmt.usd(selectedFund.unfunded_usd)}
+                Commitment: {fmt.usd(selectedFund.commitment_usd ?? 0)} ·
+                Unfunded: {fmt.usd(selectedFund.unfunded_usd ?? 0)}
               </p>
             )}
           </div>

@@ -427,8 +427,10 @@ router.post('/upload', async (c) => {
   }
 
   // Standard flow: use explicit type if valid, otherwise fall back to parsed type
+  // For funds like NB Real Estate, check fundReport.document_type which may be 'capital_and_distribution'
   const noticeType =
     parsed.noticeType === 'capital_and_distribution' ? parsed.noticeType
+    : parsed.fundReport?.document_type === 'capital_and_distribution' ? parsed.fundReport.document_type
     : reqType && ALLOWED_TYPES.includes(reqType) ? reqType
     : parsed.noticeType
 

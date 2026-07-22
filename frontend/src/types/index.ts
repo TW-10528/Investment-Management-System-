@@ -12,17 +12,17 @@ export interface FundSummary {
   manager?: string;
   vintage_year?: number;
   currency?: string;
-  commitment_usd: number;
-  contract_commitment_usd?: number | null;
+  commitment_usd?: number;
+  contract_commitment_usd?: number;
   commitment_jpy?: number | null;
   contract_commitment_jpy?: number | null;
-  total_called_usd: number;
+  total_called_usd?: number;
   total_called_jpy?: number;
   drawn_pct: number;
-  unfunded_usd: number;
+  unfunded_usd?: number;
   investment_capacity: number;
   net_cash_position: number;
-  total_received_usd: number;
+  total_received_usd?: number;
   total_received_jpy?: number;
   nav_usd?: number;
   total_value_usd?: number;
@@ -78,11 +78,15 @@ export interface LedgerRow {
 }
 
 export interface LedgerSnapshot {
-  commitment_usd: number;
-  total_called_usd: number;
-  total_received_usd: number;
+  commitment_usd?: number;
+  commitment_jpy?: number;
+  total_called_usd?: number;
+  total_called_jpy?: number;
+  total_received_usd?: number;
+  total_received_jpy?: number;
   drawn_pct: number;
-  unfunded_usd: number;
+  unfunded_usd?: number;
+  unfunded_jpy?: number;
   investment_capacity: number;
   net_cash_position: number;
   dpi: number;

@@ -604,7 +604,7 @@ export function extractNbRealestateReport(
     source_file_name:     fileName,
     extraction_status:    'success',
     module_name:          'nb_realestate_secondary_opportunities',
-    document_type:        'capital_call_notice_with_deemed_distribution',
+    document_type:        'capital_and_distribution',
     company_name:         findCompanyName(text),
     fund_name:            detectFundName(text),
     currency:             detectCurrency(text),
