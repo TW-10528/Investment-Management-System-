@@ -144,79 +144,44 @@ export default function FundDetail() {
         </div>
       </div>
 
-      {/* Pre-calculate values for snapshot metrics and ledger summary row */}
+      {/* Prepare data for ledger summary */}
       {(() => {
         const isSdg = fund && /sdg/i.test(fund.fund_name ?? '');
         const lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
-        const totalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
-        const totalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
-        const totalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
-        // @ts-ignore - stored in window for use in ledger summary row
         const summaryTotalReceived = rows.reduce((sum, r) => sum + (r.capital_received ?? 0), 0);
-        // @ts-ignore - stored in window for use in ledger summary row
         const summaryTotalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
-        // @ts-ignore - stored in window for use in ledger summary row
         const summaryTotalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
-        // @ts-ignore - stored in window for use in ledger summary row
         const summaryTotalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
-        (window as any).__fundDetail = { isSdg, lastRow, totalReturnOfCapital, totalGain, totalInterest, summaryTotalReceived, summaryTotalReturnOfCapital, summaryTotalGain, summaryTotalInterest };
+        (window as any).__fundDetail = { isSdg, lastRow, summaryTotalReceived, summaryTotalReturnOfCapital, summaryTotalGain, summaryTotalInterest };
         return null;
       })()}
 
       {/* Snapshot metrics */}
-      {(() => {
-        // Don't require snap - calculate from rows directly
-        const isSdg = fund && /sdg/i.test(fund.fund_name ?? '');
-        const lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
-
+      {snap && (() => {
         const totalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
         const totalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
         const totalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
 
-        // Use snapshot if available, otherwise calculate from rows
-        const commitmentVal = snap?.commitment_jpy ?? snap?.commitment_usd ?? (fund?.commitment_jpy ?? fund?.commitment_usd ?? 0);
-        const totalCalledVal = snap?.total_called_jpy ?? snap?.total_called_usd ?? (lastRow?.cumulative_called ?? 0);
-        const totalReceivedVal = snap?.total_received_jpy ?? snap?.total_received_usd ?? rows.reduce((sum, r) => sum + (r.capital_received ?? 0), 0);
-        const dryPowderVal = snap?.unfunded_jpy ?? snap?.unfunded_usd ?? (lastRow?.investment_capacity ?? 0);
-
-        // VISIBLE DEBUG - display on page
-        if (isSdg) {
-          console.warn('SDG VALUES:', { totalCalledVal, dryPowderVal });
-        }
-
-        console.log('[FUNDDETAIL DEBUG]', {
-          fund_name: fund?.fund_name,
-          isSdg,
-          snap_keys: Object.keys(snap || {}),
-          snap_total_called_jpy: snap?.total_called_jpy,
-          snap_total_called_usd: snap?.total_called_usd,
-          snap_unfunded_jpy: snap?.unfunded_jpy,
-          snap_unfunded_usd: snap?.unfunded_usd,
-          totalCalledVal,
-          dryPowderVal,
-        });
+        const isSdg = 'commitment_jpy' in snap;
+        const commitment = isSdg ? snap.commitment_jpy : snap.commitment_usd;
+        const totalCalled = isSdg ? snap.total_called_jpy : snap.total_called_usd;
+        const totalReceived = isSdg ? snap.total_received_jpy : snap.total_received_usd;
+        const unfunded = isSdg ? snap.unfunded_jpy : snap.unfunded_usd;
+        const fmt_fn = isSdg ? fmt.jpy : (v: number) => fmt.usd(v, true);
 
         return (
-          <div>
-            {isSdg && (
-              <div style={{ background: '#fff3cd', padding: '10px', marginBottom: '10px', fontSize: '12px', color: '#333' }}>
-                DEBUG: isSdg={String(isSdg)} | totalCalledVal={totalCalledVal} | dryPowderVal={dryPowderVal}
-                <br />snap.total_called_jpy={snap?.total_called_jpy} | snap.unfunded_jpy={snap?.unfunded_jpy}
-              </div>
-            )}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-              <Snap label="Commitment"     value={isSdg ? fmt.jpy(commitmentVal) : fmt.usd(commitmentVal, true)} />
-              <Snap label={isSdg ? "Paid-In (E)" : "Total Called"}   value={isSdg ? fmt.jpy(totalCalledVal) : fmt.usd(totalCalledVal, true)} />
-            <Snap label="Total Received" value={isSdg ? fmt.jpy(totalReceivedVal) : fmt.usd(totalReceivedVal, true)} />
-            <Snap label="Drawn %"        value={fmt.pct(snap?.drawn_pct ?? 0)} />
-            <Snap label={isSdg ? "Dry Powder (F)" : "Unfunded"}       value={isSdg ? fmt.jpy(dryPowderVal) : fmt.usd(dryPowderVal, true)} />
-            <Snap label="Inv. Capacity"  value={fmt.usd(snap?.investment_capacity ?? 0, true)} />
-            <Snap label="Net Cash"       value={isSdg ? fmt.jpy(snap?.net_cash_position ?? 0) : fmt.usd(snap?.net_cash_position ?? 0, true)} sub={(snap?.net_cash_position ?? 0) < 0 ? 'Net outflow' : 'Net inflow'} />
-            <Snap label="DPI"            value={(snap?.dpi ?? 0).toFixed(2) + 'x'} />
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            <Snap label="Commitment"     value={fmt_fn(commitment)} />
+            <Snap label="Total Called"   value={fmt_fn(totalCalled)} />
+            <Snap label="Total Received" value={fmt_fn(totalReceived)} />
+            <Snap label="Drawn %"        value={fmt.pct(snap.drawn_pct)} />
+            <Snap label="Unfunded"       value={fmt_fn(unfunded)} />
+            <Snap label="Inv. Capacity"  value={fmt.usd(snap.investment_capacity, true)} />
+            <Snap label="Net Cash"       value={isSdg ? fmt.jpy(snap.net_cash_position) : fmt.usd(snap.net_cash_position, true)} sub={snap.net_cash_position < 0 ? 'Net outflow' : 'Net inflow'} />
+            <Snap label="DPI"            value={snap.dpi.toFixed(2) + 'x'} />
             <Snap label="Return of Capital" value={isSdg ? fmt.jpy(totalReturnOfCapital) : fmt.usd(totalReturnOfCapital, true)} />
             <Snap label="Gain" value={isSdg ? fmt.jpy(totalGain) : fmt.usd(totalGain, true)} />
             <Snap label="Interest" value={isSdg ? fmt.jpy(totalInterest) : fmt.usd(totalInterest, true)} />
-            </div>
           </div>
         );
       })()}
@@ -392,6 +357,8 @@ export default function FundDetail() {
                   })()}
                   {rows.map((row, i) => {
                     const isCall = row.tx_type === 'capital_call';
+                    const isSdg = fund && /sdg/i.test(fund.fund_name ?? '');
+                    const fmt_fn = isSdg ? fmt.jpy : (v: number) => fmt.usd(v);
                     return (
                       <tr key={i} className={`hover:bg-gray-50 ${isCall ? '' : 'bg-green-50/30'}`}>
                         <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{fmt.date(row.date)}</td>
@@ -406,37 +373,37 @@ export default function FundDetail() {
                         </td>
                         <td className="px-3 py-2.5 text-right text-gray-500 font-mono">{fmt.rate(row.fx_rate)}</td>
                         <td className="px-3 py-2.5 text-right font-mono text-red-700 bg-blue-50/40">
-                          {row.capital_paid_in ? fmt.usd(row.capital_paid_in) : '—'}
+                          {row.capital_paid_in ? fmt_fn(row.capital_paid_in) : '—'}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono text-green-700 bg-green-50/40">
-                          {row.capital_received ? fmt.usd(row.capital_received) : '—'}
+                          {row.capital_received ? fmt_fn(row.capital_received) : '—'}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono text-gray-600 bg-yellow-50/40">
-                          {row.reinvestable ? fmt.usd(row.reinvestable) : '—'}
+                          {row.reinvestable ? fmt_fn(row.reinvestable) : '—'}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono font-semibold text-blue-700 bg-blue-50/40">
-                          {fmt.usd(row.cumulative_called)}
+                          {fmt_fn(row.cumulative_called)}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono font-semibold text-purple-700 bg-purple-50/40">
-                          {fmt.usd(row.investment_capacity)}
+                          {fmt_fn(row.investment_capacity)}
                         </td>
                         <td className={`px-3 py-2.5 text-right font-mono font-semibold bg-orange-50/40 ${row.cash_flow < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {fmt.usd(row.cash_flow)}
+                          {fmt_fn(row.cash_flow)}
                         </td>
                         <td className={`px-3 py-2.5 text-right font-mono font-semibold bg-red-50/40 ${row.net_cash_position < 0 ? 'text-red-700' : 'text-green-700'}`}>
-                          {fmt.usd(row.net_cash_position)}
+                          {fmt_fn(row.net_cash_position)}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono text-gray-500">
-                          {row.capital_received ? fmt.usd(row.capital_received - (row.reinvestable ?? 0)) : '—'}
+                          {row.capital_received ? fmt_fn(row.capital_received - (row.reinvestable ?? 0)) : '—'}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono text-gray-500">
-                          {row.return_of_capital ? fmt.usd(row.return_of_capital) : '—'}
+                          {row.return_of_capital ? fmt_fn(row.return_of_capital) : '—'}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono text-gray-500">
-                          {row.gain ? fmt.usd(row.gain) : '—'}
+                          {row.gain ? fmt_fn(row.gain) : '—'}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono text-gray-500">
-                          {row.interest ? fmt.usd(row.interest) : '—'}
+                          {row.interest ? fmt_fn(row.interest) : '—'}
                         </td>
                       </tr>
                     );
