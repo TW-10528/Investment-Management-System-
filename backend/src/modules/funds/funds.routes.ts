@@ -178,17 +178,24 @@ router.get('/:id/ledger', async (c) => {
   }
 
   // For SDG fund, return JPY totals to match dashboard
-  // Use last row's cumulative called value (E) - already calculated correctly by buildLedger
-  const lastRow = rows.length > 0 ? rows[rows.length - 1] : null
-  const totalCalledJpy   = lastRow ? lastRow.cumulativeCalled : new Decimal(0)
+  // Calculate cumulative called in JPY by summing capital paid in JPY
+  const totalCalledJpy   = rows.reduce((s, r) => s.plus(r.capitalPaidJpy), new Decimal(0))
   const totalReceivedJpy = rows.reduce((s, r) => s.plus(r.capitalReceivedJpy), new Decimal(0))
 
   // DEBUG: Log final snapshot values
   if (isSdg) {
     console.log(`[SNAPSHOT CALCULATION] SDG Fund: ${fund.fundName}`)
+    console.log(`  - rows count: ${rows.length}`)
+    if (rows.length > 0) {
+      console.log(`  - first row capitalPaidJpy: ${rows[0].capitalPaidJpy?.toString()}`)
+      console.log(`  - last row capitalPaidJpy: ${rows[rows.length - 1].capitalPaidJpy?.toString()}`)
+    }
     console.log(`  - totalCalledJpy (Decimal): ${totalCalledJpy.toString()}`)
     console.log(`  - totalCalledJpy (float): ${f(totalCalledJpy)}`)
+    console.log(`  - totalReceivedJpy (Decimal): ${totalReceivedJpy.toString()}`)
     console.log(`  - totalReceivedJpy (float): ${f(totalReceivedJpy)}`)
+    console.log(`  - commitment (Decimal): ${commitment.toString()}`)
+    console.log(`  - unfunded (Decimal): ${commitment.minus(totalCalledJpy).toString()}`)
   }
 
   // Build the snapshot object for response
