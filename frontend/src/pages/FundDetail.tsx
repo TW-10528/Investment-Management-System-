@@ -163,10 +163,10 @@ export default function FundDetail() {
         const totalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
 
         const isSdg = 'commitment_jpy' in snap;
-        const commitment = isSdg ? snap.commitment_jpy : snap.commitment_usd;
-        const totalCalled = isSdg ? snap.total_called_jpy : snap.total_called_usd;
-        const totalReceived = isSdg ? snap.total_received_jpy : snap.total_received_usd;
-        const unfunded = isSdg ? snap.unfunded_jpy : snap.unfunded_usd;
+        const commitment = (isSdg ? snap.commitment_jpy : snap.commitment_usd) ?? 0;
+        const totalCalled = (isSdg ? snap.total_called_jpy : snap.total_called_usd) ?? 0;
+        const totalReceived = (isSdg ? snap.total_received_jpy : snap.total_received_usd) ?? 0;
+        const unfunded = (isSdg ? snap.unfunded_jpy : snap.unfunded_usd) ?? 0;
         const fmt_fn = isSdg ? fmt.jpy : (v: number) => fmt.usd(v, true);
 
         return (
