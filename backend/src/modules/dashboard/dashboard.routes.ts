@@ -18,12 +18,19 @@ router.get('/summary', async (c) => {
   const totalCommitment = summaries.reduce((s: number, f: any, idx: number) => {
     const contractUsd = funds[idx].contractCommitmentUsd ? parseFloat(funds[idx].contractCommitmentUsd.toString()) : 0
     const contractJpy = funds[idx].contractCommitmentJpy ? parseFloat(funds[idx].contractCommitmentJpy.toString()) : 0
-    const currentCommit = f.commitment_usd
+    const isSdg = funds[idx].fundName && /sdg/i.test(funds[idx].fundName)
+    const currentCommit = isSdg ? f.commitment_jpy : f.commitment_usd
     // Use USD if available, else use JPY (as-is for JPY funds like SDG), else use current commitment
     return s + (contractUsd > 0 ? contractUsd : (contractJpy > 0 ? contractJpy : currentCommit))
   }, 0)
-  const totalCalled     = summaries.reduce((s: number, f: any) => s + f.total_called_usd, 0)
-  const totalReceived   = summaries.reduce((s: number, f: any) => s + f.total_received_usd, 0)
+  const totalCalled     = summaries.reduce((s: number, f: any, idx) => {
+    const isSdg = funds[idx].fundName && /sdg/i.test(funds[idx].fundName)
+    return s + (isSdg ? (f.total_called_jpy || 0) : (f.total_called_usd || 0))
+  }, 0)
+  const totalReceived   = summaries.reduce((s: number, f: any, idx) => {
+    const isSdg = funds[idx].fundName && /sdg/i.test(funds[idx].fundName)
+    return s + (isSdg ? (f.total_received_jpy || 0) : (f.total_received_usd || 0))
+  }, 0)
   const netCash         = summaries.reduce((s: number, f: any) => s + f.net_cash_position, 0)
   const dryPowder       = summaries.reduce((s: number, f: any) => s + f.unfunded_usd, 0)
   const drawnPct        = totalCommitment > 0 ? (totalCalled / totalCommitment * 100) : 0

@@ -144,6 +144,21 @@ export default function FundDetail() {
         </div>
       </div>
 
+      {/* Pre-calculate values for snapshot metrics and ledger summary row */}
+      {(() => {
+        const isSdg = fund && /sdg/i.test(fund.fund_name ?? '');
+        const lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
+        const totalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
+        const totalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
+        const totalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
+        const summaryTotalReceived = rows.reduce((sum, r) => sum + (r.capital_received ?? 0), 0);
+        const summaryTotalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
+        const summaryTotalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
+        const summaryTotalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
+        (window as any).__fundDetail = { isSdg, lastRow, totalReturnOfCapital, totalGain, totalInterest, summaryTotalReceived, summaryTotalReturnOfCapital, summaryTotalGain, summaryTotalInterest };
+        return null;
+      })()}
+
       {/* Snapshot metrics */}
       {(() => {
         console.log('[FUNDDETAIL OUTER DEBUG] snap is:', snap ? 'defined' : 'NULL/UNDEFINED', snap);
@@ -156,6 +171,12 @@ export default function FundDetail() {
 
         // For SDG: read directly from last row since snapshot isn't working
         const lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
+
+        // Ledger summary row calculations
+        const summaryTotalReceived = rows.reduce((sum, r) => sum + (r.capital_received ?? 0), 0);
+        const summaryTotalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
+        const summaryTotalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
+        const summaryTotalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
 
         // VISIBLE DEBUG
         if (isSdg) {
@@ -303,6 +324,50 @@ export default function FundDetail() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
+                  {rows.length > 0 && (() => {
+                    const d = (window as any).__fundDetail;
+                    if (!d) return null;
+                    return (
+                      <tr className="bg-gray-100 font-semibold hover:bg-gray-100">
+                        <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">SUMMARY</td>
+                        <td className="px-3 py-2.5 text-gray-700">Totals & Latest</td>
+                        <td className="px-3 py-2.5 text-right text-gray-500 font-mono">—</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-800 bg-blue-50/60">
+                          {d.isSdg ? fmt.jpy(d.lastRow?.cumulative_called ?? 0) : fmt.usd(d.lastRow?.cumulative_called ?? 0)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-800 bg-green-50/60">
+                          {d.isSdg ? fmt.jpy(d.summaryTotalReceived) : fmt.usd(d.summaryTotalReceived)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-500 bg-yellow-50/60">
+                          —
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold text-blue-900 bg-blue-50/60">
+                          {d.isSdg ? fmt.jpy(d.lastRow?.cumulative_called ?? 0) : fmt.usd(d.lastRow?.cumulative_called ?? 0)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold text-purple-900 bg-purple-50/60">
+                          {d.isSdg ? fmt.jpy(d.lastRow?.investment_capacity ?? 0) : fmt.usd(d.lastRow?.investment_capacity ?? 0)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-600 bg-orange-50/60">
+                          —
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold text-gray-900 bg-red-50/60">
+                          {d.isSdg ? fmt.jpy(d.lastRow?.net_cash_position ?? 0) : fmt.usd(d.lastRow?.net_cash_position ?? 0)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-500 bg-gray-50/60">
+                          —
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-500 bg-gray-50/60">
+                          {d.isSdg ? fmt.jpy(d.summaryTotalReturnOfCapital) : fmt.usd(d.summaryTotalReturnOfCapital)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-500 bg-gray-50/60">
+                          {d.isSdg ? fmt.jpy(d.summaryTotalGain) : fmt.usd(d.summaryTotalGain)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-500 bg-gray-50/60">
+                          {d.isSdg ? fmt.jpy(d.summaryTotalInterest) : fmt.usd(d.summaryTotalInterest)}
+                        </td>
+                      </tr>
+                    );
+                  })()}
                   {rows.map((row, i) => {
                     const isCall = row.tx_type === 'capital_call';
                     return (

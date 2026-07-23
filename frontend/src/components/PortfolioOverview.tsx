@@ -699,8 +699,8 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                 if (!sdgFund) return null;
 
                 const sdgCommit = (sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0);
-                const sdgContrib = jpy(sdgFund.total_called_usd ?? 0);
-                const sdgDist = jpy(sdgFund.total_received_usd ?? 0);
+                const sdgContrib = sdgFund.total_called_jpy ?? jpy(sdgFund.total_called_usd ?? 0);
+                const sdgDist = sdgFund.total_received_jpy ?? jpy(sdgFund.total_received_usd ?? 0);
                 const sdgNav = jpy(sdgFund.nav_usd ?? 0);
 
                 return (
