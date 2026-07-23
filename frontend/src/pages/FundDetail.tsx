@@ -165,34 +165,19 @@ export default function FundDetail() {
 
       {/* Snapshot metrics */}
       {(() => {
-        console.log('[FUNDDETAIL OUTER DEBUG] RENDERING snap metrics, snap is:', snap);
-        console.log('[FUNDDETAIL] snap?.total_called_jpy =', snap?.total_called_jpy);
-        if (!snap) {
-          console.log('[FUNDDETAIL] snap is NULL, returning null');
-          return null;
-        }
-        const d = (window as any).__fundDetail;
-        const { isSdg, totalReturnOfCapital, totalGain, totalInterest } = d || {};
-        if (!d) return null;
+        if (!snap) return null;
 
-        // VISIBLE DEBUG
-        if (isSdg) {
-          console.log('[FUNDDETAIL DEBUG - SDG SNAPSHOT VALUES]', {
-            isSdg,
-            rows_length: rows.length,
-            snap_keys: Object.keys(snap),
-            snap_total_called_jpy: snap?.total_called_jpy,
-            snap_total_received_jpy: snap?.total_received_jpy,
-            snap_unfunded_jpy: snap?.unfunded_jpy,
-            snap_commitment_jpy: snap?.commitment_jpy,
-            snap_drawn_pct: snap?.drawn_pct,
-          });
-        }
+        // Detect SDG fund by checking if JPY values exist in snapshot
+        const isSdg = snap.commitment_jpy != null && snap.total_called_jpy != null;
+
+        const totalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
+        const totalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
+        const totalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
 
         const commitmentVal = isSdg ? (snap.commitment_jpy ?? 0) : (snap.commitment_usd ?? 0);
-        const totalCalledVal = isSdg ? (snap?.total_called_jpy ?? 0) : (snap?.total_called_usd ?? 0);
+        const totalCalledVal = isSdg ? (snap.total_called_jpy ?? 0) : (snap.total_called_usd ?? 0);
         const totalReceivedVal = isSdg ? (snap.total_received_jpy ?? 0) : (snap.total_received_usd ?? 0);
-        const dryPowderVal = isSdg ? (snap?.unfunded_jpy ?? 0) : (snap?.unfunded_usd ?? 0);
+        const dryPowderVal = isSdg ? (snap.unfunded_jpy ?? 0) : (snap.unfunded_usd ?? 0);
 
         // VISIBLE DEBUG - display on page
         if (isSdg) {
