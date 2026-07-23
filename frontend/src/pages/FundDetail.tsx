@@ -165,8 +165,12 @@ export default function FundDetail() {
 
       {/* Snapshot metrics */}
       {(() => {
-        console.log('[FUNDDETAIL OUTER DEBUG] snap is:', snap ? 'defined' : 'NULL/UNDEFINED', snap);
-        if (!snap) return null;
+        console.log('[FUNDDETAIL OUTER DEBUG] RENDERING snap metrics, snap is:', snap);
+        console.log('[FUNDDETAIL] snap?.total_called_jpy =', snap?.total_called_jpy);
+        if (!snap) {
+          console.log('[FUNDDETAIL] snap is NULL, returning null');
+          return null;
+        }
         const d = (window as any).__fundDetail;
         const { isSdg, totalReturnOfCapital, totalGain, totalInterest } = d || {};
         if (!d) return null;
