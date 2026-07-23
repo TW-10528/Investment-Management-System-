@@ -183,9 +183,9 @@ export default function FundDetail() {
         }
 
         const commitmentVal = isSdg ? (snap.commitment_jpy ?? 0) : (snap.commitment_usd ?? 0);
-        const totalCalledVal = isSdg ? (lastRow?.cumulative_called ?? 0) : (snap?.total_called_usd ?? 0);
+        const totalCalledVal = isSdg ? (snap?.total_called_jpy ?? 0) : (snap?.total_called_usd ?? 0);
         const totalReceivedVal = isSdg ? (snap.total_received_jpy ?? 0) : (snap.total_received_usd ?? 0);
-        const dryPowderVal = isSdg ? (lastRow?.investment_capacity ?? 0) : (snap?.unfunded_usd ?? 0);
+        const dryPowderVal = isSdg ? (snap?.unfunded_jpy ?? 0) : (snap?.unfunded_usd ?? 0);
 
         // VISIBLE DEBUG - display on page
         if (isSdg) {
@@ -280,7 +280,48 @@ export default function FundDetail() {
               <p className="text-sm mt-1">Create a capital call above, approve it, then mark as Paid</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="space-y-4">
+              {/* Ledger Summary Header */}
+              {(() => {
+                const d = (window as any).__fundDetail;
+                if (!d) return null;
+                return (
+                  <div className="border-b border-gray-200 pb-4">
+                    <div className="grid grid-cols-7 gap-4 text-xs">
+                      <div>
+                        <p className="text-gray-500 font-medium mb-1">COMMITMENT (JPY)</p>
+                        <p className="font-bold text-gray-900">{d.isSdg ? fmt.jpy(snap?.commitment_jpy ?? 0) : fmt.usd(snap?.commitment_usd ?? 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 font-medium mb-1">PAID-IN</p>
+                        <p className="font-bold text-gray-900">{d.isSdg ? fmt.jpy(snap?.total_called_jpy ?? 0) : fmt.usd(snap?.total_called_usd ?? 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 font-medium mb-1">RECEIVED</p>
+                        <p className="font-bold text-gray-900">{d.isSdg ? fmt.jpy(snap?.total_received_jpy ?? 0) : fmt.usd(snap?.total_received_usd ?? 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 font-medium mb-1">DRAWN %</p>
+                        <p className="font-bold text-gray-900">{fmt.pct(snap?.drawn_pct ?? 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 font-medium mb-1">UNFUNDED</p>
+                        <p className="font-bold text-gray-900">{d.isSdg ? fmt.jpy(snap?.unfunded_jpy ?? 0) : fmt.usd(snap?.unfunded_usd ?? 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 font-medium mb-1">H NET CASH</p>
+                        <p className="font-bold text-gray-900">{d.isSdg ? fmt.jpy(snap?.net_cash_position ?? 0) : fmt.usd(snap?.net_cash_position ?? 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 font-medium mb-1">DPI</p>
+                        <p className="font-bold text-gray-900">{snap?.dpi.toFixed(3)}x</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
@@ -415,6 +456,7 @@ export default function FundDetail() {
                 </tbody>
               </table>
             </div>
+              </div>
           )}
         </div>
       )}
