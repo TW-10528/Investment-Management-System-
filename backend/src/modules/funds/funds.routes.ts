@@ -163,7 +163,10 @@ router.get('/:id/ledger', async (c) => {
     return c.json({ fund_id: fund.id, fund_name: fund.fundName, commitment: parseFloat(commitment.toString()), rows: [], snapshot: null })
   }
 
-  const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, new Decimal('150'), commitmentHistory)
+  // For SDG (JPY funds), use rate=1 (no conversion). For USD funds, use rate=150 (fallback)
+  // In real usage, the rate should come from the transaction or latest FX rate
+  const ledgerRate = isSdg ? new Decimal('1') : new Decimal('150')
+  const { rows, snapshot } = CalculationEngine.buildLedger(commitment, txns, ledgerRate, commitmentHistory)
   const f = (d: Decimal) => parseFloat(d.toString())
 
   // DEBUG: Log buildLedger results

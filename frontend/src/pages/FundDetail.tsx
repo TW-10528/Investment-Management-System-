@@ -173,12 +173,15 @@ export default function FundDetail() {
 
         // VISIBLE DEBUG
         if (isSdg) {
-          console.log('[FUNDDETAIL DEBUG]', {
+          console.log('[FUNDDETAIL DEBUG - SDG SNAPSHOT VALUES]', {
             isSdg,
             rows_length: rows.length,
-            lastRow_exists: !!lastRow,
-            lastRow_cumulative_called: lastRow?.cumulative_called,
-            lastRow_investment_capacity: lastRow?.investment_capacity,
+            snap_keys: Object.keys(snap),
+            snap_total_called_jpy: snap?.total_called_jpy,
+            snap_total_received_jpy: snap?.total_received_jpy,
+            snap_unfunded_jpy: snap?.unfunded_jpy,
+            snap_commitment_jpy: snap?.commitment_jpy,
+            snap_drawn_pct: snap?.drawn_pct,
           });
         }
 
