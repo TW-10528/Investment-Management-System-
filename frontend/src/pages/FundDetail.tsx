@@ -151,9 +151,13 @@ export default function FundDetail() {
         const totalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
         const totalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
         const totalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
+        // @ts-ignore - stored in window for use in ledger summary row
         const summaryTotalReceived = rows.reduce((sum, r) => sum + (r.capital_received ?? 0), 0);
+        // @ts-ignore - stored in window for use in ledger summary row
         const summaryTotalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
+        // @ts-ignore - stored in window for use in ledger summary row
         const summaryTotalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
+        // @ts-ignore - stored in window for use in ledger summary row
         const summaryTotalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
         (window as any).__fundDetail = { isSdg, lastRow, totalReturnOfCapital, totalGain, totalInterest, summaryTotalReceived, summaryTotalReturnOfCapital, summaryTotalGain, summaryTotalInterest };
         return null;
@@ -163,20 +167,9 @@ export default function FundDetail() {
       {(() => {
         console.log('[FUNDDETAIL OUTER DEBUG] snap is:', snap ? 'defined' : 'NULL/UNDEFINED', snap);
         if (!snap) return null;
-        const totalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
-        const totalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
-        const totalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
-
-        const isSdg = fund && /sdg/i.test(fund.fund_name ?? '');
-
-        // For SDG: read directly from last row since snapshot isn't working
-        const lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
-
-        // Ledger summary row calculations
-        const summaryTotalReceived = rows.reduce((sum, r) => sum + (r.capital_received ?? 0), 0);
-        const summaryTotalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
-        const summaryTotalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
-        const summaryTotalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
+        const d = (window as any).__fundDetail;
+        const { isSdg, lastRow, totalReturnOfCapital, totalGain, totalInterest } = d || {};
+        if (!d) return null;
 
         // VISIBLE DEBUG
         if (isSdg) {
