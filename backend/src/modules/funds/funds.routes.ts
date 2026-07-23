@@ -173,10 +173,18 @@ router.get('/:id/ledger', async (c) => {
   if (isSdg) {
     console.log(`[BUILDLEDGER RESULT] SDG Fund: ${fund.fundName}`)
     console.log(`  - Rows returned: ${rows.length}`)
+    console.log(`  - Input transactions: ${txns.length}`)
+    if (txns.length > 0) {
+      console.log(`  - First txn:`)
+      console.log(`    - capitalPaidIn: ${txns[0].capitalPaidIn?.toString()}`)
+      console.log(`    - fxRate: ${txns[0].fxRate?.toString()}`)
+    }
     if (rows.length > 0) {
       const lastRowDebug = rows[rows.length - 1]
-      console.log(`  - Last row cumulativeCalled: ${lastRowDebug.cumulativeCalled.toString()}`)
-      console.log(`  - Last row description: ${lastRowDebug.description}`)
+      console.log(`  - Last row:`)
+      console.log(`    - cumulativeCalled: ${lastRowDebug.cumulativeCalled.toString()}`)
+      console.log(`    - capitalPaidJpy: ${lastRowDebug.capitalPaidJpy?.toString()}`)
+      console.log(`    - description: ${lastRowDebug.description}`)
     }
   }
 
