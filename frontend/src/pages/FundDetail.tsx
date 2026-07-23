@@ -168,7 +168,7 @@ export default function FundDetail() {
         console.log('[FUNDDETAIL OUTER DEBUG] snap is:', snap ? 'defined' : 'NULL/UNDEFINED', snap);
         if (!snap) return null;
         const d = (window as any).__fundDetail;
-        const { isSdg, lastRow, totalReturnOfCapital, totalGain, totalInterest } = d || {};
+        const { isSdg, totalReturnOfCapital, totalGain, totalInterest } = d || {};
         if (!d) return null;
 
         // VISIBLE DEBUG
