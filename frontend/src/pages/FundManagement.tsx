@@ -552,7 +552,7 @@ function shiftDate(dateStr: string, days: number): string {
 // LEDGER TAB — B Called / B (¥) / C Received / C (¥) adjacent columns, notes edit
 // FX column shows the MURC TTM rate for each transaction date (auto-fetched)
 // ─────────────────────────────────────────────────────────────────────────────
-function LedgerTab({ fundId, canEdit, currency }: { fundId:string; canEdit:boolean; currency?:string }) {
+function LedgerTab({ fundId, canEdit, currency, ledgerCommitment, onTabActive }: { fundId:string; canEdit:boolean; currency?:string; ledgerCommitment?: number; onTabActive?: () => void }) {
   const [rows, setRows]           = useState<LedgerRow[]>([]);
   const [snap, setSnap]           = useState<LedgerSnapshot|null>(null);
   const [fundName, setFundName]   = useState('');
@@ -606,12 +606,9 @@ function LedgerTab({ fundId, canEdit, currency }: { fundId:string; canEdit:boole
     setEditDateIdx(null);
     setEditDateVal('');
     loadLedger();
-  }, [loadLedger]);
-
-  function jpyStr(usd: number, rate: number | null | undefined): string {
-    if (!usd || !rate) return '—';
-    return '¥' + Math.round(usd * rate).toLocaleString('ja-JP');
-  }
+    // Refresh commitment history when Ledger tab becomes active
+    onTabActive?.();
+  }, [loadLedger, onTabActive]);
 
   const fmtAmt = (n: any) =>
     n == null ? '—'
@@ -693,19 +690,43 @@ function LedgerTab({ fundId, canEdit, currency }: { fundId:string; canEdit:boole
              style={{ background:'rgba(79,70,229,0.04)' }}>
           {(() => {
             const isSdg = /sdg/i.test(fundName ?? '');
-            const commitmentValue = isSdg && fundDetail?.contract_commitment_jpy
-              ? fundDetail.contract_commitment_jpy
-              : snap.commitment_usd;
+            // For ledger: show current commitment (from tranches) if available, otherwise use snapshot
+            const commitmentValue = isSdg && ledgerCommitment
+              ? ledgerCommitment
+              : (isSdg && fundDetail?.contract_commitment_jpy
+                ? fundDetail.contract_commitment_jpy
+                : snap.commitment_usd);
             const commitmentLabel = isSdg ? 'Commitment (JPY)' : 'Commitment';
-            const commitmentFormatted = isSdg && fundDetail?.contract_commitment_jpy
-              ? fmt.jpy(Number(fundDetail.contract_commitment_jpy))
+            const commitmentFormatted = isSdg
+              ? fmt.jpy(Number(commitmentValue))
               : fmtAmt(commitmentValue);
+
+            // For SDG: calculate paid-in and unfunded from ledger rows
+            let paidInFormatted = fmtAmt(snap.total_called_usd);
+            let receivedFormatted = fmtAmt(snap.total_received_usd);
+            let unfundedFormatted = fmtAmt(snap.unfunded_usd);
+
+            if (isSdg) {
+              const totalPaidInJpy = rows
+                .filter(r => r.tx_type === 'capital_call')
+                .reduce((sum, r) => sum + (r.capital_paid_in ?? 0), 0);
+              const totalReceivedJpy = rows
+                .filter(r => r.tx_type === 'distribution')
+                .reduce((sum, r) => sum + (r.capital_received ?? 0), 0);
+              const commitmentJpy = Number(fundDetail?.contract_commitment_jpy ?? 0);
+              const powderJpy = commitmentJpy - totalPaidInJpy;
+
+              paidInFormatted = fmt.jpy(totalPaidInJpy);
+              receivedFormatted = fmt.jpy(totalReceivedJpy);
+              unfundedFormatted = fmt.jpy(powderJpy);
+            }
+
             return [
               [commitmentLabel, commitmentFormatted],
-              ['Paid-in',     fmtAmt(snap.total_called_usd)],
-              ['Received',    fmtAmt(snap.total_received_usd)],
+              ['Paid-in',     paidInFormatted],
+              ['Received',    receivedFormatted],
               ['Drawn %',     fmt.pct(snap.drawn_pct)],
-              ['Unfunded',    fmtAmt(snap.unfunded_usd)],
+              ['Unfunded',    unfundedFormatted],
               ['H Net Cash',  fmtAmt(snap.net_cash_position)],
               ['DPI',         snap.dpi.toFixed(3)+'×'],
             ];
@@ -734,9 +755,7 @@ function LedgerTab({ fundId, canEdit, currency }: { fundId:string; canEdit:boole
                   { label: 'Description',  right: false },
                   { label: 'FX',           right: true  },
                   { label: 'B Called',     right: true  },
-                  { label: 'B (¥)',        right: true  },
                   { label: 'C Received',   right: true  },
-                  { label: 'C (¥)',        right: true  },
                   { label: 'D Reinvest',   right: true  },
                   { label: 'E Cum.Called', right: true  },
                   { label: 'F Inv.Cap',    right: true  },
@@ -833,23 +852,9 @@ function LedgerTab({ fundId, canEdit, currency }: { fundId:string; canEdit:boole
                           {call.capital_paid_in ? fmtAmt(call.capital_paid_in) : <span className="theme-text-muted">—</span>}
                         </td>
 
-                        {/* B (¥) */}
-                        <td className="px-3 py-3 text-right font-mono" style={{color: call.capital_paid_in ? 'rgba(239,68,68,0.65)' : 'inherit'}}>
-                          {call.capital_paid_in && currency !== 'JPY'
-                            ? rateLoading ? <span className="opacity-40 text-xs">…</span> : jpyStr(call.capital_paid_in, rate)
-                            : <span className="theme-text-muted">—</span>}
-                        </td>
-
                         {/* C Received */}
                         <td className="px-3 py-3 text-right font-mono font-semibold" style={{color: dist.capital_received ? C.emerald : 'inherit'}}>
                           {dist.capital_received ? fmtAmt(dist.capital_received) : <span className="theme-text-muted">—</span>}
-                        </td>
-
-                        {/* C (¥) */}
-                        <td className="px-3 py-3 text-right font-mono" style={{color: dist.capital_received ? 'rgba(16,185,129,0.65)' : 'inherit'}}>
-                          {dist.capital_received && currency !== 'JPY'
-                            ? rateLoading ? <span className="opacity-40 text-xs">…</span> : jpyStr(dist.capital_received, rate)
-                            : <span className="theme-text-muted">—</span>}
                         </td>
 
                         {/* D Reinvest */}
@@ -967,23 +972,9 @@ function LedgerTab({ fundId, canEdit, currency }: { fundId:string; canEdit:boole
                         {row.capital_paid_in ? fmtAmt(row.capital_paid_in) : <span className="theme-text-muted">—</span>}
                       </td>
 
-                      {/* B (¥) */}
-                      <td className="px-3 py-3 text-right font-mono" style={{color: row.capital_paid_in ? 'rgba(239,68,68,0.65)' : 'inherit'}}>
-                        {row.capital_paid_in && currency !== 'JPY'
-                          ? rateLoading ? <span className="opacity-40 text-xs">…</span> : jpyStr(row.capital_paid_in, murcRates[row.date] ?? row.fx_rate)
-                          : <span className="theme-text-muted">—</span>}
-                      </td>
-
                       {/* C Received (USD) */}
                       <td className="px-3 py-3 text-right font-mono font-semibold" style={{color: row.capital_received ? C.emerald : 'inherit'}}>
                         {row.capital_received ? fmtAmt(row.capital_received) : <span className="theme-text-muted">—</span>}
-                      </td>
-
-                      {/* C (¥) */}
-                      <td className="px-3 py-3 text-right font-mono" style={{color: row.capital_received ? 'rgba(16,185,129,0.65)' : 'inherit'}}>
-                        {row.capital_received && currency !== 'JPY'
-                          ? rateLoading ? <span className="opacity-40 text-xs">…</span> : jpyStr(row.capital_received, murcRates[row.date] ?? row.fx_rate)
-                          : <span className="theme-text-muted">—</span>}
                       </td>
 
                       {/* D Reinvest */}
@@ -1501,24 +1492,49 @@ function FundSection({
   const dotColor = strategyColor[fund.strategy??''] ?? '#6b7280';
   const badge    = strategyBg[fund.strategy??'']   ?? 'bg-gray-100 text-gray-700';
   const summary  = (detail as any).summary ?? {};
-  const paidIn   = Number(summary.total_called_usd  ?? 0);
-  const powder   = Number(summary.unfunded_usd       ?? (Number(detail.commitment_usd) - paidIn));
   const drawn    = Number(summary.drawn_pct          ?? 0);
 
   const isSdg = /sdg/i.test(detail.fund_name ?? '') || /sdg/i.test((detail as any).fund_key ?? '');
 
-  // For SDG funds, commitment grows over time. Fetch the latest history entry so
-  // the dashboard KPI always shows the current total commitment, not the static seed value.
+  // For SDG funds: calculate paid-in and powder in JPY using FX rate
+  // For other funds: use USD values directly
   const [latestHistCommitment, setLatestHistCommitment] = useState<number | null>(null);
   const [ledgerRows, setLedgerRows] = useState<LedgerRow[]>([]);
+
+  // For SDG: sum all B Called (capital_paid_in) from ledger rows (already in JPY, no FX conversion needed)
+  // For DRY POWDER: use latest F INV.CAP value from ledger, not commitment - paid_in
+  const { paidInCalc, powderCalc } = useMemo(() => {
+    if (isSdg) {
+      // For SDG, ledger rows are already in JPY - just sum them directly
+      const totalPaidInJpy = ledgerRows
+        .filter(r => r.tx_type === 'capital_call')
+        .reduce((sum, r) => sum + (r.capital_paid_in ?? 0), 0);
+      // DRY POWDER: use latest F INV.CAP (investment_capacity) from ledger rows
+      // If no rows, fall back to 0
+      const powder = ledgerRows.length > 0
+        ? (ledgerRows[ledgerRows.length - 1].investment_capacity ?? 0)
+        : 0;
+      return { paidInCalc: totalPaidInJpy, powderCalc: powder };
+    } else {
+      // For non-SDG funds, use USD values
+      const paidIn = Number(summary.total_called_usd ?? 0);
+      const powder = Number(summary.unfunded_usd ?? (Number(detail.commitment_usd) - paidIn));
+      return { paidInCalc: paidIn, powderCalc: powder };
+    }
+  }, [ledgerRows, isSdg, summary, detail]);
 
   const refreshHistCommitment = useCallback(() => {
     if (!isSdg) return;
     fundsAPI.getCommitmentHistory(fundId)
       .then((r: any) => {
         const entries: CommitmentHistoryEntry[] = r.data ?? [];
-        const last = entries[entries.length - 1];
-        setLatestHistCommitment(last ? last.commitment_amount : null);
+        if (entries.length > 0) {
+          // Get the latest commitment by effective_date
+          const sorted = [...entries].sort((a, b) =>
+            new Date(b.effective_date).getTime() - new Date(a.effective_date).getTime()
+          );
+          setLatestHistCommitment(sorted[0].commitment_amount);
+        }
       })
       .catch(() => {});
   }, [fundId, isSdg]);
@@ -1533,12 +1549,22 @@ function FundSection({
 
   useEffect(() => { refreshHistCommitment(); }, [refreshHistCommitment]);
 
-  // For commitments page: show contract_commitment_jpy for SDG, commitment_usd for others
-  // SDG: displayCommitment = contract_commitment_jpy (fixed contract amount in JPY)
-  // Others: displayCommitment = commitment_usd (USD value)
+  // Re-fetch commitment history whenever the detail (fund data) changes
+  useEffect(() => {
+    if (isSdg && detail) {
+      refreshHistCommitment();
+    }
+  }, [detail?.fund_id]);
+
+  // displayCommitment: show contract amount (original/permanent commitment) in top KPI
+  // ledgerDisplayCommitment: show current commitment from tranches in ledger section
   const displayCommitment = isSdg
     ? Number((detail as any).contract_commitment_jpy ?? (detail as any).commitment_jpy ?? detail.commitment_usd ?? 0)
     : Number(detail.commitment_usd ?? 0);
+
+  const ledgerDisplayCommitment = isSdg && latestHistCommitment !== null
+    ? latestHistCommitment
+    : displayCommitment;
 
   async function toggleActive() {
     if (!confirm(isActive ? t('manageFunds.deactivateConfirm') : t('manageFunds.reactivateConfirm'))) return;
@@ -1611,9 +1637,9 @@ function FundSection({
           const totalInterest = ledgerRows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
 
           const boxes = [
-            { label:t('manageFunds.totalCommitment'), value: fmtMoney(displayCommitment), note: isSdg && latestHistCommitment ? `${latestHistCommitment > 0 ? (paidIn / latestHistCommitment * 100).toFixed(2) : '0.00'}% ${t('manageFunds.drawn')}` : t('manageFunds.gross') },
-            { label:t('manageFunds.paidInE'),      value: fmtMoney(paidIn),          note:`${drawn.toFixed(2)}% ${t('manageFunds.drawn')}` },
-            { label:t('manageFunds.dryPowderF'),   value: fmtMoney(powder),          note:t('manageFunds.unfunded') },
+            { label:t('manageFunds.totalCommitment'), value: fmtMoney(displayCommitment), note: isSdg && latestHistCommitment ? `${latestHistCommitment > 0 ? (paidInCalc / latestHistCommitment * 100).toFixed(2) : '0.00'}% ${t('manageFunds.drawn')}` : t('manageFunds.gross') },
+            { label:t('manageFunds.paidInE'),      value: fmtMoney(paidInCalc),          note:`${drawn.toFixed(2)}% ${t('manageFunds.drawn')}` },
+            { label:t('manageFunds.dryPowderF'),   value: fmtMoney(powderCalc),          note:t('manageFunds.unfunded') },
             { label:t('manageFunds.dpi'),             value: `${Number(summary.dpi??0).toFixed(3)}×`, note:t('manageFunds.distPaidIn') },
           ];
 
@@ -1662,12 +1688,12 @@ function FundSection({
         {tab==='calls'         && <CallsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} currency={detail.currency} />}
         {tab==='distributions' && <DistsTab    fundId={fundId} canEdit={canEdit} onChanged={onChanged} currency={detail.currency} />}
         {tab==='nav'           && <NavTab      fundId={fundId} canEdit={canEdit} onChanged={onChanged} />}
-        {tab==='ledger'        && <LedgerTab   fundId={fundId} canEdit={canEdit} currency={detail.currency} />}
+        {tab==='ledger'        && <LedgerTab   fundId={fundId} canEdit={canEdit} currency={detail.currency} ledgerCommitment={ledgerDisplayCommitment} onTabActive={refreshHistCommitment} />}
         {tab==='commitments'   && <CommitmentsTab
           fundId={fundId} canEdit={canEdit}
           currentCommitment={displayCommitment}
           investmentCapacity={Number(summary.investment_capacity ?? summary.unfunded_usd ?? 0)}
-          onChanged={refreshHistCommitment}
+          onChanged={() => { refreshHistCommitment(); onChanged(); }}
         />}
         {tab==='details'       && <DetailsTab  detail={detail} canEdit={canEdit} fundId={fundId} onSaved={onChanged} />}
       </div>
@@ -1792,8 +1818,8 @@ function ReportFilesTile({
   );
 }
 
-function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
-  { funds: FundSummary[]; canEdit: boolean; onChanged: () => void; onOpenLedger: (fundId: string) => void }) {
+function ReportsSection({ funds, canEdit, onChanged, onOpenLedger, section, onBack }:
+  { funds: FundSummary[]; canEdit: boolean; onChanged: () => void; onOpenLedger: (fundId: string) => void; section?: string; onBack?: () => void }) {
   const { t } = useTranslation();
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1854,11 +1880,28 @@ function ReportsSection({ funds, canEdit, onChanged, onOpenLedger }:
 
   return (
     <div className="space-y-5">
+      {/* Back button to Manage Funds */}
+      {onBack && (
+        <div className="flex items-center gap-2">
+          <button onClick={onBack}
+            className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1">
+            ← Back to Manage Funds
+          </button>
+        </div>
+      )}
+
       {/* Upload — pick the document type + select the fund, then drop a PDF */}
       {canEdit && (
         <FundUploadBar
           funds={funds.map(f => ({ fund_id: f.fund_id, fund_name: f.fund_name, manager: f.manager }))}
-          onUploaded={(fundId) => { onChanged(); load(); setOpenFundId(fundId); }}
+          onUploaded={(fundId) => {
+            onChanged();
+            load();
+            // Only open fund if on manage tab, preserve reports/comparison sections
+            if (section === 'manage') {
+              setOpenFundId(fundId);
+            }
+          }}
         />
       )}
 
@@ -2175,10 +2218,17 @@ export default function FundManagement() {
 
       {section === 'reports' ? (
         /* ── REPORTS SECTION — upload / edit / delete documents ── */
-        <ReportsSection funds={funds} canEdit={canEdit} onChanged={loadFunds} onOpenLedger={fundId => { setOpenAtTab('ledger'); setSelectedFundId(fundId); setSearchParams(p => { const n = new URLSearchParams(p); n.delete('section'); return n; }); }} />
+        <ReportsSection
+          funds={funds}
+          canEdit={canEdit}
+          onChanged={loadFunds}
+          onOpenLedger={fundId => { setOpenAtTab('ledger'); setSelectedFundId(fundId); setSearchParams(p => { const n = new URLSearchParams(p); n.delete('section'); return n; }); }}
+          section={section}
+          onBack={() => setSearchParams(p => { const n = new URLSearchParams(p); n.delete('section'); return n; })}
+        />
       ) : section === 'comparison' ? (
         /* ── COMPARISON SECTION — fund series comparison ── */
-        <ComparisonSection funds={funds} />
+        <ComparisonSection funds={funds} onBack={() => setSearchParams(p => { const n = new URLSearchParams(p); n.delete('section'); return n; })} />
       ) : selectedFund ? (
         /* ── DETAIL VIEW — one fund's full sections ── */
         selectedDetail ? (

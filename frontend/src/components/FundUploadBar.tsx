@@ -612,18 +612,31 @@ export default function FundUploadBar({ funds, onUploaded }: Props) {
                 onChange={e => setManualDocType(e.target.value)}
                 className="theme-input rounded-lg px-3 py-2 text-sm w-full border theme-border"
               >
-                {Object.entries(DOC_TYPE_LABELS)
-                  .filter(([k]) => k !== 'UNKNOWN')
-                  .map(([k, v]) => (
-                    <option key={k} value={k}>{v.label}</option>
-                  ))}
+                <option value="CAPITAL_CALL">Capital Call</option>
+                <option value="DISTRIBUTION">Distribution</option>
+                <option value="NETTED_CALL">Capital & Distribution</option>
+                <option value="FINANCIAL_STATEMENT">Financial Statement</option>
+                <option value="NAV_REPORT">NAV Report</option>
+                <option value="QUARTERLY_REPORT">Quarterly Report</option>
+                <option value="ANNUAL_REPORT">Annual Report</option>
+                <option value="COMMITMENT_NOTICE">Commitment Document</option>
+                <option value="OTHER">Other Document</option>
               </select>
             </div>
             <div className="px-5 py-4 border-t border-amber-200 flex items-center justify-between gap-4"
                  style={{ background: 'rgba(251,191,36,0.04)' }}>
-              <button onClick={reset} className="text-sm theme-text-muted hover:theme-text transition-colors">
-                Cancel
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => detect(file)}
+                  disabled={detecting}
+                  className="text-sm font-medium px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors"
+                >
+                  {detecting ? 'Retrying...' : 'Retry'}
+                </button>
+                <button onClick={reset} className="text-sm theme-text-muted hover:theme-text transition-colors">
+                  Cancel
+                </button>
+              </div>
               <button
                 onClick={uploadManual}
                 disabled={uploading || !manualFundId}

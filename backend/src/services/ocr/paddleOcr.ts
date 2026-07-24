@@ -22,8 +22,8 @@ import path from 'path'
 
 const execFileAsync = promisify(execFile)
 
-const VENV_PYTHON = path.join(__dirname, '../../../paddle-venv/bin/python')
-const SCRIPT_PATH = path.join(__dirname, '../../../scripts/paddle_ocr.py')
+const VENV_PYTHON = path.join(__dirname, '../../paddle-venv/bin/python')
+const SCRIPT_PATH = path.join(__dirname, '../../scripts/paddle_ocr.py')
 
 // Budget: 5s model load + N pages × ~25s/page at 2x scale.
 // 1200s (20 min) covers large scanned contracts (22-page subscription booklets etc.)

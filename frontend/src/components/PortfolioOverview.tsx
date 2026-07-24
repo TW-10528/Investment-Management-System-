@@ -166,6 +166,8 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
     regularReturnOfCapital: number; regularGain: number; regularInterest: number;
     sdgReturnOfCapital: number; sdgGain: number; sdgInterest: number;
   }>({ regularReturnOfCapital: 0, regularGain: 0, regularInterest: 0, sdgReturnOfCapital: 0, sdgGain: 0, sdgInterest: 0 });
+  const [sdgPaidInJpy, setSdgPaidInJpy] = useState<number>(0);
+  const [sdgReceivedJpy, setSdgReceivedJpy] = useState<number>(0);
 
   // Refs for horizontal drag scrolling on tables
   const table1Ref = useRef<HTMLDivElement>(null);
@@ -211,6 +213,9 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
       let regularReturnOfCapital = 0, regularGain = 0, regularInterest = 0;
       let sdgReturnOfCapital = 0, sdgGain = 0, sdgInterest = 0;
 
+      let sdgPaidIn = 0;
+      let sdgReceived = 0;
+
       ledgers.forEach(({ f, rows }) => {
         const isRegular = regularFundIds.includes(f.fund_id);
         rows.forEach(r => {
@@ -222,11 +227,20 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
             sdgReturnOfCapital += r.return_of_capital ?? 0;
             sdgGain += r.gain ?? 0;
             sdgInterest += r.interest ?? 0;
+            // For SDG: sum capital paid-in and received from ledger rows
+            if (r.tx_type === 'capital_call') {
+              sdgPaidIn += r.capital_paid_in ?? 0;
+            }
+            if (r.tx_type === 'distribution') {
+              sdgReceived += r.capital_received ?? 0;
+            }
           }
         });
       });
 
       setTotals({ regularReturnOfCapital, regularGain, regularInterest, sdgReturnOfCapital, sdgGain, sdgInterest });
+      setSdgPaidInJpy(sdgPaidIn);
+      setSdgReceivedJpy(sdgReceived);
 
       const base: ReportRow[] = ledgers.map(({ f, rows }) => {
         const calls = rows.filter(r => r.tx_type === 'capital_call'  && r.capital_paid_in  > 0);
@@ -378,23 +392,21 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
           utilizationPct: (f.commitment_usd ?? 0) > 0 ? ((f.total_called_usd ?? 0) / (f.commitment_usd ?? 1)) * 100 : 0,
         }));
         const pieDataUsd = regularFunds
-          .map(f => ({ name: f.fund_name, value: f.total_value_usd ?? ((f.total_received_usd ?? 0) + (f.nav_usd ?? 0)) }))
-          .filter(d => d.value > 0);
+          .map(f => ({ name: f.fund_name, value: f.commitment_usd ?? 0 }));
 
-        // SDG Fund data (JPY)
+        // SDG Fund data (JPY) - use calculated ledger values
+        const commitmentJpy = (sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0);
         const barDataJpy = sdgFund ? [{
           name: shortName(sdgFund.fund_name),
-          commitment: (sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0),
-          Commitment:   (sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0),
-          Contribution: (sdgFund.total_called_usd ?? 0) * rate,
-          Distribution: (sdgFund.total_received_usd ?? 0) * rate,
-          utilizationPct: ((sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0)) > 0
-            ? (((sdgFund.total_called_usd ?? 0) * rate) / ((sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0))) * 100
-            : 0,
+          commitment: commitmentJpy,
+          Commitment:   commitmentJpy,
+          Contribution: sdgPaidInJpy,
+          Distribution: sdgReceivedJpy,
+          utilizationPct: commitmentJpy > 0 ? (sdgPaidInJpy / commitmentJpy) * 100 : 0,
         }] : [];
         const pieDataJpy = sdgFund ? [{
           name: sdgFund.fund_name,
-          value: ((sdgFund.total_value_usd ?? ((sdgFund.total_received_usd ?? 0) + (sdgFund.nav_usd ?? 0))) * rate)
+          value: (sdgFund as any).contract_commitment_jpy ?? ((sdgFund as any).commitment_jpy ?? 0)
         }] : [];
 
         return (
@@ -413,9 +425,9 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                       <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} tickFormatter={(v: number) => fmt.usdAbbr(v)} width={56} />
                       <Tooltip formatter={(v: any) => typeof v === 'number' && v > 100 ? fmt.usdFull(Number(v)) : `${Number(v).toFixed(1)}%`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <Bar yAxisId="left" dataKey="Commitment" fill="#1e40af" radius={[3,3,0,0]} label={{ dataKey: 'Commitment', formatter: (v: any) => fmt.usdAbbr(v ?? 0), position: 'top', fontSize: 9, fill: '#1e40af' }} />
-                      <Bar yAxisId="left" dataKey="Contribution" fill="#0f766e" radius={[3,3,0,0]} label={{ dataKey: 'Contribution', formatter: (v: any) => fmt.usdAbbr(v ?? 0), position: 'top', fontSize: 9, fill: '#1e40af' }} />
-                      <Bar yAxisId="left" dataKey="Distribution" fill="#047857" radius={[3,3,0,0]} label={{ dataKey: 'Distribution', formatter: (v: any) => fmt.usdAbbr(v ?? 0), position: 'top', fontSize: 9, fill: '#1e40af' }} />
+                      <Bar yAxisId="left" dataKey="Commitment" fill="#1e40af" radius={[3,3,0,0]} />
+                      <Bar yAxisId="left" dataKey="Contribution" fill="#10b981" radius={[3,3,0,0]} />
+                      <Bar yAxisId="left" dataKey="Distribution" fill="#0ea5e9" radius={[3,3,0,0]} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -431,7 +443,7 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                       <ResponsiveContainer>
                         <PieChart>
                           <Pie
-                            data={pieDataUsd}
+                            data={pieDataUsd.filter(d => d.value > 0)}
                             dataKey="value"
                             nameKey="name"
                             cx="50%"
@@ -440,9 +452,9 @@ export default function PortfolioOverview({ onSelectFund }: { onSelectFund?: (id
                             innerRadius={35}
                             paddingAngle={2}
                           >
-                            {pieDataUsd.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                            {pieDataUsd.filter(d => d.value > 0).map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
                           </Pie>
-                          <Tooltip formatter={(v: any) => fmt.usdFull(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                          <Tooltip formatter={(v: any) => fmt.usdFull(Number(v))} labelFormatter={(label: any) => `${label}: `} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>

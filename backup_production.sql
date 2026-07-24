@@ -564,12 +564,11 @@ CREATE TABLE public.pdf_labels (
     "fileHash" text NOT NULL,
     "values" jsonb NOT NULL,
     extraction_date timestamp(3) without time zone NOT NULL,
-    extracted_by text,
+    extracted_by text,   
     pdf_storage_path text,
     validation_log jsonb,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
-
 
 ALTER TABLE public.pdf_labels OWNER TO ims_user;
 

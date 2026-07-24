@@ -5,6 +5,32 @@ import type { FundDetail as FundDetailType, LedgerRow, LedgerSnapshot } from '..
 import { fmt, strategyBg } from '../lib/format';
 import CapitalCallEntry from '../components/CapitalCallEntry';
 
+// ── SDG Fund Snapshot Helper ──────────────────────────────────────────────────
+// Single function to extract & format snapshot values (PAID-IN, DRY POWDER, etc.)
+// Detects SDG fund and returns correct fields + formatting function
+function getSnapshotData(fund: any, snap: LedgerSnapshot | null) {
+  if (!snap) return null;
+
+  const isSdg = fund && /sdg/i.test(fund.fund_name ?? '');
+  const commitment = (isSdg ? snap.commitment_jpy : snap.commitment_usd) ?? 0;
+  const totalCalled = (isSdg ? snap.total_called_jpy : snap.total_called_usd) ?? 0;
+  const totalReceived = (isSdg ? snap.total_received_jpy : snap.total_received_usd) ?? 0;
+  const unfunded = (isSdg ? snap.unfunded_jpy : snap.unfunded_usd) ?? 0;
+  const fmt_fn = isSdg ? fmt.jpy : (v: number) => fmt.usd(v, true);
+  const currency = isSdg ? 'JPY' : 'USD';
+
+
+  return {
+    isSdg,
+    commitment,
+    totalCalled,
+    totalReceived,
+    unfunded,
+    fmt_fn,
+    currency,
+  };
+}
+
 function canEditRole() {
   return true;   // every signed-in user can edit (no role differentiation)
 }
@@ -111,6 +137,8 @@ export default function FundDetail() {
   const badge   = strategyBg[fund.strategy ?? ''] ?? 'bg-gray-100 text-gray-700';
   const canEdit = canEditRole();
 
+  console.log('[RENDER] Fund loaded:', { fund_name: fund?.fund_name, snap: snap, rows_count: rows.length });
+
   return (
     <div className="p-6 space-y-5 animate-fade-in">
 
@@ -158,30 +186,26 @@ export default function FundDetail() {
 
       {/* Snapshot metrics */}
       {snap && (() => {
+        const d = getSnapshotData(fund, snap);
+        if (!d) return null;
+
         const totalReturnOfCapital = rows.reduce((sum, r) => sum + (r.return_of_capital ?? 0), 0);
         const totalGain = rows.reduce((sum, r) => sum + (r.gain ?? 0), 0);
         const totalInterest = rows.reduce((sum, r) => sum + (r.interest ?? 0), 0);
 
-        const isSdg = 'commitment_jpy' in snap;
-        const commitment = (isSdg ? snap.commitment_jpy : snap.commitment_usd) ?? 0;
-        const totalCalled = (isSdg ? snap.total_called_jpy : snap.total_called_usd) ?? 0;
-        const totalReceived = (isSdg ? snap.total_received_jpy : snap.total_received_usd) ?? 0;
-        const unfunded = (isSdg ? snap.unfunded_jpy : snap.unfunded_usd) ?? 0;
-        const fmt_fn = isSdg ? fmt.jpy : (v: number) => fmt.usd(v, true);
-
         return (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-            <Snap label="Commitment"     value={fmt_fn(commitment)} />
-            <Snap label="Total Called"   value={fmt_fn(totalCalled)} />
-            <Snap label="Total Received" value={fmt_fn(totalReceived)} />
+            <Snap label="Commitment"     value={d.fmt_fn(d.commitment)} />
+            <Snap label="Total Called"   value={d.fmt_fn(d.totalCalled)} />
+            <Snap label="Total Received" value={d.fmt_fn(d.totalReceived)} />
             <Snap label="Drawn %"        value={fmt.pct(snap.drawn_pct)} />
-            <Snap label="Unfunded"       value={fmt_fn(unfunded)} />
+            <Snap label="Unfunded"       value={d.fmt_fn(d.unfunded)} />
             <Snap label="Inv. Capacity"  value={fmt.usd(snap.investment_capacity, true)} />
-            <Snap label="Net Cash"       value={isSdg ? fmt.jpy(snap.net_cash_position) : fmt.usd(snap.net_cash_position, true)} sub={snap.net_cash_position < 0 ? 'Net outflow' : 'Net inflow'} />
+            <Snap label="Net Cash"       value={d.isSdg ? fmt.jpy(snap.net_cash_position) : fmt.usd(snap.net_cash_position, true)} sub={snap.net_cash_position < 0 ? 'Net outflow' : 'Net inflow'} />
             <Snap label="DPI"            value={snap.dpi.toFixed(2) + 'x'} />
-            <Snap label="Return of Capital" value={isSdg ? fmt.jpy(totalReturnOfCapital) : fmt.usd(totalReturnOfCapital, true)} />
-            <Snap label="Gain" value={isSdg ? fmt.jpy(totalGain) : fmt.usd(totalGain, true)} />
-            <Snap label="Interest" value={isSdg ? fmt.jpy(totalInterest) : fmt.usd(totalInterest, true)} />
+            <Snap label="Return of Capital" value={d.isSdg ? fmt.jpy(totalReturnOfCapital) : fmt.usd(totalReturnOfCapital, true)} />
+            <Snap label="Gain" value={d.isSdg ? fmt.jpy(totalGain) : fmt.usd(totalGain, true)} />
+            <Snap label="Interest" value={d.isSdg ? fmt.jpy(totalInterest) : fmt.usd(totalInterest, true)} />
           </div>
         );
       })()}
@@ -238,42 +262,6 @@ export default function FundDetail() {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Ledger Summary Header */}
-              {snap && (
-                <div className="border-b border-gray-200 pb-4">
-                  <div className="grid grid-cols-7 gap-4 text-xs">
-                    <div>
-                      <p className="text-gray-500 font-medium mb-1">COMMITMENT (JPY)</p>
-                      <p className="font-bold text-gray-900">{fmt.jpy(snap.commitment_jpy ?? 0)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 font-medium mb-1">PAID-IN</p>
-                      <p className="font-bold text-gray-900">{fmt.jpy(snap.total_called_jpy ?? 0)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 font-medium mb-1">RECEIVED</p>
-                      <p className="font-bold text-gray-900">{fmt.jpy(snap.total_received_jpy ?? 0)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 font-medium mb-1">DRAWN %</p>
-                      <p className="font-bold text-gray-900">{fmt.pct(snap.drawn_pct ?? 0)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 font-medium mb-1">UNFUNDED</p>
-                      <p className="font-bold text-gray-900">{fmt.jpy(snap.unfunded_jpy ?? 0)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 font-medium mb-1">H NET CASH</p>
-                      <p className="font-bold text-gray-900">{fmt.jpy(snap.net_cash_position ?? 0)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 font-medium mb-1">DPI</p>
-                      <p className="font-bold text-gray-900">{snap.dpi?.toFixed(3)}x</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>

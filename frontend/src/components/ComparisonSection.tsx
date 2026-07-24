@@ -47,7 +47,7 @@ function extractSeries(fundName: string): string | null {
   return null;
 }
 
-export default function ComparisonSection({ funds }: { funds: FundSummary[] }) {
+export default function ComparisonSection({ funds, onBack }: { funds: FundSummary[]; onBack?: () => void }) {
   const activeFunds = useMemo(() => funds.filter(f => f.is_active !== false), [funds]);
   const [familiesData, setFamiliesData] = useState<any[]>([]);
 
@@ -128,6 +128,16 @@ export default function ComparisonSection({ funds }: { funds: FundSummary[] }) {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Back button to Manage Funds */}
+      {onBack && (
+        <div className="flex items-center gap-2 mb-4">
+          <button onClick={onBack}
+            className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1">
+            ← Back to Manage Funds
+          </button>
+        </div>
+      )}
+
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
